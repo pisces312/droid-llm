@@ -29,11 +29,21 @@ class EngineCoexistenceTest {
     fun loadOrderA_litert_mnn_genie_llamacpp() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         assertTrue(context.packageName.isNotEmpty())
+        // P2: force-load LiteRT-LM AAR class (pulls its natives).
+        assertTrue(touchLitertAar())
         // P1: llamacpp + mnn so exist
         assertTrue(tryLoad("llamacpp_chat_jni"))
         assertTrue(tryLoad("mnn_chat_jni"))
-        // TODO(P2): litert is AAR, no jni name
         // TODO(P3): assertTrue(tryLoad("genie_chat_jni"))
+    }
+
+    private fun touchLitertAar(): Boolean {
+        return try {
+            Class.forName("com.google.ai.edge.litertlm.Engine")
+            true
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     @Test
@@ -45,7 +55,8 @@ class EngineCoexistenceTest {
 
     @Test
     fun loadOrderC_all_available() {
-        // P1 partial; P3 completes
+        // P2 partial (litert + llamacpp + mnn); P3 adds genie
+        assertTrue(touchLitertAar())
         assertTrue(tryLoad("llamacpp_chat_jni"))
         assertTrue(tryLoad("mnn_chat_jni"))
         // TODO(P3): genie

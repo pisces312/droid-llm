@@ -8,7 +8,7 @@
 |------|------|----------|------|
 | P0 | ✅ 完成 | 2026-09-26 | 工程骨架 + engine-api + FakeEngine + UI + smoke 框架（详见 git 历史 / 会话记录） |
 | P1 | ✅ 完成，待审阅 | 2026-09-26 | llamacpp + mnn，见「P1 交付说明」 |
-| P2 | ⬜ 未开始 | | litert |
+| P2 | ✅ 完成，待审阅 | 2026-09-26 | litert，见「P2 交付说明」 |
 | P3 | ⬜ 未开始 | | genie |
 | P4 | ⬜ 未开始 | | benchmark |
 | P5 | ⬜ 未开始 | | 打磨 |
@@ -58,6 +58,51 @@
 1. 依赖 `com.google.ai.edge.litertlm:litertlm-android`（查 Maven 最新版本）
 2. 纯 Kotlin 适配器（参照 gallery `LlmModelHelper`），跳过 chattemplate
 3. `.litertlm` 模型可聊，三引擎切换
+
+### P2 交付说明（2026-09-26）
+
+**已完成**
+
+1. **工具链升级**（litertlm 0.11.0 的 Kotlin metadata 为 2.3.0，2.1 编译器读不了）：
+   - Kotlin `2.1.20` → `2.2.21`（与 gallery 一致）
+   - KSP `2.1.20-1.0.32` → `2.3.6`（新版独立版本号，与 gallery 一致）
+   - AGP 仍为 8.13.2，未动 SDK/JDK 路径
+2. **依赖**：`com.google.ai.edge.litertlm:litertlm-android:0.11.0`（与 DESIGN.md 一致；gallery 同版本）
+3. **`:engine:litert` 纯 Kotlin 适配器**（参照 gallery `LlmChatModelHelper`）：
+   - `EngineConfig(modelPath, backend, maxNumTokens, cacheDir)` + `Engine.initialize()`
+   - `createConversation(ConversationConfig(samplerConfig, systemInstruction, initialMessages))`
+   - `sendMessageAsync` + `MessageCallback` 流式；`cancelProcess` / `close`
+   - Backend 映射：`CPU→CPU()`、`GPU→GPU()`、`NPU_HTP→NPU(nativeLibraryDir)`、`AUTO→GPU()`（warning）；**OPENCL 拒绝**（LiteRT 走 GPU delegate）
+   - NPU 路径 `SamplerConfig=null`（gallery 行为）；`threads`/`seed` 不适用时写入 warnings
+   - 多轮：每次 generate 按 `GenerateRequest.messages` 重建 conversation（`initialMessages` 播种历史 + `sendMessageAsync` 最后一条 USER），保证历史权威
+   - `MetricsCollector` 统一 TTFT/decode 口径；generate/unload 互斥
+4. **chattemplate**：跳过（LiteRT 内部自带模板，与 PolyEngineInfer 一致）
+5. **Smoke test**：`EngineCoexistenceTest` 增加 `touchLitertAar()`（`Class.forName("com.google.ai.edge.litertlm.Engine")`）；A /C 用例已打开 litert
+6. **验收**：`:engine:litert:assembleDebug` + `:app:assembleDebug` BUILD SUCCESSFUL；`:core:engine-api:testDebugUnitTest` 通过；`app-debug.apk` ≈ 79.9 MB（新增 `liblitertlm_jni.so` 6.5MB、`libLiteRt.so` 2.1MB、`libLiteRtClGlAccelerator.so` 1.3MB）
+
+**已知偏差 / 待办**
+
+| 项 | 说明 |
+|----|------|
+| litertlm 版本 | 0.11.0（DESIGN 写死；Maven 查询超时，未写回“最新”） |
+| Backend.AUTO | 解析为 GPU（gallery 默认）；CPU 可显式指定 |
+| 生成期换 Backend | load 时绑定 backend；generate 内换 backend 仅影响 Sampler/警告，不重载引擎 |
+| SAF | 仍拒绝，要求绝对路径 |
+| 真机 DoD | 见下方检查单 |
+
+**P2 真机 DoD 检查单**
+
+1. 推 `.litertlm` / `.task` 模型 → `Android/data/io.github.pisces312.droidllm/files/models/litert/`
+2. Models 页添加路径，校验扩展名
+3. Chat 页选 LiteRT-LM，流式对话，TTFT/tps 合理
+4. 三引擎（llamacpp / mnn / litert）同一聊天页来回切换不崩
+5. `adb shell am instrument` 跑 `EngineCoexistenceTest`
+
+**下一步（P3）**
+
+1. Genie/QNN：`-PskipGenie=true` 门控 + QAIRT 本地路径 + SOC_MODEL HTP 配置（参照 chatapp_android）
+2. minja chattemplate JNI（Genie 需要）
+3. 四引擎真机可联，M2 达成
 
 ---
 

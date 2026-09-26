@@ -28,8 +28,9 @@ android {
 
 dependencies {
     api(project(":core:engine-api"))
+    implementation(project(":core:common"))
+    implementation(libs.litertlm.android)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    // P2: implementation(libs.litertlm.android)
 }

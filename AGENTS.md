@@ -19,7 +19,7 @@
 | JDK | `D:\dev\AndroidStudio\jbr`（构建时设 `JAVA_HOME`） |
 | Android SDK | `D:\dev\android_sdk`（`local.properties` 已写 `sdk.dir`） |
 | NDK / CMake | 27.0.12077973 / 3.22.1（SDK 内） |
-| Gradle | wrapper 8.13（Tencent 镜像）+ AGP 8.13.2 |
+| Gradle | wrapper 8.13（Tencent 镜像）+ AGP 8.13.2；Kotlin 2.2.21 + KSP 2.3.6（litertlm 0.11.0 需要 ≥2.2 metadata） |
 | 构建命令 | `cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android_sdk&& gradlew.bat :app:assembleDebug"` |
 | GitHub | 直连易 reset，用 `https://gh-proxy.com/https://github.com/...` |
 | MNN 预编译 | `droid.mnnRoot` 属性或 `MNN_ROOT` 环境变量，默认 `D:/3rd-party-projects/MNN`（`project/android/build_64/lib/libMNN.so`） |
