@@ -30,7 +30,11 @@ dependencies {
     api(project(":core:engine-api"))
     implementation(project(":core:common"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
+    // Real org.json for JVM unit tests (android.jar stubs throw).
+    testImplementation("org.json:json:20240303")
 }

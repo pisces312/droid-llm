@@ -39,6 +39,7 @@ class ChatViewModel @Inject constructor(
     private val engineSet: Set<@JvmSuppressWildcards LlmEngine>,
     private val modelStore: ModelPathStore,
     private val probe: io.github.pisces312.droidllm.common.device.DeviceProbe,
+    private val sessionRegistry: io.github.pisces312.droidllm.common.bench.SessionRegistry,
 ) : ViewModel() {
 
     private val _engines = MutableStateFlow<List<EngineChoice>>(emptyList())
@@ -63,6 +64,7 @@ class ChatViewModel @Inject constructor(
     val availability: StateFlow<String> = _availability.asStateFlow()
 
     private var session: SessionHandle? = null
+    private var sessionEngine: LlmEngine? = null
 
     init {
         viewModelScope.launch {
@@ -85,16 +87,16 @@ class ChatViewModel @Inject constructor(
     }
 
     fun selectEngine(choice: EngineChoice) {
-        _selectedEngine.value = choice
-        _availability.value = when (val av = choice.availability) {
-            is Availability.Available -> "可用"
-            is Availability.MissingDependency -> "不可用：${av.detail}"
-            is Availability.UnsupportedSoc -> "不支持的 SoC：${av.detail}"
-            is Availability.ModelNotConfigured -> "未配置模型：${av.detail}"
-            is Availability.InvalidModel -> "模型无效：${av.detail}"
-        }
         viewModelScope.launch {
             unloadSession()
+            _selectedEngine.value = choice
+            _availability.value = when (val av = choice.availability) {
+                is Availability.Available -> "可用"
+                is Availability.MissingDependency -> "不可用：${av.detail}"
+                is Availability.UnsupportedSoc -> "不支持的 SoC：${av.detail}"
+                is Availability.ModelNotConfigured -> "未配置模型：${av.detail}"
+                is Availability.InvalidModel -> "模型无效：${av.detail}"
+            }
             loadModelsFor(choice.engine)
         }
     }
@@ -139,6 +141,8 @@ class ChatViewModel @Inject constructor(
         runCatching {
             val handle = engine.load(model, InferenceConfig())
             session = handle
+            sessionEngine = engine
+            sessionRegistry.register(engine, handle)
             _status.value = "已加载 ${model.displayName}"
         }.onFailure {
             _status.value = "加载失败：${it.message}"
@@ -147,8 +151,11 @@ class ChatViewModel @Inject constructor(
 
     private suspend fun unloadSession() {
         val handle = session ?: return
-        runCatching { _selectedEngine.value?.engine?.unload(handle) }
+        val engine = sessionEngine ?: _selectedEngine.value?.engine
+        runCatching { engine?.unload(handle) }
+        sessionRegistry.unregister(handle)
         session = null
+        sessionEngine = null
     }
 
     fun send(text: String) {

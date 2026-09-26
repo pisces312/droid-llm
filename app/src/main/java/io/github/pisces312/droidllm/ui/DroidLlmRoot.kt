@@ -27,10 +27,10 @@ import io.github.pisces312.droidllm.ui.settings.SettingsScreen
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
 private val tabs = listOf(
-    Tab("chat", "Chat", Icons.Filled.Chat),
-    Tab("models", "Models", Icons.Filled.Folder),
-    Tab("benchmark", "Bench", Icons.Filled.BarChart),
-    Tab("settings", "Settings", Icons.Filled.Settings),
+    Tab("chat", "聊天", Icons.Filled.Chat),
+    Tab("models", "模型", Icons.Filled.Folder),
+    Tab("benchmark", "评测", Icons.Filled.BarChart),
+    Tab("settings", "设置", Icons.Filled.Settings),
 )
 
 @Composable
@@ -66,7 +66,15 @@ fun DroidLlmRoot() {
         ) {
             composable("chat") { ChatScreen() }
             composable("models") { ModelsScreen() }
-            composable("benchmark") { BenchmarkScreen() }
+            composable("benchmark") {
+                BenchmarkScreen(onGoToModels = {
+                    nav.navigate("models") {
+                        popUpTo("chat") { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                })
+            }
             composable("settings") { SettingsScreen() }
         }
     }

@@ -154,7 +154,7 @@ interface LlmEngine {
 **不要求**「同一基座 × 四份导出」。用户在手机存储里自己组织模型，App 只保存「哪个引擎 → 哪个路径」。
 
 ```
-/sdcard/Android/data/<pkg>/files/models/     （或用户任意 SAF 目录）
+/sdcard/Android/data/<pkg>/files/models/     （或用户任意目录，经内置文件浏览器/直接路径）
 ├── litert/
 │   └── qwen1.5b.litertlm
 ├── mnn/
@@ -167,12 +167,12 @@ interface LlmEngine {
 
 **配置模型（Models 页）**
 
-- 每个引擎一张卡片：当前已配置路径、格式校验结果、更换 / 浏览（SAF）/ 清除
+- 每个引擎一张卡片：当前已配置路径、格式校验结果、更换 / 浏览（内置文件浏览器）/ 清除
 - 支持「收藏模型列表」：可给同一引擎存多个模型条目，聊天/Benchmark 时下拉选
 - 路径来源：
   1. App 私有目录 `getExternalFilesDir("models")`（默认，免权限）
-  2. SAF `content://` URI（用户自选任意存储，参考 ChatterUI 的 `getContentFd` / ai-hub 的 SAF 改动）
-  3. 可选直接路径 `/sdcard/...`（需存储权限，方便高级用户）
+  2. 直接路径 `/sdcard/...` + **内置文件浏览器**（`java.io.File` 语义，需 `MANAGE_EXTERNAL_STORAGE`，引导跳系统设置页授权；未授权时仅可浏览 App 私有目录。注意 Android 11+ 即使有所有文件权限也读不了**其他 App** 的 `Android/data/`，浏览器中灰显）
+  3. SAF `content://` URI：**降级为可选**（仅外部分享场景，P5 不强制实现）。native 引擎需真实路径，SAF 必须反解（参考 StreamClip `FileUtils.getPathResultFromUri()` 的四级 fallback）；目录型模型（MNN/Genie）fd 方案不可用，GB 级模型复制到私有目录不可接受
 - **格式校验**（load 前快速探测）：
   - LiteRT：扩展名 `.litertlm` / `.task` 或文件头
   - MNN：目录内存在 `config.json` + `llm.mnn`
@@ -342,7 +342,7 @@ Home
 │   ├── 流式对话（显示 TTFT / 本次 tps）
 │   └── 采样参数面板（temp/top_k/top_p/threads/backend/max_tokens）
 ├── Models
-│   ├── 四张引擎卡片：各自模型路径 / 添加(文件/SAF) / 校验 / 删除
+│   ├── 四张引擎卡片：各自模型路径 / 添加(文件浏览器/路径) / 校验 / 删除
 │   └── 同引擎多模型收藏
 ├── Benchmark
 │   ├── 选引擎 × 每引擎选模型 × 选用例 × 轮数
@@ -355,6 +355,8 @@ Home
 ```
 
 技术栈：Jetpack Compose + Hilt + Coroutines/Flow + Room + DataStore。
+
+> **视觉与交互的唯一权威**见独立文档 [`UI_DESIGN.md`](UI_DESIGN.md)（风格锚点 StreamClip + PixelPlayerOSS）；本文只约束信息架构。
 
 ---
 
@@ -382,7 +384,7 @@ Home
 |------|------|------|
 | QAIRT 获取/授权 | Genie 构建门槛 | `-PskipGenie`；真机已验证可跑，按参考工程脚本集成 |
 | 四家 so 符号冲突 | 运行时崩溃 | 分 module 只是编译期隔离，运行时同进程仍可能撞 vendored 符号（protobuf/abseil/ggml 等）；对策：各 JNI 封装层编译加 `-fvisibility=hidden` + version script / `-Wl,--exclude-libs,ALL`，只导出 `Java_*`；**P0 阶段即做四 so 同进程顺序加载 smoke test**，尽早暴露而非 P3 才发现 |
-| 模型路径指向 content:// 大文件 | 加载失败/泄漏 | 参考 ChatterUI：取 fd / 用完 closeFd；支持复制到 app 私有目录再加载 |
+| 模型路径指向 content:// 大文件 | 加载失败/泄漏 | SAF 已降级为可选（§1.3）；主路径为真实路径 + 内置文件浏览器（`MANAGE_EXTERNAL_STORAGE`），native 直读。若未来接 SAF：先反解真实路径（参考 StreamClip `FileUtils.getPathResultFromUri()`），失败才复制到 App 私有目录 |
 | 各引擎 quant 不一致被误比 | 结论误导 | 结果表强制展示模型名+quant+路径；文档声明只作参考 |
 | Genie 偶发空回复 | bench 中断 | reset + 有限重试，计入错误率 |
 | APK 体积 | 安装负担 | arm64 only；模型外置；实测 ≈143MB（QNN 全 arch），必要时按 SoC 裁剪 Skel/Stub |
@@ -451,7 +453,7 @@ droid-llm/
 
 1. **llama.cpp**：自建 CMake + 薄 JNI（与 MNN/Genie 同构），不引入 React Native。
 2. **包体**：单 APK，arm64 only，四引擎全打。
-3. **模型**：默认根目录 `getExternalFilesDir("models")/<engine>/`，同时支持 SAF 自定义路径。
+3. **模型**：默认根目录 `getExternalFilesDir("models")/<engine>/`；自定义路径走 `MANAGE_EXTERNAL_STORAGE` + 内置文件浏览器（真实路径直读）；SAF 降级为可选（仅外部分享场景）。
 4. **Benchmark**：L/P/D 默认勾选，T 可选；warmup=1，runs=3；功耗不测。
 5. **Genie**：集成但带门控；你的真机已验证可跑，按 chatapp_android 的 so/HTP 配置搬迁。
 6. **单 App 合一**（而非保持四个独立 App 或扩展成熟项目）：合并的核心价值是**控制变量对比**（同机、同测量路径、同 UI/计时开销）与一处管理模型/对话/参数。成熟项目不满足前提：ChatterUI 是 React Native 且只集成 llama.cpp，gallery 绑死 LiteRT 系——给它们补三个引擎的成本不低于自建 Compose 壳，还会引入不可控的计时噪声。

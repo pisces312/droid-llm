@@ -9,8 +9,8 @@
 | P0 | ✅ 完成 | 2026-09-26 | 工程骨架 + engine-api + FakeEngine + UI + smoke 框架（详见 git 历史 / 会话记录） |
 | P1 | ✅ 完成，待审阅 | 2026-09-26 | llamacpp + mnn，见「P1 交付说明」 |
 | P2 | ✅ 完成 | 2026-09-26 | litert，见「P2 交付说明」 |
-| P3 | ✅ 完成，待审阅 | 2026-09-26 | genie，见「P3 交付说明」 |
-| P4 | ⬜ 未开始 | | benchmark |
+| P3 | ✅ 完成 | 2026-09-26 | genie，见「P3 交付说明」 |
+| P4 | ✅ 完成，待审阅 | 2026-09-26 | 核心 + UI 已通；见「P4 交付说明」 |
 | P5 | ⬜ 未开始 | | 打磨 |
 
 ### P0 交付摘要（2026-09-26）
@@ -162,6 +162,61 @@
 1. `:core:benchmark`：L/P/D（+可选 T）、warmup=1 + runs=3 中位数、RSS 三段 delta、电池温度
 2. 跑某引擎前强制 unload 其他 Session；结果表含 engineId/modelName/modelPath/quantHint；JSON 导出
 3. 结果页文案：跨模型/跨量化数字只作参考
+
+### P4 交付说明（2026-09-26，核心 + UI 完成）
+
+**已完成（核心）**
+
+1. `SessionRegistry`（`:core:common`）：全局 Session 登记，bench 前 `unloadAll()` 保证 RSS 独占；ChatViewModel 已接入并修复「先切引擎再 unload」用错 engine 的问题
+2. `:core:benchmark`：
+   - `BenchmarkSpec` / `BenchCaseId(L/P/D/T)` / `BenchmarkPrompts`（中英代码总结 4 条）
+   - `BenchmarkRunner`：warmup=1 + runs=3 中位数；L 测 load_ms；P 短输出 16 token 测 TTFT/prefill；D 短提示长输出测 decode_tps；T 多轮看掉速；超时 180s；失败样本保留 error
+   - RSS 三段：baseline（unloadAll 后）→ load 后 → 生成峰值；电池温度起止记录
+   - Room `ResultStoreDatabase`（Hilt 注入）落库；`JsonExporter` 导出 `getExternalFilesDir("benchmark")/`
+   - 样本等待改 `CompletableDeferred` + `withTimeoutOrNull`（可取消/可暂停，不再阻塞 latch）
+   - `run(..., awaitIfPaused)` 钩子：样本间可暂停，暂停区间不计时
+3. 单测 4 个通过（JSON 必含 engineId/modelName/modelPath/quantHint）
+
+**已完成（UI，对齐 [`UI_DESIGN.md`](UI_DESIGN.md)）**
+
+1. **主题**：`ui/theme/{Color,Type,Theme}.kt` — StreamClip 紫/青 token + M3 双套 Light/Dark；`DroidExtraColors`（Accent/Warn/Ok）走 CompositionLocal；Metric 字号带 tabular `tnum`
+2. **通用组件** `ui/components/UiComponents.kt`：EngineStatusCard / ModelPicker / MetricPill / PrimaryButton(52dp) / OutlinedToolButton / ProgressHeader / ResultTable（首列冻结+横滑）/ WarningBanner
+3. **评测页** `BenchmarkViewModel` + `BenchmarkScreen`：
+   - 引擎×模型卡片（可用默认勾选，勾选展开 ModelPicker，空态「去 Models 页」）
+   - 提示词 4 Chip 单选；用例 Chip 默认 L/P/D；折叠参数 warmup/runs/maxNewTokens
+   - 跑前 WarningBanner（插电/冷却提示）；进行中 `引擎 x/y · 用例 · 样本 i/n（含 warmup）` + 最近 decode tps + 取消
+   - 退后台自动暂停 → 返回呈 Warn 描边暂停态，提供「继续 / 放弃本次评测」
+   - 结果表列：引擎/模型/Quant/Load/TTFT/Prefill/Decode/RSS peak/温度；失败格 Error 短因；空值 `—`
+   - 底部免责句 + 导出 JSON（Snackbar 路径提示）+ 历史列表可清空
+4. **导航**：Tab 文案改为 聊天/模型/评测/设置（UI_DESIGN §4.3）
+5. **验收**：`:app:assembleDebug` BUILD SUCCESSFUL；`:core:benchmark:testDebugUnitTest` 通过
+
+**已知偏差 / 留给 P5**
+
+| 项 | 说明 |
+|----|------|
+| Chat/Models/Settings 视觉 | 仍为 P0 简易布局，未换新 token（UI_DESIGN §9 标注 P5 微调） |
+| Chat「新建会话」溢出菜单 | UI_DESIGN §5.1 要求，P5 补（对应 `reset(handle)`） |
+| 采样参数面板灰显不适用字段 | UI_DESIGN §5.1，P5 随 Chat 统一做 |
+| Settings 外观切换 / 多模型驻留开关 | UI_DESIGN §5.4，P5 接 DataStore |
+| 内置文件浏览器 | UI_DESIGN §5.2 / DESIGN §1.3，P5 |
+| 进度条 fraction | 近似值（按引擎+样本估算），文案精确 |
+| 真机 DoD | 见下方检查单 |
+
+**P4 真机 DoD 检查单（M3）**
+
+1. 配置 ≥1 个真实模型（或勾选 Fake）后一键跑 L/P/D
+2. 进行中退后台再回：暂停态出现，可继续/放弃；暂停不计入样本耗时
+3. 结果表出现 + 免责句完整；失败格显示短因非 0
+4. 导出 JSON 到 `Android/data/.../files/benchmark/`，Snackbar 提示文件名
+5. 历史列表出现本次记录，可清空
+
+**下一步（P5）**
+
+1. Chat/Models/Settings 换 UI_DESIGN token；Chat 新建会话；采样面板字段灰显
+2. 内置文件浏览器 + `MANAGE_EXTERNAL_STORAGE` 授权引导（SAF 仍可选）
+3. Settings：外观切换、多模型驻留开关、默认采样 DataStore
+4. docs/README / DESIGN 偏差回写
 
 ---
 
@@ -334,7 +389,8 @@
 ## 8. P5 打磨
 
 - 全部错误路径走 `Availability`/`EngineException` 分类提示，不裸崩
-- Genie 未集成、模型未配置、格式校验失败、SAF fd 泄漏（用完 closeFd，参考 ChatterUI）各有一条用户可懂的提示
+- Genie 未集成、模型未配置、格式校验失败、存储权限未授予（引导跳 `ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION`）各有一条用户可懂的提示
+- 内置文件浏览器（`java.io.File`，按引擎过滤扩展名/目录特征；未授权降级为仅 App 私有目录 + 授权引导；其他 App 的 `Android/data/` 灰显）
 - `docs/ENGINE_INTEGRATION.md`：每引擎的依赖获取、编译开关、模型导出格式说明
 - `docs/MODEL_PATHS.md`：四种格式的目录组织与获取渠道
 - README：定位一句话（「同一台真机上四引擎实测对比」）+ 截图 + benchmark 示例表
@@ -346,7 +402,7 @@
 
 1. **GitHub 直连不稳**：submodule/大文件优先 `gh-proxy.com` 镜像；失败重试前先 `rm -rf` 残留目录
 2. **符号冲突是头号风险**：每接入一个引擎立刻跑共存 smoke test，不要攒到 P3
-3. **SAF 大文件**：`content://` 模型用 `getContentFd` 取 fd，用完 close；加载失败时提供「复制到 App 私有目录再加载」选项
+3. **模型路径一律真实路径**：SAF 已降级为可选（DESIGN §1.3），不引入 `content://` 反解负担；内置文件浏览器基于 `java.io.File`，前提是 `MANAGE_EXTERNAL_STORAGE`（无运行时弹窗，只能跳系统设置页授权）；Android 11+ 该权限也读不了其他 App 的 `Android/data/`，浏览器需灰显
 4. **计时口径统一**：TTFT 从请求发出到首个 token 回调，不含模型加载和模板格式化；各适配器不得自行其是
 5. **Genie 只支持骁龙 HTP**：开发机/模拟器上必须优雅降级，所有 P0–P2、P4 工作不依赖 Genie 可用
 6. **不要扩大范围**：功耗测量、Dynamic Feature、雷达图、质量评测、OpenAI 兼容 API 均明确不做（API 是 P5+ 可选增强，不在本计划内）
