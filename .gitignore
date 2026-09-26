@@ -1,0 +1,42 @@
+# droid-llm
+*.iml
+.gradle/
+local.properties
+.idea/
+.kotlin/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+.DS_Store
+*.log
+*.hprof
+secrets.properties
+
+# Local build / test scratch logs (root-level)
+build_*.txt
+test_*.txt
+*_log.txt
+
+# Prebuilt native libs copied in by Gradle (not source)
+**/src/main/jniLibs/
+
+# Optional external SDK roots (QAIRT / QNN / MNN prebuilts)
+qaairt/
+qnn/
+*.so
+!third_party/**/*.so
+
+# OS / editor
+Thumbs.db
+desktop.ini
+*.swp
+*~

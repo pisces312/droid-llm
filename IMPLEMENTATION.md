@@ -1,0 +1,249 @@
+# droid-llm 实施计划（供独立会话执行）
+
+> 本文档是 droid-llm 的可执行实施计划。执行前先通读 `DESIGN.md`（设计决策的唯一权威来源），本文档只做落地拆解，不重复论证设计。两者冲突时以 `DESIGN.md` 为准，并在 `DESIGN.md` 中回写偏差。
+
+## 进度
+
+| 阶段 | 状态 | 完成时间 | 备注 |
+|------|------|----------|------|
+| P0 | ✅ 完成 | 2026-09-26 | 工程骨架 + engine-api + FakeEngine + UI + smoke 框架（详见 git 历史 / 会话记录） |
+| P1 | ✅ 完成，待审阅 | 2026-09-26 | llamacpp + mnn，见「P1 交付说明」 |
+| P2 | ⬜ 未开始 | | litert |
+| P3 | ⬜ 未开始 | | genie |
+| P4 | ⬜ 未开始 | | benchmark |
+| P5 | ⬜ 未开始 | | 打磨 |
+
+### P0 交付摘要（2026-09-26）
+
+工程骨架（AGP 8.13.2 / Kotlin 2.1.20 / minSdk 31 / arm64 only）、`:core:engine-api`（LlmEngine 三契约 + FakeEngine）、`:core:common`（ModelPathStore / FileFormatValidator / DeviceProbe / MetricsCollector / ResultStore）、Compose 四页 UI、四引擎占位模块、`EngineCoexistenceTest` 骨架。`assembleDebug` 通过（APK ≈ 63MB）。
+
+### P1 交付说明（2026-09-26）
+
+**已完成**
+
+1. **目录改名**：工程根为 `D:\my-projects\droid-llm`（会话外完成）。
+2. **vendored llama.cpp**：`third_party/llama.cpp/`（源码树自本机 `D:\3rd-party-projects\llama.cpp`，tag `b9294`+ 后续提交快照；仅含 `src/include/ggml/common/cmake/vendor` + CMakeLists + LICENSE，约 26MB）。以 `add_subdirectory` 静态编入 JNI。
+3. **`:engine:llamacpp`**：
+   - `CMakeLists.txt`：`LLAMA_BUILD_*` 全关、`BUILD_SHARED_LIBS=OFF`、`CXX_VISIBILITY_PRESET hidden` + `-Wl,--exclude-libs,ALL`
+   - `llamacpp_jni.cpp`：session 封装（model/ctx/batch/sampler）；`nativeLoad/Prefill/NextToken/ClearKv/Free`；UTF-8 断包拼接；`nativeApplyChatTemplate`（`llama_chat_apply_template`）
+   - `LlamaCppEngine`：完整 `LlmEngine`；Backend 仅 CPU/AUTO（GPU/OpenCL/NPU 拒绝）；`MetricsCollector` 统一 TTFT 口径（含 prefill）；generate/unload 互斥
+4. **`:engine:mnn`**：
+   - 预编译 `libMNN.so`（`droid.mnnRoot` / `MNN_ROOT`，默认 `D:/3rd-party-projects/MNN`，`project/android/build_64/lib/libMNN.so`，已含 LLM 组件）；Gradle `copyMnnJniLibs` 打进 jniLibs
+   - `mnn_chat_jni.cpp`：`Llm::createLLM` + `response(ChatMessages, ostream)` 流式 + `Utf8StreamProcessor`；`nativeReset/SetConfig/Generate`
+   - `MnnEngine`：Backend CPU / OPENCL（GPU→OPENCL），NPU_HTP 拒绝；`set_config` 写 `backend_type/thread_num/max_new_tokens/temperature/top_k/top_p`
+5. **chattemplate**：P1 两引擎均走各自原生模板（llama.cpp `llama_chat_apply_template`，MNN `Llm::response(ChatMessages)`）。minja JNI **推迟到 P3**（Genie 需要）；`ChatTemplate.format` 保留为 fallback。
+6. **Smoke test**：`EngineCoexistenceTest` 已打开 llamacpp + mnn 三种加载顺序用例。
+7. **验收**：`gradlew :app:assembleDebug` BUILD SUCCESSFUL；`app-debug.apk` ≈ 66.9 MB；内含 `libllamacpp_chat_jni.so` 7.5MB、`libMNN.so` 8.5MB、`libmnn_chat_jni.so` 0.09MB、`libc++_shared.so`/`libomp.so`；` :core:engine-api:testDebugUnitTest` 通过。
+
+**已知偏差 / 待办**
+
+| 项 | 说明 |
+|----|------|
+| llama.cpp OpenCL | 未链 GGML OpenCL，Backend 仅 CPU（契约：拒绝而非静默回退） |
+| minja chattemplate | 推迟到 P3 Genie；P1 两引擎用原生模板 |
+| 真机验证 | 构建/装包链路已通；流式聊天 DoD 需真机推模型后手测（见下方） |
+| Settings 采样默认值 DataStore | 仍未绑（P5） |
+| SAF 选择器 | 仍为占位 |
+
+**P1 真机 DoD 检查单**
+
+1. 推 `qwen1.5b-q4_k_m.gguf` → `Android/data/io.github.pisces312.droidllm/files/models/llamacpp/`
+2. Models 页添加绝对路径并校验 GGUF 魔数
+3. Chat 页选 llama.cpp + 该模型，流式对话，TTFT/tps 合理
+4. 切到 MNN 目录模型（`config.json`+`llm.mnn`），同一聊天页来回切换不崩（单模型驻留）
+5. `adb shell am instrument` 跑 `EngineCoexistenceTest`
+
+**下一步（P2）**
+
+1. 依赖 `com.google.ai.edge.litertlm:litertlm-android`（查 Maven 最新版本）
+2. 纯 Kotlin 适配器（参照 gallery `LlmModelHelper`），跳过 chattemplate
+3. `.litertlm` 模型可聊，三引擎切换
+
+---
+
+## 0. 前置上下文
+
+- **项目名**：droid-llm（仓库 `droid-llm`，应用显示名 DroidLLM，包名 `io.github.<owner>.droidllm`）
+- **工作目录**：`D:\my-projects\droid-llm`
+- **定位**：单 APK 集成四端侧 LLM 引擎（LiteRT-LM / MNN / Genie / llama.cpp），统一聊天界面 + 轻量 benchmark。推理为主，评测为辅
+- **参考项目本地副本**：`D:\my-projects\references\PolyEngineInfer`（浅克隆，无 submodule；`git submodule update --init <path>` 按需拉取）
+- **四个原始参考工程**（gallery / MnnLlmChat / chatapp_android / ChatterUI）在真机上均已验证可跑，源码位置见执行者本地环境或重新拉取（GitHub 直连不稳时用 `https://gh-proxy.com/https://github.com/...` 镜像，已验证可用）
+
+### 0.1 本机环境（来自 AGENTS.md，Windows 11）
+
+| 项 | 位置/说明 |
+|---|---|
+| Android SDK / adb | `D:\dev\android_sdk`，adb 全路径 `D:\dev\android_sdk\platform-tools\adb.exe`，不在 PATH |
+| Git Bash | 所有 shell 操作用 Unix 语法 |
+| GitHub 访问 | 直连常被 reset，用 `gh-proxy.com` 前缀镜像 |
+| pip | TUNA 镜像可用 |
+
+### 0.2 不可变默认决策（DESIGN.md §10）
+
+单 APK 全打、仅 `arm64-v8a`、模型一律外置、不做 DFM、不测功耗、Genie 带 `-PskipGenie` 门控、benchmark 默认 L/P/D（warmup=1, runs=3）、默认单模型驻留。
+
+### 0.3 关键交叉引用（动手前先读）
+
+- 统一接口契约：`DESIGN.md` §1.2（含 Backend 映射表、字段适用性约定、Session 线程安全契约）
+- 模型路径与校验：§1.3
+- Benchmark 用例与指标：§2
+- 符号冲突对策（**P0 就必须做 smoke test**）：§6
+- 参考清单（含 PolyEngineInfer 五个可参考点）：§7
+
+---
+
+## 1. 阶段总览与里程碑
+
+| 阶段 | 内容 | 验收（DoD） | 估时 |
+|------|------|------------|------|
+| P0 | 工程骨架 + engine-api + FakeEngine + UI 导航 + Models 页 + **四 so 共存 smoke test 框架** | App 可安装，FakeEngine 可假聊 | 1–2 天 |
+| P1 | `:engine:llamacpp` + `:engine:mnn` | 两引擎真机流式聊天，M1 达成 | 3–5 天 |
+| P2 | `:engine:litert` | 三引擎可切换 | 1–2 天 |
+| P3 | `:engine:genie`（可跳过编译） | 骁龙真机四引擎，M2 达成 | 2–4 天 |
+| P4 | Benchmark L/P/D/T + Room + JSON 导出 | 一键出对比表，M3 达成 | 1–2 天 |
+| P5 | 校验/错误提示/文档打磨 | 可交付 | 1 天 |
+
+**顺序纪律**：llamacpp 先行（生态最成熟、调试最快），mnn 次之；litert 纯 Kotlin 最快；genie 最后且有跳过开关。每个引擎接入都走同一模板：probe → load → generate 流式 → metrics → smoke test。
+
+---
+
+## 2. P0 脚手架
+
+### 2.1 工程初始化
+
+- `settings.gradle.kts` 纳入模块：`:app`, `:core:engine-api`, `:core:common`, `:core:benchmark`, `:engine:litert`, `:engine:mnn`, `:engine:genie`, `:engine:llamacpp`, `:core:chattemplate`
+  - `:core:chattemplate` 参照 PolyEngineInfer 的 `chattemplate/` 模块（minja + nlohmann/json，JNI），**P0 先建空壳**，P1 接 llama.cpp 时填充
+- 版本：AGP 8.13.x、Kotlin 2.x、minSdk 31、target 35、NDK r27+、CMake 3.22+、`arm64-v8a` only
+- `gradle/libs.versions.toml` 集中管理版本；依赖：Compose BOM、Hilt、Coroutines/Flow、Room、DataStore
+- app 级配置：
+  - `jniLibs.useLegacyPackaging = true`（Genie/llama.cpp 需 so 落盘 dlopen）
+  - `noCompress += ["bin", "json", "mnn", "gguf", "litertlm", "task"]`（仅预留）
+- 建 `scripts/build_native.ps1` 与 `scripts/export_benchmark.ps1` 空壳占位
+
+### 2.2 `:core:engine-api`（纯 Kotlin，无 Android 依赖之外的重依赖）
+
+按 `DESIGN.md` §1.2 原样落地：
+
+- `EngineId / Backend / InferenceConfig / GenerateRequest / ChatMessage`
+- `sealed class EngineEvent { Token, Done, Error }`
+- `interface LlmEngine { probe / load / generate / reset / unload / lastMetrics }`
+- `SessionHandle`、`GenerateJob`（支持 cancel）、`EngineMetrics`、`Availability`（`Available / MissingDependency / UnsupportedSoc / ModelNotConfigured`）、`EngineException`
+- **把以下三条写成接口 KDoc 契约**（DESIGN.md §1.2 已定义，此处是执行提醒）：
+  1. Backend 不支持的取值拒绝并提示，不静默回退
+  2. `InferenceConfig` 不适用字段忽略并记 warning，指标里如实标注生效值
+  3. 同一 `SessionHandle` 上 generate 与 unload/reset 互斥，generate 进行中 unload 阻塞或明确失败
+- `FakeEngine`：固定延迟逐字吐 lorem ipsum，伪造 TTFT/tps 指标——UI 联调用，也是接口行为的可执行样例
+
+### 2.3 `:core:common`
+
+- `ModelPathStore`（DataStore）：`LocalModel` 列表持久化（字段见 §1.3，`location: FilePath | SafUri | AppPrivate`）
+- `ModelFormatValidator`：四种格式的快速探测（扩展名 + 魔数/特征文件，规则见 §1.3）
+- `DeviceProbe`：`Build.SOC_MODEL`、SDK、`libOpenCL.so`/`libcdsprpc.so` 探测、RAM/存储
+- `MetricsCollector`：TTFT/prefill_tps/decode_tps 统一计时口径（计时点在 engine-api 层，**不要**像 PolyEngineInfer 那样把模板格式化算进 TTFT）
+- `ResultStore`（Room）：benchmark 结果表，字段见 §2.3（含 baseline→加载后→峰值三段 RSS delta）
+
+### 2.4 `:app` UI 骨架（Compose + Hilt 导航）
+
+四个页面占位即可，FakeEngine 驱动 Chat 页全流程：
+
+- Chat：引擎选择器（显示 Availability）+ 模型下拉 + 流式气泡 + TTFT/tps 角标 + 采样参数面板
+- Models：四张引擎卡片（路径/添加/校验/删除）+ 同引擎多模型收藏
+- Benchmark：页面骨架 + 「P4 实现」占位
+- Settings：默认采样参数、后端偏好、数据目录
+
+### 2.5 四 so 共存 smoke test（P0 必做，DESIGN.md §6）
+
+- 建 `app/src/androidTest/EngineCoexistenceTest.kt`：按四种顺序排列组合 `System.loadLibrary` 真实 so（P0 阶段 so 还不存在，测试先 skip 并留 TODO 钩子，每接入一个引擎打开一组）
+- 每个引擎 JNI 封装层的 CMake 从第一天就带：
+  ```cmake
+  set_target_properties(<jni_lib> PROPERTIES CXX_VISIBILITY_PRESET hidden)
+  target_link_options(<jni_lib> PRIVATE "-Wl,--exclude-libs,ALL")
+  ```
+  或用 version script 只导出 `Java_*`
+
+**P0 验收**：`gradlew assembleDebug` 通过；adb 安装后 FakeEngine 完整聊一轮；Models 页能对四种格式各校验一个样本文件。
+
+---
+
+## 3. P1 `:engine:llamacpp`
+
+参照 PolyEngineInfer `llamacpp/` 模块与 ChatterUI。
+
+1. llama.cpp 源码作为 submodule 或 vendored 快照（镜像拉取），钉住一个 release tag（PolyEngineInfer 用 b6018，执行时选当月稳定 tag）
+2. `engine/llamacpp/src/main/cpp/CMakeLists.txt`：编 `libllama/libggml*` + `libllamacpp_chat_jni.so`（符号隐藏配置按 §2.5）
+3. JNI 薄封装：load_model / new_context / decode 循环 / kv_cache_clear / perf_context；流式回调注意 **UTF-8 断包拼接**（参考 MnnLlmChat `llm_session.cpp` 的处理）
+4. Kotlin 侧 `LlamaCppEngine : LlmEngine`：实现全部接口；backend 支持 CPU/OPENCL（GPU 映射 OpenCL），HTP 可选
+5. `.gguf` 魔数校验接入 `ModelFormatValidator`
+6. chattemplate 模块填充：用 minja 格式化 prompt（llama.cpp 不自带模板应用时）
+7. 打开 smoke test 中 llamacpp 相关用例
+
+**验收**：真机推一个 `qwen1.5b-q4_k_m.gguf` 到 `Android/data/<pkg>/files/models/llamacpp/`，流式聊天正常，TTFT/decode tps 显示合理，切模型即 unload 上一个（单模型驻留）。
+
+## 4. P1 `:engine:mnn`
+
+参照 MnnLlmChat 与 MNN 官方 Android 构建文档。
+
+1. MNN 预编译 so（`MNN_SOURCE_ROOT` 指向本地 MNN 源码/产物，需含 LLM 组件：`MNN_BUILD_LLM=true` 配置编译，或用官方 release 的 llm 库）
+2. `libmnn_chat_jni.so` 封装 `Llm::createLLM` / 流式 `Response()` / 新会话 reset
+3. backend：CPU / OpenCL（GPU 映射）；`threads` 生效
+4. 目录型模型校验：`config.json` + `llm.mnn`(+分片)
+5. 生命周期竞态处理照抄 MnnLlmChat（`@Volatile` + synchronized），并实现 §2.2 的互斥契约
+
+**验收**：MNN 目录模型流式聊天；与 llamacpp 在同一聊天页来回切换不崩——**M1 达成**。
+
+## 5. P2 `:engine:litert`
+
+1. 依赖 `com.google.ai.edge.litertlm:litertlm-android`（DESIGN.md 写 0.11.0；执行时先查 Maven 实际最新版本并回写文档）
+2. 纯 Kotlin 适配器，参照 gallery 的 `LlmModelHelper`/`MetricsTracker`
+3. 注意：LiteRT-LM 内置 chat template（PolyEngineInfer 代码里 `engine !is LiteRtLmInference` 才走 minja），适配器里跳过 chattemplate
+4. backend：CPU / GPU(delegate) / NPU（若机型支持）
+
+**验收**：`.litertlm` 模型可聊，三引擎切换正常。
+
+## 6. P3 `:engine:genie`
+
+参照 chatapp_android。全程可被 `-PskipGenie=true` 跳过。
+
+1. QAIRT/QNN SDK 2.45 本地路径（环境变量 `QAIRT_SDK_ROOT` 或 gradle.properties 配置）；未配置时模块编译跳过、UI 显示 `MissingDependency`
+2. `libgenie_chat_jni.so` 薄封装 `GenieDialog_create/query/reset`；`libQnnHtp*` 等 so 随包打
+3. HTP config 按 `Build.SOC_MODEL` 选择（照抄 chatapp_android 的配置表）
+4. `probe()` 非骁龙/无 HTP 时返回 `UnsupportedSoc`，UI 灰显说明原因
+5. 目录校验：`genie_config.json` + `tokenizer.json` + `*.bin`
+6. 已知坑：Genie 偶发空回复 → reset + 有限重试（≤2 次），计入错误率（DESIGN.md §6）
+
+**验收**：骁龙真机四引擎矩阵全部 `Available`，缺依赖场景灰显不崩——**M2 达成**。四 so 共存 smoke test 全绿。
+
+## 7. P4 `:core:benchmark`
+
+按 DESIGN.md §2 执行，要点：
+
+1. 用例 L/P/D（默认勾选）+ T（可选）；内置 4 条提示词（中文问答/英文问答/代码/总结）单选
+2. warmup=1 + runs=3 取中位数；**跑某引擎前强制 unload 其他所有 Session**（§2.1-5）
+3. RSS 三段 delta：baseline（全 unload 后）→ 加载后 → 生成峰值，读 `/proc/self/status`
+4. 温度用 `ACTION_BATTERY_CHANGED` 电池温度（注明非 SoC 温度）；>42℃ 警告不拦截
+5. 退后台自动暂停
+6. 结果表强制展示 engineId/modelName/modelPath/quantHint；导出 JSON 到 `getExternalFilesDir("benchmark")/`
+7. 结果页文案声明：跨模型/跨量化数字只作参考（§2.5）
+
+**验收**：四引擎各选模型一键跑 L/P/D，出对比表并导出 JSON——**M3 达成**。
+
+## 8. P5 打磨
+
+- 全部错误路径走 `Availability`/`EngineException` 分类提示，不裸崩
+- Genie 未集成、模型未配置、格式校验失败、SAF fd 泄漏（用完 closeFd，参考 ChatterUI）各有一条用户可懂的提示
+- `docs/ENGINE_INTEGRATION.md`：每引擎的依赖获取、编译开关、模型导出格式说明
+- `docs/MODEL_PATHS.md`：四种格式的目录组织与获取渠道
+- README：定位一句话（「同一台真机上四引擎实测对比」）+ 截图 + benchmark 示例表
+- 回写 `DESIGN.md`：实际使用的依赖版本、与设计的偏差
+
+---
+
+## 9. 执行者注意事项（坑位速查）
+
+1. **GitHub 直连不稳**：submodule/大文件优先 `gh-proxy.com` 镜像；失败重试前先 `rm -rf` 残留目录
+2. **符号冲突是头号风险**：每接入一个引擎立刻跑共存 smoke test，不要攒到 P3
+3. **SAF 大文件**：`content://` 模型用 `getContentFd` 取 fd，用完 close；加载失败时提供「复制到 App 私有目录再加载」选项
+4. **计时口径统一**：TTFT 从请求发出到首个 token 回调，不含模型加载和模板格式化；各适配器不得自行其是
+5. **Genie 只支持骁龙 HTP**：开发机/模拟器上必须优雅降级，所有 P0–P2、P4 工作不依赖 Genie 可用
+6. **不要扩大范围**：功耗测量、Dynamic Feature、雷达图、质量评测、OpenAI 兼容 API 均明确不做（API 是 P5+ 可选增强，不在本计划内）
+7. **目录改名**：仓库建立后工作目录可从 `LlmChatAndroid` 改为 `droid-llm`，改名时同步 `DESIGN.md` 头部说明
