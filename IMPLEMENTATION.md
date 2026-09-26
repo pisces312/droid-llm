@@ -8,8 +8,8 @@
 |------|------|----------|------|
 | P0 | ✅ 完成 | 2026-09-26 | 工程骨架 + engine-api + FakeEngine + UI + smoke 框架（详见 git 历史 / 会话记录） |
 | P1 | ✅ 完成，待审阅 | 2026-09-26 | llamacpp + mnn，见「P1 交付说明」 |
-| P2 | ✅ 完成，待审阅 | 2026-09-26 | litert，见「P2 交付说明」 |
-| P3 | ⬜ 未开始 | | genie |
+| P2 | ✅ 完成 | 2026-09-26 | litert，见「P2 交付说明」 |
+| P3 | ✅ 完成，待审阅 | 2026-09-26 | genie，见「P3 交付说明」 |
 | P4 | ⬜ 未开始 | | benchmark |
 | P5 | ⬜ 未开始 | | 打磨 |
 
@@ -103,6 +103,65 @@
 1. Genie/QNN：`-PskipGenie=true` 门控 + QAIRT 本地路径 + SOC_MODEL HTP 配置（参照 chatapp_android）
 2. minja chattemplate JNI（Genie 需要）
 3. 四引擎真机可联，M2 达成
+
+### P3 交付说明（2026-09-26）
+
+**已完成**
+
+1. **QAIRT 2.50 对齐 local-dream**：`QAIRT_PATH=D:/dev/qairt/2.50.0.260828`（env 优先，亦支持 `droid.qairtSdkRoot` / `QAIRT_SDK_ROOT`）。与 local-dream `AGENTS.md` / `rebuild-native.bat` 同一路径与变量名。
+2. **编译门控**（三种跳过路径均验证）：
+   - `-Pdroid.skipGenie=true` 显式跳过（并 `excludes **/*.so` + 清空 jniLibs.srcDirs，避免残留 so 入包）
+   - QAIRT 路径不存在时自动跳过并 warn
+   - 跳过时 Kotlin 仍编译，`probe()` 返回 `MissingDependency`，UI 可灰显
+3. **JNI 薄封装** `libgenie_chat_jni.so`（`engine/genie/src/main/cpp/`）：
+   - `nativeCreate(configJson)` → `GenieDialogConfig_createFromJson` + `GenieDialog_create`
+   - `nativeGenerate` → `GenieDialog_query(COMPLETE, QueryCallback)` 流式 `onToken`
+   - `nativeReset` / `nativeSetMaxNumTokens` / `nativeDestroy` / `nativeVersion`
+   - CMake `IMPORTED libGenie.so` + `-Wl,--exclude-libs,ALL` 符号隔离
+4. **QNN 运行时 so 打包**（`copyQnnJniLibs`，平铺进 `jniLibs/arm64-v8a/`）：
+   - `libGenie.so` + `libQnnHtp.so` + `libQnnHtpPrepare.so` + `libQnnSystem.so` + `libQnnSaver.so`
+   - `libQnnHtpV{68..81}Stub.so` + 对应 `hexagon-v*/unsigned/libQnnHtpV*Skel.so`（已 exclude CalculatorStub）
+   - 与 chatapp_android `CopyQnnLibs` 同集合；jniLibs 已 gitignore
+5. **HTP config 按 `Build.SOC_MODEL`**（chatapp 表）：SM8850/SM8750→8-elite、SM8650→8-gen3、QCS8550→8-gen2；assets `htp_config/*.json` 复制到 `filesDir/htp_config/` 后注入 `dialog.engine.backend.extensions`
+6. **`GenieConfigResolver`**：`genie_config.json` 重写（tokenizer.path / ctx-bins 绝对路径 / extensions / sampler 覆盖 temp/top-k/top-p/seed），对应 chatapp `LoadModelConfig`；目录校验 `genie_config.json`+`tokenizer.json`+`*.bin`
+7. **`GenieEngine`**：
+   - Backend 仅 NPU_HTP / AUTO（AUTO→HTP + warning）；CPU/GPU/OPENCL **拒绝**
+   - 多轮：`GenerateRequest.messages` 权威；历史一致则增量发最后一条 USER，否则 `reset` + 全量拼 prompt
+   - Prompt tags：优先模型 `metadata.json` 的 `genie.chat_template`（AI Hub），否则 `user:/assistant:` fallback
+   - 空回复：`GenieDialog_reset` + 重试，总尝试 ≤3（即额外 ≤2 次），仍失败则 `GenerateFailed`（DESIGN §6）
+   - `MetricsCollector` 统一 TTFT；`generatedTokens≈回调次数`（Genie 流的是文本片段）记入 warnings；threads 忽略并警告
+   - Hilt `@Binds @IntoSet` 注册
+8. **Smoke test**：`EngineCoexistenceTest` A/C 用例在 `libgenie_chat_jni.so` 存在时断言加载成功
+9. **验收**：`:engine:genie:assembleDebug` BUILD SUCCESSFUL；`:app:assembleDebug` BUILD SUCCESSFUL；`-Pdroid.skipGenie=true` 门控 BUILD SUCCESSFUL；APK ≈ **143 MB**（QNN HTP 全 arch Skel/Stub 体积大）
+
+**已知偏差 / 待办**
+
+| 项 | 说明 |
+|----|------|
+| QAIRT 版本 | DESIGN 写 2.45，本机/local-dream 用 **2.50.0.260828**；接口兼容（GenieDialog_*） |
+| minja chattemplate | **未做 JNI**。Genie 走 metadata.json 角色标签 + ChatTemplate.format fallback，与 chatapp 一致；Jinja 模板模型留 P5 |
+| promptTokens | Genie 无 tokenize 回调，写 0；prefill_tps 为空 |
+| generatedTokens | 约等于流式回调次数（文本片段≠token） |
+| APK 体积 | 143MB（含 V68–V81 全套 QNN HTP）；可按目标 SoC 裁剪 Skel/Stub |
+| GenieProfile | 未接（chatapp 用它打 TTFT 日志）；我方 TTFT 统一走 MetricsCollector |
+| 生成期换 Backend | load 时绑定；与 LiteRT 同限制 |
+| SAF | 仍拒绝，要求绝对路径 |
+| 真机 DoD | 见下方检查单 |
+
+**P3 真机 DoD 检查单（M2）**
+
+1. 推 AI Hub Genie 模型目录（`genie_config.json`+`tokenizer.json`+`*.bin`）→ `Android/data/io.github.pisces312.droidllm/files/models/genie/`
+2. 骁龙真机（SM8850/8750/8650 等）上 Genie probe=`Available`；非骁龙=`UnsupportedSoc` 灰显不崩
+3. Chat 页选 Genie 流式对话；偶发空回复能 reset+重试恢复
+4. **四引擎**（llamacpp / mnn / litert / genie）同一聊天页来回切换不崩（单模型驻留）——**M2 达成**
+5. `adb shell am instrument` 跑 `EngineCoexistenceTest` 全绿
+6. 开发机/无 QAIRT 环境：`-Pdroid.skipGenie=true` 构建后 Genie 灰显 `MissingDependency`，其余三引擎正常
+
+**下一步（P4）**
+
+1. `:core:benchmark`：L/P/D（+可选 T）、warmup=1 + runs=3 中位数、RSS 三段 delta、电池温度
+2. 跑某引擎前强制 unload 其他 Session；结果表含 engineId/modelName/modelPath/quantHint；JSON 导出
+3. 结果页文案：跨模型/跨量化数字只作参考
 
 ---
 

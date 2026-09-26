@@ -37,7 +37,7 @@ cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android
 cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android_sdk&& gradlew.bat :core:engine-api:testDebugUnitTest"
 
 # 跳过 Genie native（QAIRT 未配置时）
-# gradlew.bat :app:assembleDebug -PskipGenie=true
+# gradlew.bat :app:assembleDebug -PskipGenie=true   (or -Pdroid.skipGenie=true)
 ```
 
 - 目标 ABI 仅 `arm64-v8a`，单 APK 全打，不做 Dynamic Feature。

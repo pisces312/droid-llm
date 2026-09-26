@@ -1,8 +1,8 @@
 # droid-llm 多引擎统一 App + Benchmark 方案
 
-> 目标：构建一个 Android App（项目名 **droid-llm**，仓库 `droid-llm`，工作目录 `D:\my-projects\LlmChatAndroid`），**同时接入四种端侧 LLM 引擎**，在同一个聊天界面里切换使用；附带一个**轻量 benchmark**，用于对比各引擎在本机的速度表现。
+> 目标：构建一个 Android App（项目名 **droid-llm**，仓库 `droid-llm`，工作目录 `D:\my-projects\droid-llm`），**同时接入四种端侧 LLM 引擎**，在同一个聊天界面里切换使用；附带一个**轻量 benchmark**，用于对比各引擎在本机的速度表现。
 >
-> 应用显示名 **DroidLLM**，包名 `io.github.<owner>.droidllm`。
+> 应用显示名 **DroidLLM**，包名 `io.github.pisces312.droidllm`。
 >
 > 定位差异：最接近的同类项目是 [PolyEngineInfer](https://github.com/FilipFan/PolyEngineInfer)（llama.cpp/ONNX/ExecuTorch/LiteRT 四引擎实验性 App），但它无 Genie(NPU)/MNN、无独立 benchmark、对话无状态。droid-llm 的差异即：NPU 引擎聚合 + 可控评测 + 多轮对话。
 >
@@ -16,10 +16,10 @@
 |------|------------------|--------------|------------------|-----------|
 | 参考项目 | `gallery` | `MNN/apps/Android/MnnLlmChat` | `ai-hub-apps/chatapp_android` | `ChatterUI` |
 | 技术栈 | Kotlin + AAR | C++/JNI + libMNN.so | C++/JNI + libGenie.so | C++/JNI + libllama.so |
-| 依赖 | `com.google.ai.edge.litertlm:litertlm-android:0.11.0` | `MNN_SOURCE_ROOT` 预编译 so | QAIRT/QNN SDK 2.45（本地路径） | 源码 CMake / 绑定 |
+| 依赖 | `com.google.ai.edge.litertlm:litertlm-android:0.11.0` | `MNN_SOURCE_ROOT` 预编译 so | QAIRT/QNN SDK **2.50.0.260828**（`QAIRT_PATH`，对齐 local-dream；原稿 2.45 已被本机 SDK 取代） | 源码 CMake / 绑定 |
 | 模型格式 | `.litertlm` / `.task` | 目录：`config.json` + `llm.mnn`(+分片) | `*.bin`(ctx) + `genie_config.json` + `tokenizer.json` | `.gguf` |
 | 加速后端 | CPU / GPU / NPU | CPU / OpenCL (+QnnModule) | **仅 HTP/NPU**（骁龙） | CPU / OpenCL / HTP |
-| 指标 | TTFT / prefill&decode tps | prefill&decode tps | TTFT / TPS（GenieProfile） | prompt/predicted tps |
+| 指标 | TTFT / prefill&decode tps | prefill&decode tps | TTFT / decode tps（`MetricsCollector` 统一口径；GenieProfile 仅参考） | prompt/predicted tps |
 
 **关键结论**
 
@@ -72,7 +72,7 @@
 | `:engine:genie` | Genie 适配器 + JNI | CMake→libGenie + QAIRT |
 | `:engine:llamacpp` | llama.cpp 适配器 + JNI | CMake→libllama |
 
-**包体策略：单 APK 全打（arm64-v8a only）**，预计 70–120 MB（不含模型）。模型一律外置存储，不进 APK。
+**包体策略：单 APK 全打（arm64-v8a only）**，实测 **≈143 MB**（不含模型；含 QNN HTP 全 arch 运行时，可按目标 SoC 裁剪）。模型一律外置存储，不进 APK。
 
 > **关于 Dynamic Feature（动态功能模块）**：Play Feature Delivery 的一种发布方式，把 App 拆成「基础模块 + 可选插件模块」，用户安装时只下基础包，进到某功能时再按需下载插件（例如 `:engine:genie` 单独一个包）。好处是首装包小；代价是构建复杂、调试麻烦、离线侧载（adb install）不友好，而且对 benchmark 场景不友好（引擎应常驻可比）。
 > **本项目直接不做 DFM**，四个引擎全部编进单 APK；若以后包体真成问题再考虑。
@@ -124,7 +124,7 @@ interface LlmEngine {
 | `load` | `Engine.initialize` | `Llm::createLLM` + `load` | `GenieDialog_create` | `llama_load_model` + new context |
 | `generate` | `sendMessageAsync` | `Response()` 流式 | `GenieDialog_query` | decode 循环 |
 | `reset` | 新 Conversation | 新 Prompt 会话 | `GenieDialog_reset` | `llama_kv_cache_clear` |
-| 指标 | MetricsTracker | prefill_time / tps | GenieProfile | `llama_perf_context` |
+| 指标 | MetricsCollector（统一） | MetricsCollector（统一） | MetricsCollector（统一） | MetricsCollector（统一） |
 
 **`Backend` 枚举的引擎映射**（`GPU` 与 `OPENCL` 有交集，按下表对齐；不支持的取值一律拒绝并明确提示，不做静默回退）
 
@@ -137,6 +137,15 @@ interface LlmEngine {
 | AUTO | 引擎自选 | 引擎自选 | = NPU_HTP | 引擎自选 |
 
 **`InferenceConfig` 字段适用性**：并非所有字段对所有引擎生效（如 `threads` 对 Genie 无意义、各家 `topK` 默认值不同）。约定：不适用的字段**忽略并记 warning**，适配器在日志/指标中如实标注实际生效值，避免 benchmark 结果的参数列误导。
+
+**Prompt / chat template 策略（按引擎落地）**
+
+| 引擎 | 模板来源 | 说明 |
+|------|----------|------|
+| LiteRT-LM | AAR 内置 | 适配器不调 `ChatTemplate` |
+| llama.cpp | `llama_chat_apply_template` | JNI 内原生模板 |
+| MNN | `Llm::response(ChatMessages)` | 原生模板 |
+| Genie | 模型目录 `metadata.json` → `genie.chat_template` 角色前后缀；缺省 `user:`/`assistant:` | 与 chatapp_android 一致；**minja JNI 推迟**（`:core:chattemplate` 仅 `ChatTemplate.format` fallback） |
 
 **Session 线程安全契约**（写在 engine-api，而非各适配器自行处理）：同一 `SessionHandle` 上 `generate` 与 `unload`/`reset` 互斥；同一时刻至多一个 `generate` 在跑；`generate` 进行中调用 `unload` 必须阻塞等待或明确失败，不得崩溃。
 
@@ -259,19 +268,48 @@ Benchmark 页
 
 ### 3.1 Gradle / 构建
 
-- AGP 8.13.x，Kotlin 2.x，minSdk **31**，target 35
-- **仅 `arm64-v8a`**
-- NDK r27+，CMake 3.22+
-- `jniLibs.useLegacyPackaging = true`（Genie/llama.cpp 需 so 落盘 dlopen）
+**工具链（与 Android 官方推荐一致，增量可跳过）**
+
+| 层 | 工具 | 说明 |
+|----|------|------|
+| 工程/依赖 | **Gradle 8.13** + **AGP 8.13.2** | 配置缓存 `org.gradle.configuration-cache=true`；任务级 up-to-date / build cache |
+| Kotlin | **2.2.21** + **KSP 2.3.6** | litertlm 0.11.0 要求 Kotlin metadata 2.3.0，2.1 读不了（见 P2） |
+| Native | **AGP externalNativeBuild + CMake 3.22.1 + Ninja** | Android SDK 自带 `cmake/3.22.1/bin/ninja.exe`；生成 `build.ninja` / `.ninja_log`，按 `.cpp` 时间戳与依赖图增量编译 |
+| NDK | **27.x**（`ANDROID_HOME`） | 仅 `arm64-v8a` |
+| JNI 打包 | `jniLibs.useLegacyPackaging = true` | Genie/llama.cpp/MNN 需 so 落盘 dlopen |
+
+**增量行为（已验证）**
+
+- 未改动的模块/翻译单元：Gradle 标 `UP-TO-DATE`，Ninja 不重编；只重链受影响的 so
+- 改 `*.cpp` / `CMakeLists.txt`：Ninja 只重编该 TU 并重链 `lib*_chat_jni.so`
+- 改 Kotlin：只重编对应 module，不触碰 native
+- 预编译 so 拷贝（`copyMnnJniLibs` / `copyQnnJniLibs`）：Gradle `Copy` 任务按输入哈希跳过；`onlyIf { !skipGenie }`
+- 重配置触发：AGP `hash_key.txt` 变化（CMake 参数 / NDK / ABI）才重新 `cmake` configure
+
+**工程约束**
+
+- minSdk **31**，target 35
 - `noCompress += ["bin", "json", "mnn", "gguf", "litertlm", "task"]`（仅预留：模型一律外置不进 APK，此配置只在将来做预置演示模型时才生效）
 - Native 产物：
   ```
   engine/mnn/src/main/cpp/       → libmnn_chat_jni.so + libMNN.so
-  engine/genie/src/main/cpp/     → libgenie_chat_jni.so + libGenie/libQnn*
-  engine/llamacpp/src/main/cpp/  → libllamacpp_chat_jni.so + libllama/libggml*
-  engine/litert/                 → 纯 Kotlin + AAR
+  engine/genie/src/main/cpp/     → libgenie_chat_jni.so + libGenie/libQnnHtp*
+  engine/llamacpp/src/main/cpp/  → libllamacpp_chat_jni.so（静态编入 llama/ggml）
+  engine/litert/                 → 纯 Kotlin + litertlm AAR
   ```
-- 可选 `-PskipGenie=true` 跳过 Genie 编译（QAIRT 未配置时）
+- Genie 跳过：`-PskipGenie=true` 或 `-Pdroid.skipGenie=true`；QAIRT 路径无效时自动跳过并 warn。跳过时 `excludes **/*.so`，Kotlin 仍编译（`probe()`→`MissingDependency`）
+- QAIRT 路径解析顺序：`droid.qairtSdkRoot` → env `QAIRT_PATH` → env `QAIRT_SDK_ROOT` → 默认 `D:/dev/qairt/2.50.0.260828`
+- 实测 APK ≈ **143 MB**（四引擎 + QNN HTP V68–V81 Skel/Stub；可按目标 SoC 裁剪）
+
+**实现与原稿的偏差（以代码为准）**
+
+| 原稿 | 实际 |
+|------|------|
+| Kotlin 2.x（P0 时 2.1.20） | **2.2.21** + KSP **2.3.6**（litertlm 约束） |
+| QAIRT 2.45 | **2.50.0.260828**（本机 / local-dream 同款） |
+| Genie 指标用 GenieProfile | **MetricsCollector 统一口径**；GenieProfile 未接 |
+| minja chattemplate JNI | **推迟**：Genie 走模型 `metadata.json` 角色标签（chatapp 同款）+ `ChatTemplate.format` fallback |
+| 包体 70–120MB | **≈143MB**（QNN 全 arch） |
 
 ### 3.2 能力探测（DeviceProbe）
 
@@ -347,7 +385,7 @@ Home
 | 模型路径指向 content:// 大文件 | 加载失败/泄漏 | 参考 ChatterUI：取 fd / 用完 closeFd；支持复制到 app 私有目录再加载 |
 | 各引擎 quant 不一致被误比 | 结论误导 | 结果表强制展示模型名+quant+路径；文档声明只作参考 |
 | Genie 偶发空回复 | bench 中断 | reset + 有限重试，计入错误率 |
-| APK 体积 | 安装负担 | arm64 only；模型外置；接受 100MB 级 |
+| APK 体积 | 安装负担 | arm64 only；模型外置；实测 ≈143MB（QNN 全 arch），必要时按 SoC 裁剪 Skel/Stub |
 
 ---
 

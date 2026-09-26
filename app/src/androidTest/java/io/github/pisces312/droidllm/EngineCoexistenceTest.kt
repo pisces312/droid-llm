@@ -34,7 +34,10 @@ class EngineCoexistenceTest {
         // P1: llamacpp + mnn so exist
         assertTrue(tryLoad("llamacpp_chat_jni"))
         assertTrue(tryLoad("mnn_chat_jni"))
-        // TODO(P3): assertTrue(tryLoad("genie_chat_jni"))
+        // P3: genie — assert only when the so was packaged (QAIRT build on)
+        if (nativeLibExists(context, "libgenie_chat_jni.so")) {
+            assertTrue(tryLoad("genie_chat_jni"))
+        }
     }
 
     private fun touchLitertAar(): Boolean {
@@ -55,10 +58,20 @@ class EngineCoexistenceTest {
 
     @Test
     fun loadOrderC_all_available() {
-        // P2 partial (litert + llamacpp + mnn); P3 adds genie
+        // P2 partial (litert + llamacpp + mnn); P3 adds genie when packaged
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         assertTrue(touchLitertAar())
         assertTrue(tryLoad("llamacpp_chat_jni"))
         assertTrue(tryLoad("mnn_chat_jni"))
-        // TODO(P3): genie
+        if (nativeLibExists(context, "libgenie_chat_jni.so")) {
+            assertTrue(tryLoad("genie_chat_jni"))
+        }
+    }
+
+    private fun nativeLibExists(
+        context: android.content.Context,
+        fileName: String,
+    ): Boolean {
+        return java.io.File(context.applicationInfo.nativeLibraryDir, fileName).isFile
     }
 }
