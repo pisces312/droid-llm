@@ -8,6 +8,7 @@ import dagger.multibindings.IntoSet
 import io.github.pisces312.droidllm.chattemplate.ChatTemplate
 import io.github.pisces312.droidllm.common.metrics.MetricsCollector
 import io.github.pisces312.droidllm.common.metrics.RssReader
+import io.github.pisces312.droidllm.engine.llamacpp.BuildConfig
 import io.github.pisces312.droidllm.engineapi.Availability
 import io.github.pisces312.droidllm.engineapi.Backend
 import io.github.pisces312.droidllm.engineapi.ChatMessage
@@ -16,6 +17,7 @@ import io.github.pisces312.droidllm.engineapi.EngineEvent
 import io.github.pisces312.droidllm.engineapi.EngineException
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.EngineMetrics
+import io.github.pisces312.droidllm.engineapi.EngineVersion
 import io.github.pisces312.droidllm.engineapi.GenerateJob
 import io.github.pisces312.droidllm.engineapi.GenerateRequest
 import io.github.pisces312.droidllm.engineapi.GenerateResult
@@ -47,6 +49,10 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
 
     override val id: EngineId = EngineId.LLAMACPP
     override val displayName: String = "llama.cpp"
+    override val version: EngineVersion = EngineVersion(
+        version = BuildConfig.ENGINE_VERSION.takeIf { it.isNotBlank() },
+        commit = BuildConfig.ENGINE_COMMIT.takeIf { it.isNotBlank() },
+    )
 
     private class LlamaSession(
         override val modelId: String,

@@ -13,8 +13,10 @@ import io.github.pisces312.droidllm.engineapi.ChatMessage
 import io.github.pisces312.droidllm.engineapi.ChatRole
 import io.github.pisces312.droidllm.engineapi.EngineEvent
 import io.github.pisces312.droidllm.engineapi.EngineException
+import io.github.pisces312.droidllm.engine.mnn.BuildConfig
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.EngineMetrics
+import io.github.pisces312.droidllm.engineapi.EngineVersion
 import io.github.pisces312.droidllm.engineapi.GenerateJob
 import io.github.pisces312.droidllm.engineapi.GenerateRequest
 import io.github.pisces312.droidllm.engineapi.GenerateResult
@@ -45,6 +47,10 @@ class MnnEngine @Inject constructor() : LlmEngine {
 
     override val id: EngineId = EngineId.MNN
     override val displayName: String = "MNN"
+    override val version: EngineVersion = EngineVersion(
+        version = BuildConfig.ENGINE_VERSION.takeIf { it.isNotBlank() },
+        commit = BuildConfig.ENGINE_COMMIT.takeIf { it.isNotBlank() },
+    )
 
     private class MnnSession(
         override val modelId: String,

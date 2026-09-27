@@ -5,13 +5,32 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// Provenance for the chat/benchmark engine label. llama.cpp is vendored into
+// this repo, so its identity is the repo commit that last touched the tree —
+// the only honest "commit" available without a submodule checkout.
+val vendoredCommit = runCatching {
+    val proc = ProcessBuilder("git", "log", "-1", "--format=%h", "--", "third_party/llama.cpp")
+        .directory(rootDir)
+        .redirectErrorStream(true)
+        .start()
+    val out = proc.inputStream.bufferedReader().readText().trim()
+    if (proc.waitFor() == 0) out else ""
+}.getOrDefault("")
+
 android {
     namespace = "io.github.pisces312.droidllm.engine.llamacpp"
     compileSdk = 35
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         minSdk = 31
         consumerProguardFiles("consumer-rules.pro")
+
+        buildConfigField("String", "ENGINE_VERSION", "\"vendored\"")
+        buildConfigField("String", "ENGINE_COMMIT", "\"$vendoredCommit\"")
 
         externalNativeBuild {
             cmake {

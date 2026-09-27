@@ -13,6 +13,29 @@ enum class EngineId {
 }
 
 /**
+ * Build provenance of an engine backend.
+ *
+ * Every part is optional: sources that cannot be resolved at build time
+ * (e.g. a prebuilt Maven artifact with no source tree) leave it null, and the
+ * UI omits that part instead of showing a fabricated value.
+ */
+data class EngineVersion(
+    val version: String? = null,
+    val commit: String? = null,
+) {
+    val isKnown: Boolean get() = !version.isNullOrBlank() || !commit.isNullOrBlank()
+
+    /** `"MNN 3.6.1 (#c0461933)"`; falls back to the bare name when nothing is known. */
+    fun label(name: String): String {
+        val parts = listOfNotNull(
+            version?.takeIf { it.isNotBlank() },
+            commit?.takeIf { it.isNotBlank() }?.let { "#$it" },
+        )
+        return if (parts.isEmpty()) name else "$name ${parts.joinToString(" ")}"
+    }
+}
+
+/**
  * Compute backend requested by the caller.
  *
  * Engine adapters MUST reject unsupported values with
@@ -171,6 +194,12 @@ interface LlmEngine {
     val id: EngineId
     val displayName: String
 
+    /**
+     * Library/runtime provenance compiled into the module. Shown next to
+     * [displayName] in the chat picker, benchmark rows and exported JSON.
+     */
+    val version: EngineVersion get() = EngineVersion()
+
     suspend fun probe(probeContext: ProbeContext): Availability
 
     suspend fun load(model: LocalModel, config: InferenceConfig): SessionHandle
@@ -187,3 +216,6 @@ interface LlmEngine {
 
     fun lastMetrics(handle: SessionHandle): EngineMetrics?
 }
+
+/** [LlmEngine.displayName] with version/commit appended, e.g. `MNN 3.6.1 #c0461933`. */
+val LlmEngine.labelledName: String get() = version.label(displayName)

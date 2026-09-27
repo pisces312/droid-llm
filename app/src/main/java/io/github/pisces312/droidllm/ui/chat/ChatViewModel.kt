@@ -19,6 +19,7 @@ import io.github.pisces312.droidllm.engineapi.LlmEngine
 import io.github.pisces312.droidllm.engineapi.LocalModel
 import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.SessionHandle
+import io.github.pisces312.droidllm.engineapi.labelledName
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,8 @@ import kotlinx.coroutines.launch
 data class EngineChoice(
     val engine: LlmEngine,
     val displayName: String,
+    /** [displayName] plus engine version/commit, used wherever the user reads it. */
+    val label: String,
     val available: Boolean,
     val availability: Availability,
 )
@@ -118,6 +121,7 @@ class ChatViewModel @Inject constructor(
                 EngineChoice(
                     engine = engine,
                     displayName = engine.displayName,
+                    label = engine.labelledName,
                     available = av is Availability.Available,
                     availability = av,
                 )

@@ -197,7 +197,7 @@ private fun EngineModelPickers(
             modifier = Modifier.weight(1f),
         ) {
             OutlinedTextField(
-                value = selectedEngine?.displayName ?: "引擎",
+                value = selectedEngine?.label ?: "引擎",
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("引擎") },
@@ -212,7 +212,7 @@ private fun EngineModelPickers(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                e.displayName + if (e.available) "" else "（不可用）",
+                                e.label + if (e.available) "" else "（不可用）",
                                 color = if (e.available) {
                                     MaterialTheme.colorScheme.onSurface
                                 } else {

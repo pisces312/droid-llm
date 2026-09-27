@@ -34,13 +34,28 @@ if (skipGenieProp) {
     )
 }
 
+// Provenance for the chat/benchmark engine label. The QAIRT release has no git
+// metadata, so the version comes from the SDK folder name documented in
+// AGENTS.md / docs/ENGINE_INTEGRATION.md (e.g. `2.50.0.260828`).
+val qairtVersion = Regex("\\d+\\.\\d+[\\w.]*")
+    .find(qairtSdkRoot.trim().substringAfterLast('/').substringAfterLast('\\'))
+    ?.value
+    .orEmpty()
+
 android {
     namespace = "io.github.pisces312.droidllm.engine.genie"
     compileSdk = 35
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         minSdk = 31
         consumerProguardFiles("consumer-rules.pro")
+
+        buildConfigField("String", "ENGINE_VERSION", "\"$qairtVersion\"")
+        buildConfigField("String", "ENGINE_COMMIT", "\"\"")
 
         if (!skipGenie) {
             externalNativeBuild {

@@ -16,13 +16,52 @@ val mnnRoot: String = (findProperty("droid.mnnRoot") as String?)
             "or set gradle property droid.mnnRoot.",
     )
 
+// Provenance for the chat/benchmark engine label: MNN version from its public
+// header + the checked-out commit of the local tree. Read-only file IO (no
+// external process) so configuration stays cache-friendly.
+fun mnnVersionOf(root: String): String {
+    val text = runCatching { File(root, "include/MNN/MNNDefine.h").readText() }.getOrNull() ?: return ""
+    fun macro(name: String): String? =
+        Regex("$name\\s+(\\d+)").find(text)?.groupValues?.get(1)
+    val major = macro("MNN_VERSION_MAJOR") ?: return ""
+    val minor = macro("MNN_VERSION_MINOR") ?: return ""
+    val patch = macro("MNN_VERSION_PATCH") ?: return ""
+    return "$major.$minor.$patch"
+}
+
+fun headShortSha(gitDir: File): String {
+    val head = runCatching { File(gitDir, "HEAD").readText().trim() }.getOrNull() ?: return ""
+    val sha = if (head.startsWith("ref:")) {
+        val ref = head.removePrefix("ref:").trim()
+        runCatching { File(gitDir, ref).readText().trim() }.getOrNull()
+            ?: runCatching {
+                File(gitDir, "packed-refs").readLines()
+                    .firstOrNull { it.endsWith(" $ref") }
+                    ?.substringBefore(' ')
+            }.getOrNull()
+    } else {
+        head
+    }
+    return sha?.trim()?.take(8).orEmpty()
+}
+
+val mnnVersion = mnnVersionOf(mnnRoot)
+val mnnCommit = headShortSha(File(mnnRoot, ".git"))
+
 android {
     namespace = "io.github.pisces312.droidllm.engine.mnn"
     compileSdk = 35
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         minSdk = 31
         consumerProguardFiles("consumer-rules.pro")
+
+        buildConfigField("String", "ENGINE_VERSION", "\"$mnnVersion\"")
+        buildConfigField("String", "ENGINE_COMMIT", "\"$mnnCommit\"")
 
         externalNativeBuild {
             cmake {

@@ -12,11 +12,19 @@ android {
     defaultConfig {
         minSdk = 31
         consumerProguardFiles("consumer-rules.pro")
+
+        // Provenance for the chat/benchmark engine label (no source tree to read a commit from).
+        buildConfigField("String", "ENGINE_VERSION", "\"${libs.versions.litertlm.get()}\"")
+        buildConfigField("String", "ENGINE_COMMIT", "\"\"")
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     kotlin {

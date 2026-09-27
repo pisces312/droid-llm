@@ -14,6 +14,7 @@ import io.github.pisces312.droidllm.engineapi.GenerateResult
 import io.github.pisces312.droidllm.engineapi.InferenceConfig
 import io.github.pisces312.droidllm.engineapi.LlmEngine
 import io.github.pisces312.droidllm.engineapi.LocalModel
+import io.github.pisces312.droidllm.engineapi.labelledName
 import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.SessionHandle
 import java.util.UUID
@@ -130,7 +131,7 @@ class BenchmarkRunner @Inject constructor(
             if (session == null) {
                 return TargetResult(
                     engineId = target.engineId,
-                    engineDisplayName = engine.displayName,
+                    engineDisplayName = engine.labelledName,
                     model = target.model,
                     cases = emptyMap(),
                     rssMbBaseline = rssBaseline,
@@ -217,7 +218,7 @@ class BenchmarkRunner @Inject constructor(
         } catch (t: Throwable) {
             return TargetResult(
                 engineId = target.engineId,
-                engineDisplayName = engine.displayName,
+                engineDisplayName = engine.labelledName,
                 model = target.model,
                 cases = cases,
                 rssMbBaseline = rssBaseline,
@@ -237,7 +238,7 @@ class BenchmarkRunner @Inject constructor(
 
         return TargetResult(
             engineId = target.engineId,
-            engineDisplayName = engine.displayName,
+            engineDisplayName = engine.labelledName,
             model = target.model,
             cases = cases,
             rssMbBaseline = rssBaseline,

@@ -17,6 +17,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
+import io.github.pisces312.droidllm.engine.litert.BuildConfig
 import io.github.pisces312.droidllm.common.metrics.MetricsCollector
 import io.github.pisces312.droidllm.common.metrics.RssReader
 import io.github.pisces312.droidllm.engineapi.Availability
@@ -27,6 +28,7 @@ import io.github.pisces312.droidllm.engineapi.EngineEvent
 import io.github.pisces312.droidllm.engineapi.EngineException
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.EngineMetrics
+import io.github.pisces312.droidllm.engineapi.EngineVersion
 import io.github.pisces312.droidllm.engineapi.GenerateJob
 import io.github.pisces312.droidllm.engineapi.GenerateRequest
 import io.github.pisces312.droidllm.engineapi.GenerateResult
@@ -61,6 +63,10 @@ class LiteRtEngine @Inject constructor(
 
     override val id: EngineId = EngineId.LITERT
     override val displayName: String = "LiteRT-LM"
+    override val version: EngineVersion = EngineVersion(
+        version = BuildConfig.ENGINE_VERSION.takeIf { it.isNotBlank() },
+        commit = BuildConfig.ENGINE_COMMIT.takeIf { it.isNotBlank() },
+    )
 
     private class LiteRtSession(
         override val modelId: String,

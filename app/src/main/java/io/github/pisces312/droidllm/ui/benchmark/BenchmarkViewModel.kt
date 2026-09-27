@@ -23,6 +23,7 @@ import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.LlmEngine
 import io.github.pisces312.droidllm.engineapi.LocalModel
 import io.github.pisces312.droidllm.engineapi.ModelLocation
+import io.github.pisces312.droidllm.engineapi.labelledName
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -89,7 +90,7 @@ class BenchmarkViewModel @Inject constructor(
                 val av = engine.probe(ctx)
                 BenchEngineRow(
                     engineId = engine.id,
-                    engineName = engine.displayName,
+                    engineName = engine.labelledName,
                     available = av is Availability.Available,
                     availabilityLabel = availabilityLabel(av),
                     models = emptyList(),
