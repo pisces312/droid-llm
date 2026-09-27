@@ -7,6 +7,25 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// ---- QNN HTP arch trimming (opt-in) -------------------------------------------------
+// QAIRT ships one HTP Skel/Stub pair per DSP arch; only the pair matching the target SoC
+// is usable at runtime. Trim the rest to shrink the APK by ~70 MB per dropped arch:
+//   -Pdroid.qnnHtpVersions=81        keep only libQnnHtpV81{Skel,Stub}.so
+//   -Pdroid.qnnHtpVersions=79,81     keep both
+//   unset / empty                    keep every version the SDK provides (default)
+// Values accept an optional "v" prefix. See GenieConfigResolver.SOC_TO_HTP for the
+// SoC -> dsp_arch mapping that decides which version a device actually needs.
+// The candidate range is a deliberate superset: AGP ignores exclude patterns that match
+// nothing, so future SDK arch versions are covered without editing this file.
+val qnnHtpCandidateVersions = 60..89
+val qnnHtpKeepVersions: Set<Int> =
+    ((findProperty("droid.qnnHtpVersions") as String?) ?: (findProperty("qnnHtpVersions") as String?))
+        ?.split(',', ' ', ';')
+        ?.mapNotNull { it.trim().removePrefix("v").removePrefix("V").toIntOrNull() }
+        ?.filter { it in qnnHtpCandidateVersions }
+        ?.toSet()
+        ?: emptySet()
+
 android {
     namespace = "io.github.pisces312.droidllm"
     compileSdk = 35
@@ -77,6 +96,14 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            if (qnnHtpKeepVersions.isNotEmpty()) {
+                excludes += (qnnHtpCandidateVersions.toSet() - qnnHtpKeepVersions)
+                    .flatMap { v -> listOf("**/libQnnHtpV${v}Skel.so", "**/libQnnHtpV${v}Stub.so") }
+                logger.lifecycle(
+                    "QNN HTP: keeping v${qnnHtpKeepVersions.sorted().joinToString(", v")}; " +
+                        "trimming all other HTP Skel/Stub.",
+                )
+            }
         }
     }
     // noCompress for model extensions is reserved (models stay external).
