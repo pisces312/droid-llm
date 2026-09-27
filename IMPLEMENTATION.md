@@ -212,7 +212,7 @@
 4. 导出 JSON 到 `Android/data/.../files/benchmark/`，Snackbar 提示文件名
 5. 历史列表出现本次记录，可清空
 
-**阶段状态**：P0–P5 均已完成（P5+ / P5++ 增量亦完成）。**P6（UI/UX 重构）进行中：R1 ✅、R1.5 ✅、R2 ✅、R3 ✅，下一步 R4**，见 §8d。剩余为真机 DoD 与 README 截图。
+**阶段状态**：P0–P5 均已完成（P5+ / P5++ 增量亦完成）。**P6（UI/UX 重构）已完成：R1 ✅、R1.5 ✅、R2 ✅、R3 ✅、R4 ✅**，见 §8d。剩余为真机 DoD 与 README 截图。
 
 ---
 
@@ -580,9 +580,12 @@
 
 ---
 
-## 8d. P6 增量：UI/UX 重构（**进行中**，R1 ✅ / R1.5 ✅ / R2 ✅ / R3 ✅）
+## 8d. P6 增量：UI/UX 重构（**R1 ✅ / R1.5 ✅ / R2 ✅ / R3 ✅ / R4 ✅ 全部完成**）
 
-**状态：🔄 进行中（2026-09-27 立项；R1 ✅、R1.5 ✅、R2 ✅、R3 ✅，下一步 R4）**
+**状态：✅ 已完成（2026-09-27 立项并当日收尾；R1 → R1.5 → R2 → R3 → R4 全部落地）**
+
+> **遗留**：R2 的②③⑤、R3 的手感复核、R4 的视觉复核三项需**真机 arm64**手测（模拟器跑不了真实流式与评测），
+> 见各「交付说明」末尾的「未验证」段与 `docs/mnn.md` §5.1。代码侧无待办。
 
 > **权威输入**：[`docs/UI_REVIEW.md`](docs/UI_REVIEW.md) —— 现状盘点 + 问题清单（含文件:行号）+ 布局方案 + 与 MnnLlmChat 的逐条对照。
 > 本节只做落地拆解，不重复论证。**动手前先通读该文档**；契约约束见 `DESIGN.md` §1.2，界面权威见 `UI_DESIGN.md`。
@@ -625,7 +628,7 @@
 | **R1** ✅ | **引擎显示名统一**：`engine-api` 加 `val EngineId.displayName`，各引擎 `override val displayName` 改为返回它（**单一来源**）；**6 处展示面**全改走它（`labelledName` 仅留给需版本号的场合）。**已完成**，见下方「R1 交付说明」；配套补丁 **R1.5**（Models 三行 chip）见「R1.5 交付说明」 | P0-1 | 极低，纯改名零行为变更 |
 | **R2** ✅ | 五个小改纯收益项：①数值输入本地 buffer（`NumericField`，**每次输入即提交**——非"失焦再解析"，见交付说明）②跟随滚动三件套 ③结果表补单位 ④`Settings` 的 `backend` 只读框 → 下拉 ⑤`ResultTable` 固定行高。**已完成**，见下方「R2 交付说明」 | P0-3~7 | 低（**已完成 2026-09-27**；②待真机验） |
 | **R3** ✅ | **三层控件体系**（筛选 Chip / 一屏仅一个 Filled 主操作 / 次级 Outlined）+ Chat 顶栏重构（作用域条 + 两级 BottomSheet，引擎 chip 带**状态点 ●**〔决策 2〕）+ 采样参数收成输入框上方 chip 并**点击开 BottomSheet**〔决策 4〕。**已完成并回写 `UI_DESIGN.md`**，见下方「R3 交付说明」 | §4.2 首条 + §5.1 | 中（**已完成 2026-09-27**；UI 效果待设备确认） |
-| **R4** | 评测页密度重构（置顶"选模型"卡 + 紧凑引擎行，让「开始评测」回首屏）+ **厂商 logo 资产接入**〔决策 3，含压缩与 `docs/LICENSING.md` 增记〕+ 空态统一为「插图 + 说明 + 按钮」+ 其余打磨。~~Models 引擎 chip 行~~ **已由 R1.5 提前完成** | §4.2 / §4.3 | 中 |
+| **R4** ✅ | 评测页密度重构（置顶"选模型"卡 + 紧凑引擎行，让「开始评测」回首屏）+ **厂商 logo 资产接入**〔决策 3，含压缩与 `docs/LICENSING.md` 增记〕+ 空态统一为「插图 + 说明 + 按钮」+ 其余打磨。~~Models 引擎 chip 行~~ **已由 R1.5 提前完成**。**已完成**，见下方「R4 交付说明」；实际做法与计划的差异见该节① | §4.2 / §4.3 | 中（**已完成 2026-09-27**，13 个 logo 压到 96.5KB） |
 
 ### R1 交付说明（2026-09-27，✅ 完成）
 
@@ -782,6 +785,119 @@
 面板搬进 sheet 后该指代已失效 → 改为「见聊天页参数 chip 打开的『采样参数』里的灰显说明」。
 
 
+### R4 交付说明（2026-09-27，✅ 完成）
+
+评测页密度重构 + 厂商 logo 资产接入 + 空态统一 + P2 打磨，共 **13 个改动文件 + 3 个新增**（含 13 个 logo 资源）。
+
+| 文件 | 改动 |
+|---|---|
+| `ui/benchmark/BenchmarkScreen.kt` | ①评测页密度重构（本节①） |
+| `ui/components/VendorLogo.kt`（新增） | ②厂商 logo 组件 + 映射表 |
+| `res/drawable-nodpi/*_icon.webp`（新增 13 个） | ②logo 资源，96.5KB |
+| `scripts/shrink_vendor_logos.py`（新增） | ②压缩脚本（1024px → 192px WebP q88, method=6） |
+| `ui/components/UiComponents.kt` | 新增 `DroidCard`、`EmptyState`，`formatModelSize` 沿用 |
+| `ui/models/ModelsScreen.kt` | 市场条目挂 logo；本地列表空态；路径加复制按钮；3 处裸 `Card` → `DroidCard` |
+| `ui/benchmark/BenchmarkScreen.kt` | 3 处裸 `Card` → `DroidCard` |
+| `ui/settings/SettingsScreen.kt` | `SectionCard` 内 `Card` → `DroidCard` |
+| `ui/chat/ChatScreen.kt` | 空态改 `EmptyState`（带"去模型页"按钮）；标签 `temperature` → `temp` |
+| `ui/DroidLlmRoot.kt` | 抽出 `goToModels`，Chat 与 Benchmark 共用 |
+| `ui/models/FileBrowser.kt` | 文件行 `heightIn(min = 44.dp)` |
+| `ui/theme/Color.kt`+`Theme.kt` | 新增 `Dark/LightOutlineVariant`，`outlineVariant` 指向它 |
+| `ui/theme/Type.kt` | `bodySmall` 11sp → 12sp |
+| `docs/LICENSING.md` | 新增 §2④ logo 商标条目 + 合规清单一条 |
+
+**① 评测页「开始评测」回首屏**（对应 `UI_REVIEW` §4.2「评测页"开始评测"在首屏外」）
+
+计划写的是"置顶『选模型』卡 + 紧凑引擎行"，**实际做法不同**：做成 **每个引擎一行**，行内自带模型下拉，
+不另设置顶卡——因为选模型本来就只对**已勾选**的引擎有意义，抽成独立卡片反而把"引擎 ↔ 模型"的从属关系藏了
+（与 R3 作用域条同一条理由）。一行 52dp，右侧按四态给不同内容：
+
+| 状态 | 右侧内容 |
+|---|---|
+| 已勾选且引擎有模型 | `⌄` 图标（整行开启 `ExposedDropdownMenuBox`，下拉底部有「去『模型』页添加更多」） |
+| 已勾选但引擎无模型 | 灰字"该引擎还没有模型" |
+| 未勾选但引擎可用且无模型 | 紫字「去「模型」页」，`clickable + padding(h 8, v 8)`（**不用 `TextButton`**，见踩坑③） |
+| 引擎不可用 | `availabilityLabel`（`MissingDependency` 等） |
+
+引擎区由「每引擎一卡 + 内嵌下拉」（约 **540dp**）压到「一卡 4 行」（约 **210dp**）；再把「开始评测」从
+`ParamsSection` **之后移到之前**（参数是可选高级项，不该挡主操作），页间距 `vertical 12 → 8`、
+`spacedBy 12 → 8`，banner 与参数摘要各压成一行（`"建议插电、静置冷却；>42℃ 仅警告，不中断"` /
+`"warmup 1 · runs 3 · tokens 128（共 4 次）"`）。**最终 banner 显示时按钮也完整在首屏**（模拟器实测）。
+
+**② 厂商 logo 资产接入**（决策 3）
+
+- 组件 `VendorLogo(vendor: String?, size: Dp = 40.dp)`：`vendor` 命中映射表 → `Image(painterResource)`（8dp 圆角）；
+  未命中 → 首字母方块（`surfaceContainerHigh` 底 + `outlineVariant` 描边）。**只挂在模型市场条目**上。
+- 映射 **13 家**（按 catalog `vendor` 字段精确小写拼写做 key）：`qwen` / `smol` / `gemma` / `deepseek` /
+  `llama` / `hunyuan` / `thudm`(→ChatGLM) / `minicpm` / `internlm` / `gpt`(→OpenAI) / `01.ai`(→Yi) /
+  `baichuan` / `phi`。覆盖约 **109/162 ≈ 67%**（按条数，Qwen 一家 63 条）。
+- **为什么不做子串推断**：`LocalModel` 没有 `vendor` 字段（引擎只知道 `ModelLocation` 路径），已导入列表只能靠名字猜，
+  那会把 `TinyLlama` 标成 Meta Llama、把 `Google` 标成 Gemma——**宁可回落文字也不误标商标**。
+  市场条目有精确 `vendor`，所以只接在市场（`UI_REVIEW` §5.1 第 8 条已据此更正原「74% 命中」的说法）。
+- 压缩：源 17 个文件约 **913KB**（`smolm_icon.png` 单张 417KB）→ 取 13 个转 **192px WebP q88**，
+  合计 **96.5KB**（`smolm` 417KB → 12.5KB）。脚本 `scripts/shrink_vendor_logos.py` 读 `MNN_LLM_CHAT_ROOT`，
+  输出直接落 `app/src/main/res/drawable-nodpi/`（**放 `scripts/` 不是 `build/`——后者在 gitignore 里**）。
+- 合规：`docs/LICENSING.md` §2④ 记来源/用途/权利归属（各厂商商标，Apache-2.0 不覆盖商标）+ 合规清单一条。
+
+**③ 空态统一为「图标 + 一句说明 + 按钮」**（模式 6）
+
+新增 `EmptyState(icon, text, actionLabel?, onAction?)`（44dp `outlineVariant` 图标 + 居中 `bodyMedium` + 可选 `PrimaryButton`），
+三处接入：
+
+| 位置 | 内容 | 动作 |
+|---|---|---|
+| Chat 空态 | "先在「模型」页添加模型，再回到这里启动它" | Filled「去「模型」页」 |
+| Models 本地列表空 | "还没有模型。可从模型市场下载，或用上面的卡片导入本地文件。" | Filled「浏览模型市场」（切到市场 Tab） |
+| Benchmark | **不收进空态**，改为引擎行的「去「模型」页」文字入口 | 顺带修掉原来的中英混排 `去 Models 页` |
+
+Chat 与 Benchmark 的跳转共用 `DroidLlmRoot` 抽出的 `goToModels`，避免两处各写一遍导航。
+
+**④ P2 打磨**（4 项，逐条对应 `UI_REVIEW` §4.3）
+
+| 项 | 落地 |
+|---|---|
+| `bodySmall` 偏小 | 11sp → **12sp**；`labelSmall` 保持 11sp 作脚注 |
+| 浅色卡片浮不起来 | **改做法**：实测 `#EEEAF8` 卡片 vs `#F6F5FB` 背景只有 **1.09:1**（相对亮度 0.841 / 0.920），改底色无法可辨 → 新增 `outlineVariant` token（深色 `#3A3A42` / 浅色 `#D5CFE8`），靠 **1dp 描边**拉开层次 |
+| 长路径无法复制 | 页内 `CopyPathButton`（`ClipboardManager` + Toast「已复制」），根目录行与模型条目路径各挂一颗 |
+| 点击目标不足 44dp | `FileBrowser` 文件行 `heightIn(min = 44.dp)` + 垂直居中 |
+| 术语漂移 | Chat 字段标签 `temperature` → `temp`（与参数 chip、`UI_DESIGN` §5.4 统一） |
+
+`DroidCard` 顺带统一了三个页面的裸 `Card`（`ModelsScreen` ×3 / `BenchmarkScreen` ×3 / `SettingsScreen` ×1），
+把"卡片底色 + 圆角 + 描边"收成一处，避免下个页面又各写一套。
+
+**踩坑（三条，已回写 `UI_DESIGN.md` §4.5）**
+
+1. **Kotlin 块注释可嵌套**：KDoc 里写 `res/drawable-nodpi/*_icon.*` 时那个 `/*` 会开启嵌套注释 →
+   `Unclosed comment`，且**报错行号指向文件末尾**（不是出错行），照行号找只会白费时间。
+2. **`TextButton` 会把行高撑起来**：引擎行内第一次用 `TextButton` 放那个跳转入口，
+   行高由 52dp 涨到 63dp，又把这颗按钮挤出首屏 → 改用 `clickable + padding(h 8, v 8)` 的 `Text`。
+3. **浅色细描边的可辨性只能靠实测**：不要凭"加个边框应该行"下结论，算一下 WCAG 相对亮度再定方案。
+
+**验证**：`:app:assembleDebug` **BUILD SUCCESSFUL**；`:core:engine-api` / `:core:common` 单测全绿。
+
+**模拟器实测**（`emulator-5554`，1080×2400，截图 `build/uicheck/r4_0*.png`）：
+
+| # | 验证项 | 结果 |
+|---|---|---|
+| 1 | 评测页引擎区高度 | 4 卡 → 1 卡 4 行，约 540dp → **210dp** |
+| 2 | **★「开始评测」在首屏** | 默认与 banner 显示时**均完整可见**（两次迭代：先压间距只露出顶边，再把按钮移到参数之前才彻底） |
+| 3 | 引擎行四态 | 勾选+有模型 → `⌄`；未勾选+无模型 → 紫字「去「模型」页」；不可用 → `availabilityLabel`；行高 52dp |
+| 4 | 行内下拉 | 底部含「去「模型」页添加更多」，与工具栏入口行为一致 |
+| 5 | 市场条目 logo | `qwen_icon` 等命中项显示圆角图；未命中厂商显示首字母方块（**无崩溃、无空白**） |
+| 6 | 本地列表空态 | `EmptyState`（文件夹图标 + 说明 + Filled「浏览模型市场」），点击切到市场 Tab |
+| 7 | Chat 空态 | 同款 `EmptyState`，Filled「去「模型」页」跳到模型页 |
+| 8 | 路径复制 | 根目录行与模型条目路径各一颗图标按钮，`IconButton` 32dp + 16dp 图标 |
+| 9 | 卡片描边 | 深色主题下卡片与背景可辨（1dp `outlineVariant`） |
+| 10 | 术语统一 | Chat 参数 chip 与采样 sheet 字段标签均为 `temp` |
+
+**未验证（模拟器不可及，待真机 arm64）**：logo 在 3x 高密度屏的清晰度（192px 源 → 显示 40dp，
+在 3x 屏需 120px，余量够但要看实际观感）、浅色主题描边的观感、市场长列表滚动时 logo 的解码开销。
+**R2 的跟随滚动与结果表、R3 的手势手感**同样仍待真机（`docs/mnn.md` §5.1）。
+
+**未做（明确记录，不是遗漏）**：聊天页 `titleLarge` 标题（会挤掉消息区，`UI_REVIEW` §4.3 建议不做）、
+消息长按复制（属**新功能**，不在"打磨"范围）、评测结果"行展开看样本"（`UI_REVIEW` §4.1 遗留，仍未实现）。
+
+
 
 ### 参考实现（本机源码，只借交互不借实现）
 
@@ -811,6 +927,11 @@
   - **模拟器已验证 1–11 项**（见「R3 交付说明」实测表，含 `DESIGN §1.2` 回归）；真机只需复核视觉与手势
     手感（sheet 拖动、chip 横滚）；跟随滚动与结果表仍待真机。
 - R4：评测页「开始评测」在首屏；模型条目厂商 logo 命中/兜底均正常；`LICENSING.md` 已记 logo 商标条目。
+  - **模拟器已验证 10 项**（见「R4 交付说明」实测表，含 banner 显示时按钮仍在首屏、logo 命中和兜底均不崩）；
+    真机只需复核 logo 清晰度与浅色描边观感。
+
+> **§8d 收尾结论**：代码侧 R1–R4 全部完成，构建 + 单测全绿。**唯一未闭环的是三项真机 arm64 复核**
+> （跟随滚动 / 结果表；sheet 与 chip 手感；logo 与描边观感）——模拟器跑不了真实流式与评测，属环境限制。
 
 ### 决策状态
 
@@ -819,7 +940,10 @@
 ✅ **R1.5 已完成**（Models 三行 chip；模拟器实测三行文字全部单行）。
 ✅ **R2 已完成**（5 项 UI 小改；模拟器验证 ①数值框 ④backend 下拉，②③⑤待真机）。
 ✅ **R3 已完成**（三层控件 + 顶栏作用域条 + 两级 sheet；模拟器实测 11 项，含 `DESIGN §1.2` 回归）。
-**当前进度：R1 ✅ → R1.5 ✅ → R2 ✅ → R3 ✅ → 下一步 R4**（评测页密度 + 厂商 logo 资产 + 空态统一，见上表）。
+✅ **R4 已完成**（评测页密度重构 + 13 个厂商 logo〔96.5KB〕+ 空态统一 + P2 打磨；模拟器实测 10 项）。
+**当前进度：R1 ✅ → R1.5 ✅ → R2 ✅ → R3 ✅ → R4 ✅ —— §8d 全部完成（2026-09-27）**。
+**剩余只差真机 arm64 复核**（代码侧无待办）：R2 的②跟随滚动 / ③⑤结果表，R3 的 sheet 与 chip 手感，
+R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑不了真实流式与评测（`docs/mnn.md` §5.1）。
 **R3 遗留已闭环**（2026-09-27 收尾）：`UI_DESIGN.md` §4.4 把"每个列表行都挂一个 Filled"列为反例，而模型市场
 原本每条目仍挂一颗 Filled「下载」/「已下载 · 添加到列表」（R3 只收敛了「刷新状态」那一颗）→ 已降为
 `OutlinedToolButton`，市场页 Filled 数为 0；同步修正 §4.4 与 §5.2 措辞（§5.2 原写"下载是唯一 Filled"，自相矛盾）。

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -179,6 +180,9 @@ fun FileBrowserDialog(
                         Column(
                             Modifier
                                 .fillMaxWidth()
+                                // 44dp is the minimum comfortable touch target; a bare
+                                // 14sp line with 8dp padding came to about 36dp.
+                                .heightIn(min = 44.dp)
                                 .alpha(if (blocked) 0.45f else 1f)
                                 .clickable(enabled = !blocked && entry.selectable) {
                                     if (entry.file.isDirectory) {
@@ -188,6 +192,7 @@ fun FileBrowserDialog(
                                     }
                                 }
                                 .padding(vertical = 8.dp, horizontal = 4.dp),
+                            verticalArrangement = Arrangement.Center,
                         ) {
                             Text(
                                 entry.label,

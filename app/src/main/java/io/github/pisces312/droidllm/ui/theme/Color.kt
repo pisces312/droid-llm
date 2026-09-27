@@ -12,6 +12,8 @@ object DroidColors {
     val DarkSurface = Color(0xFF1E1E1E)
     val DarkSurfaceHigh = Color(0xFF2A2A2A)
     val DarkOutline = Color(0xFF3C3C3C)
+    /** Card hairline. Slightly lighter than the card fill so the edge reads. */
+    val DarkOutlineVariant = Color(0xFF3A3A42)
     val DarkPrimary = Color(0xFF7C6AF5)
     val DarkOnPrimary = Color(0xFFFFFFFF)
     val DarkAccent = Color(0xFF26C6DA)
@@ -27,6 +29,9 @@ object DroidColors {
     val LightSurface = Color(0xFFFFFFFF)
     val LightSurfaceHigh = Color(0xFFEEEAF8)
     val LightOutline = Color(0xFFC9C5D8)
+    /** Card hairline. The light card fill sits only ~1.09:1 against the background,
+     *  so the edge has to come from this stroke rather than from the fill. */
+    val LightOutlineVariant = Color(0xFFD5CFE8)
     val LightPrimary = Color(0xFF5B4BD6)
     val LightOnPrimary = Color(0xFFFFFFFF)
     val LightAccent = Color(0xFF00838F)

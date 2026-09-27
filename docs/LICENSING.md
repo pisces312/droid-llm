@@ -41,6 +41,17 @@
 |------|--------|
 | AGP / Gradle / KSP | Apache-2.0 |
 
+### ④ 厂商 logo 商标（仅标识性使用，非代码依赖）
+
+| 项 | 说明 |
+|----|------|
+| 资产 | `app/src/main/res/drawable-nodpi/*_icon.webp`，13 个文件共 96KB |
+| 来源 | MNN 官方 Android demo `MnnLlmChat` 的 `app/src/main/res/drawable-nodpi/`；由 `scripts/shrink_vendor_logos.py` 从 1024px 压到 192px WebP |
+| 用途 | 在「模型市场」列表标注模型的**厂商**出处（`VendorLogo.kt`）。属**指示性使用**：仅用于说明模型来自哪家，不代表任何关联、赞助或背书；不改色、不叠加、不二次创作 |
+| 权利归属 | 各 logo 是其所属公司的**商标**。MNN 仓库的 Apache-2.0 只覆盖其代码，**不覆盖这些商标**；商标权归各厂商所有 |
+| 已映射 | Qwen / Smol / Gemma / DeepSeek / Llama / Hunyuan（THUDM→ChatGLM）/ MiniCPM / InternLM / GPT→OpenAI / 01.AI→Yi / Baichuan / Phi |
+| 未命中 | 其余厂商（LFM、FastVLM、MiMo、MobileLLM…）不显示 logo，回落为文字首字母。**不做子串推断**，避免把 `TinyLlama` 标成 Meta Llama、把 `Google` 标成 Gemma |
+
 ## 3. 结论：无 copyleft「传染」case
 
 全依赖树未发现 GPL / LGPL / AGPL / MPL / EPL / SSPL 等 copyleft 组件：
@@ -71,6 +82,7 @@
 - [ ] 保留 vendored 第三方源码的 LICENSE 声明（llama.cpp 等）
 - [ ] Apache-2.0 组件按条款保留许可与声明
 - [ ] 声明 Qualcomm SDK 使用条款
+- [ ] 厂商 logo 仅作标识性使用（§2④）；若某厂商要求下架其标识，从 `VendorLogo.kt` 的映射中移除即可
 - [ ] 模型权重（GGUF / MNN / litertlm / task）由用户自备，各自许可与代码许可无关，分发模型时另行遵守
 
 ## 7. 关联文档

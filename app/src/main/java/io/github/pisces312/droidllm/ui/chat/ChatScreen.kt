@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -66,6 +67,7 @@ import io.github.pisces312.droidllm.engineapi.ConfigField
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.displayName
 import io.github.pisces312.droidllm.ui.components.ChoiceChipRow
+import io.github.pisces312.droidllm.ui.components.EmptyState
 import io.github.pisces312.droidllm.ui.components.LabeledDropdown
 import io.github.pisces312.droidllm.ui.components.MetricPill
 import io.github.pisces312.droidllm.ui.components.NumericField
@@ -79,7 +81,10 @@ import io.github.pisces312.droidllm.ui.theme.DroidTheme
 import kotlinx.coroutines.launch
 
 @Composable
-fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
+fun ChatScreen(
+    onGoToModels: () -> Unit = {},
+    vm: ChatViewModel = hiltViewModel(),
+) {
     val engines by vm.engines.collectAsState()
     val selectedEngine by vm.selectedEngine.collectAsState()
     val models by vm.models.collectAsState()
@@ -152,14 +157,12 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
                     .fillMaxWidth(),
             ) {
                 if (messages.isEmpty()) {
-                    Text(
-                        "先在「模型」页添加模型，再回到这里启动它",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(horizontal = 24.dp),
+                    EmptyState(
+                        icon = Icons.Filled.Folder,
+                        text = "先在「模型」页添加模型，再回到这里启动它",
+                        actionLabel = "去「模型」页",
+                        onAction = onGoToModels,
+                        modifier = Modifier.align(Alignment.Center),
                     )
                 } else {
                     LazyColumn(
@@ -651,7 +654,7 @@ private fun SamplingSheet(
             Spacer(Modifier.height(12.dp))
             val id = engineId
             NumericField(
-                label = "temperature",
+                label = "temp",
                 value = sampling.temperature.toString(),
                 decimal = true,
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TEMPERATURE),

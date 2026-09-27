@@ -1,5 +1,9 @@
 package io.github.pisces312.droidllm.ui.models
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,13 +12,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -32,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.pisces312.droidllm.data.catalog.DownloadStatus
@@ -41,9 +45,38 @@ import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.displayName
 import io.github.pisces312.droidllm.engineapi.engineIdFromStorage
 import io.github.pisces312.droidllm.ui.components.ChoiceChipRow
+import io.github.pisces312.droidllm.ui.components.DroidCard
+import io.github.pisces312.droidllm.ui.components.EmptyState
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
+import io.github.pisces312.droidllm.ui.components.VendorLogo
 import io.github.pisces312.droidllm.ui.components.formatModelSize
+
+/**
+ * Copies [text] to the clipboard and confirms with a toast.
+ *
+ * Paths here run past 80 characters and exist to be pasted into a file manager or
+ * `adb`, so every path the page shows carries its own copy affordance.
+ */
+@Composable
+private fun CopyPathButton(text: String) {
+    val context = LocalContext.current
+    IconButton(
+        onClick = {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("path", text))
+            Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+        },
+        modifier = Modifier.size(32.dp),
+    ) {
+        Icon(
+            Icons.Filled.ContentCopy,
+            contentDescription = "复制路径",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
+        )
+    }
+}
 
 @Composable
 fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
@@ -64,11 +97,16 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
     ) {
         Spacer(Modifier.height(8.dp))
         Text("模型管理", style = MaterialTheme.typography.titleLarge)
-        Text(
-            "共享模型根目录：${modelRoot.ifEmpty { vm.modelRoot() }}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        val rootPath = modelRoot.ifEmpty { vm.modelRoot() }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "共享模型根目录：$rootPath",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            CopyPathButton(rootPath)
+        }
         Spacer(Modifier.height(8.dp))
 
         TabRow(selectedTabIndex = tab) {
@@ -116,6 +154,7 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
                 modelRoot = modelRoot.ifEmpty { vm.modelRoot() },
                 onValidate = vm::validate,
                 onDelete = vm::delete,
+                onGoToMarket = { tab = 1 },
             )
         } else {
             MarketTab(vm = vm)
@@ -156,13 +195,11 @@ private fun LocalModelsTab(
     modelRoot: String,
     onValidate: (String) -> Unit,
     onDelete: (String) -> Unit,
+    onGoToMarket: () -> Unit,
 ) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-            ) {
+            DroidCard {
                 Column(Modifier.padding(12.dp)) {
                     Text("添加 / 导入第三方模型", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
@@ -231,8 +268,18 @@ private fun LocalModelsTab(
                 }
             }
         }
+        if (models.isEmpty()) {
+            item {
+                EmptyState(
+                    icon = Icons.Filled.Folder,
+                    text = "还没有模型。可从模型市场下载，或用上面的卡片导入本地文件。",
+                    actionLabel = "浏览模型市场",
+                    onAction = onGoToMarket,
+                )
+            }
+        }
         items(models) { model ->
-            Card(Modifier.fillMaxWidth()) {
+            DroidCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
                     Text(model.displayName, style = MaterialTheme.typography.titleSmall)
                     Text(
@@ -241,14 +288,19 @@ private fun LocalModelsTab(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(
-                        when (val loc = model.location) {
-                            is ModelLocation.FilePath -> loc.path
-                            is ModelLocation.SafUri -> loc.uri
-                            is ModelLocation.AppPrivate -> loc.relativePath
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    val path = when (val loc = model.location) {
+                        is ModelLocation.FilePath -> loc.path
+                        is ModelLocation.SafUri -> loc.uri
+                        is ModelLocation.AppPrivate -> loc.relativePath
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            path,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        CopyPathButton(path)
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedToolButton(
                             "校验",
@@ -317,19 +369,27 @@ private fun MarketTab(vm: ModelsViewModel) {
             items(rows, key = { it.model.id }) { row ->
                 // catalog stores the raw EngineId.name; resolve it for display.
                 val engineLabel = engineIdFromStorage(row.model.engine)?.displayName ?: row.model.engine
-                Card(Modifier.fillMaxWidth()) {
+                DroidCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(row.model.name, style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "$engineLabel · ${row.model.vendor}" +
-                                (if (row.model.sizeBytes > 0) {
-                                    " · " + formatModelSize(row.model.sizeBytes)
-                                } else {
-                                    ""
-                                }),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            VendorLogo(row.model.vendor)
+                            Column(Modifier.weight(1f)) {
+                                Text(row.model.name, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    "$engineLabel · ${row.model.vendor}" +
+                                        (if (row.model.sizeBytes > 0) {
+                                            " · " + formatModelSize(row.model.sizeBytes)
+                                        } else {
+                                            ""
+                                        }),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                         if (row.model.tags.isNotEmpty()) {
                             Text(
                                 row.model.tags.joinToString(" · "),

@@ -16,8 +16,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -54,6 +52,7 @@ import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.ProbeContext
 import io.github.pisces312.droidllm.ui.components.ChoiceChipRow
+import io.github.pisces312.droidllm.ui.components.DroidCard
 import io.github.pisces312.droidllm.ui.components.LabeledDropdown
 import io.github.pisces312.droidllm.ui.components.NumericField
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
@@ -775,9 +774,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
 
 @Composable
 private fun SectionCard(title: String, content: @Composable () -> Unit) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    DroidCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),

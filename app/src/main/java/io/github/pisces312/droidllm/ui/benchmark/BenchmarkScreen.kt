@@ -1,5 +1,6 @@
 package io.github.pisces312.droidllm.ui.benchmark
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -9,16 +10,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -29,9 +35,12 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -44,13 +53,14 @@ import io.github.pisces312.droidllm.benchmark.CaseResult
 import io.github.pisces312.droidllm.benchmark.TargetResult
 import io.github.pisces312.droidllm.engineapi.displayName
 import io.github.pisces312.droidllm.engineapi.engineIdFromStorage
-import io.github.pisces312.droidllm.ui.components.EngineStatusCard
-import io.github.pisces312.droidllm.ui.components.LabeledDropdown
+import io.github.pisces312.droidllm.ui.components.DroidCard
 import io.github.pisces312.droidllm.ui.components.MetricPill
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
 import io.github.pisces312.droidllm.ui.components.ProgressHeader
 import io.github.pisces312.droidllm.ui.components.ResultTable
+import io.github.pisces312.droidllm.ui.components.StatusDot
+import io.github.pisces312.droidllm.ui.components.StatusDotState
 import io.github.pisces312.droidllm.ui.components.TableCellModel
 import io.github.pisces312.droidllm.ui.components.WarningBanner
 import io.github.pisces312.droidllm.ui.theme.DroidTheme
@@ -95,14 +105,16 @@ fun BenchmarkScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            // 8dp rather than 12dp: this page has six stacked sections before the start
+            // button, and the extra 20dp was what kept it off the first screen.
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text("评测", style = MaterialTheme.typography.titleLarge)
 
             if (state.showCoolingBanner) {
                 WarningBanner(
-                    text = "建议插电、静置冷却后再测；温度 >42℃ 仅警告，不会中断",
+                    text = "建议插电、静置冷却；>42℃ 仅警告，不中断",
                     onDismiss = vm::dismissCoolingBanner,
                 )
             }
@@ -117,8 +129,6 @@ fun BenchmarkScreen(
 
             CaseSection(state = state, vm = vm)
 
-            ParamsSection(state = state, vm = vm)
-
             if (!state.running) {
                 PrimaryButton(
                     "开始评测",
@@ -127,6 +137,11 @@ fun BenchmarkScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+
+            // Run parameters are optional tuning with sane defaults, so the start button
+            // sits above them rather than below. That is also what keeps it on the first
+            // screen once the cooling banner is up.
+            ParamsSection(state = state, vm = vm)
 
             if (state.running || state.paused) {
                 ProgressHeader(
@@ -160,6 +175,15 @@ fun BenchmarkScreen(
     }
 }
 
+/**
+ * One compact line per engine: checkbox, status dot, name, and the chosen model.
+ *
+ * This was a card per engine with a full dropdown inside. With four engines and the
+ * default "every available engine is checked" it ran to roughly 540dp, which pushed
+ * 「开始评测」 off the first screen. A line is ~52dp, so the whole engine×model matrix
+ * fits in ~210dp and the model list opens from the line itself. Multi-select is kept:
+ * a benchmark compares engines, so exactly one model may be pinned per engine.
+ */
 @Composable
 private fun EngineConfigSection(
     state: BenchmarkUiState,
@@ -170,51 +194,127 @@ private fun EngineConfigSection(
         Text("引擎 × 模型", style = MaterialTheme.typography.titleMedium)
         if (state.engineRows.isEmpty()) {
             Text("正在探测引擎…", style = MaterialTheme.typography.labelMedium)
+            return@Column
         }
-        state.engineRows.forEach { row ->
-            Card(
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-            ) {
-                Column(Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = row.included,
-                            onCheckedChange = { vm.toggleEngine(row.engineId, it) },
-                            enabled = row.available && row.models.isNotEmpty(),
-                        )
-                        EngineStatusCard(
-                            name = row.engineName,
-                            available = row.available,
-                            statusText = row.availabilityLabel,
-                            modifier = Modifier.weight(1f),
-                        )
+        DroidCard {
+            Column(Modifier.padding(vertical = 4.dp)) {
+                state.engineRows.forEachIndexed { index, row ->
+                    if (index > 0) {
+                        HorizontalDivider(Modifier.padding(start = 56.dp, end = 12.dp))
                     }
-                    if (row.included) {
-                        if (row.models.isEmpty()) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(
-                                    "暂无模型，先到「模型」页添加",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                TextButton(onClick = onGoToModels) { Text("去 Models 页") }
-                            }
-                        } else {
-                            LabeledDropdown(
-                                label = "模型",
-                                options = row.models.map { it.id to it.displayName },
-                                selectedKey = row.selectedModelId,
-                                onSelected = { vm.selectModel(row.engineId, it) },
-                                emptyText = "暂无模型",
-                            )
-                        }
-                    }
+                    EngineRow(row = row, vm = vm, onGoToModels = onGoToModels)
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EngineRow(
+    row: BenchEngineRow,
+    vm: BenchmarkViewModel,
+    onGoToModels: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectable = row.available && row.models.isNotEmpty()
+    val selected = row.models.firstOrNull { it.id == row.selectedModelId }
+    val extra = DroidTheme.extra
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .padding(end = 12.dp),
+    ) {
+        Checkbox(
+            checked = row.included,
+            onCheckedChange = { vm.toggleEngine(row.engineId, it) },
+            enabled = selectable,
+        )
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { if (row.included && selectable) expanded = it },
+            modifier = Modifier.weight(1f),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = row.included && selectable)
+                    .padding(vertical = 8.dp),
+            ) {
+                StatusDot(
+                    state = if (row.available) StatusDotState.OK else StatusDotState.UNAVAILABLE,
+                    solid = false,
+                )
+                Text(
+                    row.engineName,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+                // The right side shows one of four things: the chosen model, the dropdown
+                // arrow, a jump to the models page when this engine has none, or why the
+                // engine cannot be used at all.
+                if (row.included && selected != null) {
+                    Text(
+                        selected.displayName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = extra.accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                when {
+                    row.included && selectable -> Icon(
+                        Icons.Filled.ArrowDropDown,
+                        contentDescription = "选择模型",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // A TextButton here would drag the line to 63dp and push 开始评测
+                    // back off the first screen; the padded click target keeps the line
+                    // at 52dp without shrinking the tap area to the glyph.
+                    row.available && row.models.isEmpty() -> Text(
+                        "去「模型」页",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable(onClick = onGoToModels)
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                    )
+                    else -> Text(
+                        row.availabilityLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                row.models.forEach { model ->
+                    DropdownMenuItem(
+                        text = { Text(model.displayName) },
+                        onClick = {
+                            vm.selectModel(row.engineId, model.id)
+                            expanded = false
+                        },
+                    )
+                }
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("去「模型」页添加更多") },
+                    onClick = {
+                        expanded = false
+                        onGoToModels()
+                    },
+                )
             }
         }
     }
@@ -257,10 +357,7 @@ private fun CaseSection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
 
 @Composable
 private fun ParamsSection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
-    Card(
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
+    DroidCard {
         Column(Modifier.padding(12.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -292,7 +389,7 @@ private fun ParamsSection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
                 }
             } else {
                 Text(
-                    "warmup=${state.warmup} · runs=${state.runs} · maxNewTokens=${state.maxNewTokens}（默认样本共 ${state.warmup + state.runs} 次）",
+                    "warmup ${state.warmup} · runs ${state.runs} · tokens ${state.maxNewTokens}（共 ${state.warmup + state.runs} 次）",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -386,10 +483,7 @@ private fun HistorySection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
             state.history.take(8).forEach { item ->
                 // engineId is persisted as EngineId.name; resolve it for display.
                 val engineLabel = engineIdFromStorage(item.engineId)?.displayName ?: item.engineId
-                Card(
-                    shape = MaterialTheme.shapes.medium,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                ) {
+                DroidCard {
                     Column(Modifier.padding(10.dp)) {
                         Text("$engineLabel · ${item.modelName}", style = MaterialTheme.typography.labelMedium)
                         Text(

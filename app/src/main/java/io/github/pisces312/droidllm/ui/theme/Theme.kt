@@ -26,7 +26,7 @@ private val DarkColorScheme = darkColorScheme(
     surfaceContainerHigh = DroidColors.DarkSurfaceHigh,
     surfaceContainerHighest = DroidColors.DarkSurfaceHigh,
     outline = DroidColors.DarkOutline,
-    outlineVariant = DroidColors.DarkSurfaceHigh,
+    outlineVariant = DroidColors.DarkOutlineVariant,
     error = DroidColors.DarkError,
     onError = Color.White,
 )
@@ -47,7 +47,7 @@ private val LightColorScheme = lightColorScheme(
     surfaceContainerHigh = DroidColors.LightSurfaceHigh,
     surfaceContainerHighest = DroidColors.LightSurfaceHigh,
     outline = DroidColors.LightOutline,
-    outlineVariant = DroidColors.LightSurfaceHigh,
+    outlineVariant = DroidColors.LightOutlineVariant,
     error = DroidColors.LightError,
     onError = Color.White,
 )

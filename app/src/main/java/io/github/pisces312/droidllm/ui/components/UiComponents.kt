@@ -8,6 +8,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +33,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -50,8 +52,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -325,6 +329,70 @@ fun OutlinedToolButton(
         modifier = modifier.height(height),
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/**
+ * The standard content card: a `surfaceContainerHigh` fill plus a 1dp `outlineVariant`
+ * hairline.
+ *
+ * In light theme the fill (#EEEAF8) sits only about 1.09:1 against the background
+ * (#F6F5FB), so the card edge was invisible and the boundary had to be guessed. The
+ * hairline supplies it in both themes. Padding stays with the caller, since it runs from
+ * 10dp for list entries to 20dp for form sections.
+ */
+@Composable
+fun DroidCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        content = content,
+    )
+}
+
+/**
+ * Shared empty state: an icon, one sentence, and the action that resolves it.
+ *
+ * The pages used to handle this three different ways — a bare sentence on Chat, an empty
+ * area on Models, and a paragraph on Benchmark whose button said「去 Models 页」in English
+ * while every other label was Chinese. The action is filled because an empty screen has no
+ * competing primary action (UI_DESIGN 4.4).
+ */
+@Composable
+fun EmptyState(
+    icon: ImageVector,
+    text: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(44.dp),
+            tint = MaterialTheme.colorScheme.outlineVariant,
+        )
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        if (actionLabel != null && onAction != null) {
+            PrimaryButton(actionLabel, onClick = onAction)
+        }
     }
 }
 

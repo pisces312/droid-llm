@@ -59,22 +59,21 @@ fun DroidLlmRoot() {
             }
         },
     ) { padding ->
+        val goToModels: () -> Unit = {
+            nav.navigate("models") {
+                popUpTo("chat") { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
         NavHost(
             navController = nav,
             startDestination = "chat",
             modifier = Modifier.padding(padding),
         ) {
-            composable("chat") { ChatScreen() }
+            composable("chat") { ChatScreen(onGoToModels = goToModels) }
             composable("models") { ModelsScreen() }
-            composable("benchmark") {
-                BenchmarkScreen(onGoToModels = {
-                    nav.navigate("models") {
-                        popUpTo("chat") { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                })
-            }
+            composable("benchmark") { BenchmarkScreen(onGoToModels = goToModels) }
             composable("settings") { SettingsScreen() }
         }
     }

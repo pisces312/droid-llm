@@ -98,9 +98,12 @@
 | `EngineStatusCard` | 一行：`StatusDot` + 引擎名 + 状态句；灰显时透明度 45% |
 | `StatusDot` | 8dp 实心 / 10dp 空心圆；三态见 §7.2，`solid=false` 表示"可用但未加载" |
 | `ChoiceChipRow<T>` | 横向滚动 `FilterChip` 单选行；`dimmed` 只降透明度**不禁用**（不可用引擎仍要能点开看原因），`leading` 放状态点 |
+| `DroidCard` | 内容卡：`SurfaceHigh` 底 + **1dp `outlineVariant` 描边**。浅色下卡片底与背景只有约 1.09:1 对比，边界全靠这道描边（§4.5） |
+| `EmptyState` | 空态：大号 `outlineVariant` 图标 + 一句居中说明 + 可选 `PrimaryButton`。空屏没有竞争性主操作，故按钮走 Filled |
 | `LabeledDropdown` | Outlined 下拉，吃 `key to label` 列表；空态文案可传 |
 | `NumericField` | 数值输入框：本地 buffer + 每次输入即提交；末尾小数点不提交（见 §4.5） |
 | `SheetTitle` | BottomSheet 顶部标题块（标题 + 一行上下文） |
+| `VendorLogo` | 厂商 logo（40dp，圆角 8dp），未命中回落为首字母方块。资产、覆盖范围与商标说明见 `docs/LICENSING.md` §2④ |
 | `MetricPill` | 圆角胶囊，`Accent` 描边，展示 `TTFT/tps` |
 | `PrimaryButton` | 52dp 高（`height` 可覆盖，聊天状态行用 40dp），12dp 圆角，`Primary` 填充 |
 | `OutlinedToolButton` | 灰描边 + `SurfaceHigh` 底（StreamClip 样式） |
@@ -136,13 +139,19 @@
   （模型市场即此例：「刷新状态」从每行一颗提到工具栏一颗，「下载」从 Filled 降为 Outlined——
   一屏上百条目各挂一颗 Filled 正是上面那条反例）。
 
-### 4.5 Compose 表单的两个反直觉事实（实测，勿再踩）
+### 4.5 实测速查（踩过的，勿再踩）
 
 1. **触屏模式下点按钮不会移动输入焦点**。所以"失焦时提交"在本 App 里根本不触发
    （点「深色」按钮后输入框 `focused` 仍为 `true`）。`NumericField` 因此选择**每次输入即提交**，
    本地 buffer 只负责让 `0.` 这类中间态留在屏幕上。
 2. **`"0.".toFloatOrNull()` 是合法的**（= `0.0f`，不是 null）。所以"解析失败就不提交"挡不住半截
    输入：把 `0.7` 删成 `0.` 会静默把值写成 `0.0`。必须额外挡"末尾是小数点"这一种形态。
+3. **Kotlin 的块注释可以嵌套**。KDoc 里一旦出现 `/*`（例如写「drawable-nodpi 下的星号文件名」），
+   就开启了一层嵌套注释，后面那个 `*/` 只关掉内层 → 整个 KDoc 报 `Unclosed comment`，
+   而且**报错行号指向文件末尾**，很难第一时间联想到注释本身。注释里提文件名不要带星号通配。
+4. **浅色卡片底与背景只有约 1.09:1 对比**（`#EEEAF8` 对 `#F6F5FB`），卡片边界在浅色主题下
+   基本靠猜。调色板救不了这个比例：要让对比达到可辨，卡片底得深到发紫，很丑。边界只能由
+   **1dp `outlineVariant` 描边**给出，所以内容卡一律走 `DroidCard`，不再裸用 `Card`。
 
 ---
 
@@ -190,26 +199,31 @@ flowchart TD
   此项为 `DESIGN §4` 信息架构要求，P0 已实现，**不可移除**——只是从内联折叠卡搬进 sheet（决策 4）
 - 输入：多行，发送钮 `Primary`；生成中变「停止」。**仅 READY 可发送**，否则灰显 + 占位提示
   「启动模型后可发送消息」
-- 空态：「先在「模型」页添加模型，再回到这里启动它」
+- 空态：`EmptyState`——Folder 图标 + 「先在「模型」页添加模型，再回到这里启动它」+ **Filled**
+  「去「模型」页」（走 `DroidLlmRoot` 的 `goToModels`，与评测页共用同一个 lambda）
 - 错误：气泡内红色短行，不弹窗打断
 
 ### 5.2 模型（Models）
 
-- 两个 Tab：`已导入` / `模型市场`。页头显示共享模型根目录
+- 两个 Tab：`已导入` / `模型市场`。页头显示共享模型根目录，**行尾带复制按钮**——路径 80+ 字符，
+  本来就是给人粘到文件管理器或 `adb` 里的；模型条目的路径同样各带一颗
 - **`已导入`**：
   - 顶部「添加 / 导入第三方模型」卡：引擎选择用 `ChoiceChipRow`（横向滚动 chip，替掉原来 4 个
     等宽按钮——`LiteRT-LM` / `llama.cpp` 会被断成 `LITER T`），引擎格式提示一行；
     显示名 + 源路径两个输入框（**路径框的尾部图标按钮**开内置文件浏览器）；
     底部三颗动作按 §4.4 分层：`导入并复制到模型目录` 是唯一 Filled，`仅引用原路径` /
     `扫描模型根目录` 走 Outlined
-  - 已导入列表：名称 + `引擎 · 格式 · 量化` + 路径 + 「校验」「删除」（均 Outlined）
+  - 已导入列表：名称 + `引擎 · 格式 · 量化` + 路径（带复制）+ 「校验」「删除」（均 Outlined）
+  - **空列表**：`EmptyState`，「浏览模型市场」直接切到市场 Tab。**这里不加厂商 logo**——
+    `LocalModel` 没有 `vendor` 字段（引擎只知道路径），靠名字猜会把 `TinyLlama` 标成 Meta Llama
   - 添加：绝对路径 + **内置文件浏览器**（按引擎过滤：`.gguf` / `.litertlm` / `.task` 文件，
     MNN/Genie 选目录；需 `MANAGE_EXTERNAL_STORAGE`，未授权仅可浏览 App 私有目录并给授权引导；
     其他 App 的 `Android/data/` 灰显不可选）。SAF 降级为可选外部分享入口，P5 不强制（`DESIGN §1.3`）
   - 校验失败：行内红字原因（缺哪个文件写哪个）
 - **`模型市场`**：下载源 chip 行（`HF官方 / HF镜像 / ModelScope`）+ 下载过滤 chip 行
   （`全部 / 已下载 / 未下载`）+ 说明行末的**一颗**「刷新状态」（不再每个条目挂一颗）；
-  条目：名称 / `引擎 · 厂商 · 体积` / tags / 描述 / 下载进度；动作按 §4.4 分层，
+  条目：**左侧厂商 logo**（`VendorLogo`，40dp；catalog 的 `vendor` 精确匹配，未命中回落首字母）+
+  名称 / `引擎 · 厂商 · 体积` / tags / 描述 / 下载进度；动作按 §4.4 分层，
   `下载` / `已下载 · 添加到列表` 走 `OutlinedToolButton`（这一屏 Filled 数为 0：上百条目各挂一颗 Filled
   正是 §4.4 举的反例）
 - 引擎与厂商显示名一律走 `EngineId.displayName` / `engineIdFromStorage()` 反解，
@@ -219,16 +233,23 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A[引擎×模型配置] --> B[提示词 Chip + 用例 L/P/D/T]
-  B --> C[折叠参数: warmup/runs/maxNewTokens]
-  C --> D[Primary 开始评测]
+  A[引擎×模型 紧凑行] --> B[提示词 Chip + 用例 L/P/D/T]
+  B --> C[Primary 开始评测]
+  C --> D[折叠参数: warmup/runs/maxNewTokens]
   D --> E[ProgressHeader 实时]
   E --> F[ResultTable + 免责句]
   F --> G[Outlined 导出 JSON]
 ```
 
-- **配置**：可用引擎默认勾选；勾选后展开 `LabeledDropdown`；提示词 4 Chip 单选；用例默认 L/P/D
-- **跑前**：`WarningBanner`「建议插电、静置冷却（>42℃ 仅警告）」
+- **引擎 × 模型 = 每引擎一行（约 52dp），不是每引擎一卡**。一行内：`Checkbox` + `StatusDot` +
+  引擎名 + 右侧四选一（已选模型名 / 下拉箭头 / 「去「模型」页」 / 不可用原因）。
+  卡片式布局在四个引擎默认全勾选时要占约 540dp，把「开始评测」直接挤出首屏；行式约 210dp。
+  仍保留多选——一次评测比的是「多引擎各钉一个模型」
+- **「开始评测」必须落在首屏**：它是全页唯一 Filled（§4.4），排在**必填**项（引擎 / 提示词 / 用例）
+  之后、**可选的运行参数之前**。参数有合理默认值，不该挡在主操作前面
+- **提示词 4 Chip 单选**；用例默认 L/P/D
+- **跑前**：`WarningBanner`「建议插电、静置冷却；>42℃ 仅警告，不中断」——**控制在一行**，
+  两行会把「开始评测」再次挤出首屏
 - **进行中**：`引擎 2/3 · Decode · 样本 3/4`（样本数含 warmup，默认 warmup=1 + runs=3 即共 4）+ 最近 `decode xx tok/s`；可取消
 - **退后台**：自动暂停（DESIGN §3.3）；返回时 ProgressHeader 呈暂停态（`Warn` 描边），提供「继续 / 放弃本次评测」两动作，暂停区间不计时
 - **结果表列**：`引擎 / 模型 / Quant / Load ms / TTFT ms / Prefill tok/s / Decode tok/s / RSS peak MB / 温度 ℃`
@@ -271,8 +292,10 @@ flowchart TD
 
 ## 7. 标志性时刻（记忆点）
 
-1. **评测结果表**：Metric 大数字 + 青强调，一眼看出谁快；行展开看样本（**尚未实现**，见 `docs/UI_REVIEW.md` R4）
+1. **评测结果表**：Metric 大数字 + 青强调，一眼看出谁快；行展开看样本（**仍未实现**，R4 亦未做——属新功能，见 `docs/UI_REVIEW.md` §4.1 P0-6 与 §5.2「R4 实测补充」）
 2. **四引擎状态条**：绿/灰点阵列，缺依赖一目了然且不崩
+3. **厂商 logo 阵列**：模型市场每个条目左侧一枚厂商标，扫一眼就知道是哪家；未命中的回落为首字母方块，
+   列不会出现空洞（§2④ 的商标说明见 `docs/LICENSING.md`）
 
 ### 7.1 引擎状态点 `●` 的三态映射
 
@@ -303,12 +326,14 @@ flowchart TD
 
 | 文档项 | 代码落点 |
 |--------|----------|
-| Color/Type | `app/src/main/java/.../ui/theme/{Color,Type,Theme}.kt` |
-| 组件（含 §4.4 三层职责、§7.1 状态点） | `app/src/main/java/.../ui/components/UiComponents.kt` |
-| Chat 作用域条 / 两级 sheet / 参数 sheet | `ui/chat/ChatScreen.kt`；选择契约 `ui/chat/ChatViewModel.kt` |
-| Models 三行 chip / 控件分层 | `ui/models/ModelsScreen.kt` |
-| Benchmark 页 | `ui/benchmark/BenchmarkScreen.kt` + `BenchmarkViewModel.kt` |
+| Color/Type/Theme（含 `outlineVariant` 卡片描边） | `app/src/main/java/.../ui/theme/{Color,Type,Theme}.kt` |
+| 组件（含 §4.4 三层职责、§7.1 状态点、`DroidCard` / `EmptyState`） | `app/src/main/java/.../ui/components/UiComponents.kt` |
+| 厂商 logo（映射 + 首字母回落） | `ui/components/VendorLogo.kt`；资产 `app/src/main/res/drawable-nodpi/`；生成脚本 `scripts/shrink_vendor_logos.py` |
+| Chat 作用域条 / 两级 sheet / 参数 sheet / 空态 | `ui/chat/ChatScreen.kt`；选择契约 `ui/chat/ChatViewModel.kt` |
+| Models chip 行 / 控件分层 / logo / 路径复制 / 空态 | `ui/models/ModelsScreen.kt`（复制按钮为页内私有 `CopyPathButton`） |
+| Benchmark 引擎行 / 开始按钮位置 / 表头单位 | `ui/benchmark/BenchmarkScreen.kt` + `BenchmarkViewModel.kt` |
 | Settings 数值框 / backend 下拉 / 外观 chip | `ui/settings/SettingsScreen.kt` |
+| Tab 跳转（Chat 与 Benchmark 共用 `goToModels`） | `ui/DroidLlmRoot.kt` |
 
 **验收**：四页同套 token；深浅色可切换；每屏最多一个 Filled 主操作；选中态一律 chip；
 评测页在无模型时引导清晰，有结果时表+免责句齐全（表头带单位）。

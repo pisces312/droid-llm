@@ -40,7 +40,7 @@ val DroidTypography = Typography(
     ),
     bodySmall = TextStyle(
         fontFamily = FontFamily.Default,
-        fontSize = 11.sp,
+        fontSize = 12.sp,
         fontWeight = FontWeight.W400,
     ),
     labelLarge = TextStyle(
