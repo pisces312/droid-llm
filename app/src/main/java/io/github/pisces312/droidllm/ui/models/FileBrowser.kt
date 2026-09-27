@@ -42,19 +42,25 @@ object FileBrowserRules {
     fun hasAllFilesAccess(): Boolean =
         Environment.isExternalStorageManager()
 
-    fun isOtherAppAndroidData(path: String): Boolean {
+    /**
+     * @param ownPackage the running package name. Debug builds ship as
+     *   `<app>.debug`, so the own tree must be matched by the live package
+     *   instead of a hardcoded release id — otherwise the app greys out its
+     *   own external files dir.
+     */
+    fun isOtherAppAndroidData(path: String, ownPackage: String): Boolean {
         val p = path.replace('\\', '/')
         if (!p.contains("/Android/data/")) return false
         val marker = "/Android/data/"
         val idx = p.indexOf(marker)
         val rest = p.substring(idx + marker.length)
         val pkg = rest.substringBefore('/')
-        return pkg.isNotEmpty() && pkg != "io.github.pisces312.droidllm"
+        return pkg.isNotEmpty() && pkg != ownPackage
     }
 
     /** True when the entry cannot be selected for this engine. */
-    fun isBlocked(path: String, readable: Boolean): Boolean {
-        if (isOtherAppAndroidData(path)) return true
+    fun isBlocked(path: String, readable: Boolean, ownPackage: String): Boolean {
+        if (isOtherAppAndroidData(path, ownPackage)) return true
         return !readable
     }
 
@@ -136,7 +142,7 @@ fun FileBrowserDialog(
     var authorized by remember { mutableStateOf(FileBrowserRules.hasAllFilesAccess()) }
 
     LaunchedEffect(current) {
-        entries = listEntries(current, engineId)
+        entries = listEntries(current, engineId, context.packageName)
     }
 
     AlertDialog(
@@ -204,7 +210,9 @@ fun FileBrowserDialog(
                         val parent = current.parentFile
                         if (parent != null) current = parent
                     }) { Text("上级") }
-                    if (FileBrowserRules.matchesEngine(engineId, current) && !FileBrowserRules.isBlocked(current.absolutePath, current.canRead())) {
+                    if (FileBrowserRules.matchesEngine(engineId, current) &&
+                        !FileBrowserRules.isBlocked(current.absolutePath, current.canRead(), context.packageName)
+                    ) {
                         PrimaryButton(
                             text = "选此目录",
                             onClick = { onPick(current) },
@@ -228,16 +236,16 @@ private data class FileEntry(
     val hint: String?,
 )
 
-private fun listEntries(dir: File, engineId: EngineId): List<FileEntry> {
+private fun listEntries(dir: File, engineId: EngineId, ownPackage: String): List<FileEntry> {
     val children = dir.listFiles()?.toList().orEmpty()
     return children
         .sortedWith(compareByDescending<File> { it.isDirectory }.thenBy { it.name.lowercase() })
         .map { f ->
             val readable = f.canRead()
-            val blocked = FileBrowserRules.isBlocked(f.absolutePath, readable)
+            val blocked = FileBrowserRules.isBlocked(f.absolutePath, readable, ownPackage)
             val matches = FileBrowserRules.matchesEngine(engineId, f)
             val hint = when {
-                blocked && FileBrowserRules.isOtherAppAndroidData(f.absolutePath) ->
+                blocked && FileBrowserRules.isOtherAppAndroidData(f.absolutePath, ownPackage) ->
                     "其他 App 的 Android/data/ 不可访问"
                 !readable -> "无读取权限"
                 !matches && f.isFile -> "扩展名不匹配"

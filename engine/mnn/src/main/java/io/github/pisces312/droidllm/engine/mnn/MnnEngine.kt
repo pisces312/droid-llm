@@ -106,13 +106,17 @@ class MnnEngine @Inject constructor() : LlmEngine {
         if (!dir.isDirectory) {
             throw EngineException.LoadFailed("MNN model directory not found: $path")
         }
-        if (!File(dir, "config.json").isFile) {
+        val configFile = File(dir, "config.json")
+        if (!configFile.isFile) {
             throw EngineException.LoadFailed("missing config.json in $path")
         }
 
         val start = System.nanoTime()
         val rssBefore = RssReader.rssMb()
-        val handle = MnnNative.nativeCreate(path)
+        // Llm::createLLM takes either `<dir>/` or `<dir>/config.json` and derives
+        // every other path by string concatenation onto base_dir. A bare directory
+        // yields `<dir>tokenizer.txt`, so always hand it the config file.
+        val handle = MnnNative.nativeCreate(configFile.absolutePath)
         if (handle == 0L) {
             throw EngineException.LoadFailed("Llm::createLLM/load failed for $path")
         }
