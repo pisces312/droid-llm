@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,14 +37,19 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.pisces312.droidllm.ui.theme.DroidTheme
@@ -91,10 +98,10 @@ fun EngineStatusCard(
     }
 }
 
-/** Outlined dropdown for model selection. */
+/** Outlined dropdown over a `key to label` list — models, backends, any small enum. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ModelPicker(
+fun LabeledDropdown(
     label: String,
     options: List<Pair<String, String>>,
     selectedKey: String?,
@@ -204,6 +211,73 @@ fun OutlinedToolButton(
     }
 }
 
+/**
+ * Single-line text field for one numeric setting.
+ *
+ * The typed text lives in a local buffer that is mirrored to the caller on every
+ * keystroke. Keeping the buffer is what makes intermediate states such as `0.`
+ * survive: feeding the parsed value straight back as the field's text (the previous
+ * approach) makes the caret fight the user while they turn `0.7` into `0.75`.
+ *
+ * Committing per keystroke rather than on blur is deliberate. In touch mode a tap on
+ * a button does not move focus, so a blur-triggered commit fires only when the user
+ * taps another text field or the IME action — leaving the screen with a pending edit
+ * silently dropped it. Text the caller rejects is not stored; it stays on screen
+ * while the field is being edited and reverts to [value] once focus leaves.
+ *
+ * @param value canonical text owned by the caller
+ * @param decimal false uses the integer keyboard
+ * @param note shown underneath only while [enabled] is false
+ */
+@Composable
+fun NumericField(
+    label: String,
+    value: String,
+    onCommit: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    decimal: Boolean = false,
+    note: String? = null,
+) {
+    var buffer by remember { mutableStateOf(value) }
+    var focused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+
+    // Re-sync from the canonical value only while the field is idle: external updates
+    // (defaults reloaded, engine switched) should land, but never mid-edit, and text
+    // the caller rejected is dropped here instead of being left on screen.
+    LaunchedEffect(value, focused) {
+        if (!focused) buffer = value
+    }
+
+    Column(modifier.alpha(if (enabled) 1f else 0.45f)) {
+        OutlinedTextField(
+            value = buffer,
+            onValueChange = { text ->
+                buffer = text
+                // A trailing separator is still parseable (`"0."` is Float 0.0), so
+                // committing on a successful parse alone would store a value the user has
+                // not finished typing — and dropping `0.7` to `0.` would silently persist
+                // 0.0. Hold back that one ambiguous state.
+                if (!text.endsWith(".")) onCommit(text)
+            },
+            enabled = enabled,
+            singleLine = true,
+            label = { Text(label) },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number,
+            ),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focused = it.isFocused },
+        )
+        if (!enabled && note != null) {
+            Text(note, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
 /** Linear progress + primary/secondary text + optional cancel/pause actions. */
 @Composable
 fun ProgressHeader(
@@ -267,6 +341,17 @@ fun ProgressHeader(
     }
 }
 
+/**
+ * Height every `ResultTable` cell is pinned to.
+ *
+ * The pinned first column and the horizontally scrolling pane are two independent
+ * `Column`s, so nothing couples their row heights: as soon as one side wraps to a
+ * second line the rest of the table is off by one row. A shared fixed height removes
+ * the failure mode instead of trying to synchronise it. 52dp fits two lines of
+ * labelMedium plus the cell padding.
+ */
+private val TableRowHeight = 52.dp
+
 /** One header/data cell inside [ResultTable]. */
 @Composable
 fun TableCell(
@@ -288,6 +373,7 @@ fun TableCell(
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .widthIn(min = 56.dp)
+            .height(TableRowHeight)
             .padding(horizontal = 8.dp, vertical = 8.dp),
     )
 }

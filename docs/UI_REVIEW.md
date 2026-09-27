@@ -2,7 +2,7 @@
 
 > 日期：2026-09-27
 > 范围：`app/` 全部 Compose UI + `ui/theme` + `ui/components`，对照 `UI_DESIGN.md` 与**本机 MnnLlmChat 源码实测**
-> 状态：审查与规划文档。§7 的 4 项决策已于 2026-09-27 拍板；**R1、R1.5 已按本方案落地**（见 `IMPLEMENTATION.md` §8d「R1 / R1.5 交付说明」），R2–R4 待做。
+> 状态：审查与规划文档。§7 的 4 项决策已于 2026-09-27 拍板；**R1、R1.5、R2 已按本方案落地**（见 `IMPLEMENTATION.md` §8d 各「交付说明」），R3–R4 待做。§4.1 的 P0-3~7 已逐条标注实测结果，其中 **P0-4 的修法被实测推翻并改写**，值得先读那条。
 > 关联：界面权威仍是 `UI_DESIGN.md`；引擎/Backend 契约见 `DESIGN.md` §1.2。
 
 ---
@@ -163,19 +163,40 @@ activity_main.xml          DrawerLayout
 **P0-3 Settings 的 `backend` 是只读 `OutlinedTextField`**（`SettingsScreen.kt:361-368`，`readOnly=true` 在 364）
 长得像能输入，点了没反应；同一字段在 Chat 是下拉（`ui/chat/ChatScreen.kt` 采样面板）。
 **修法**：改下拉（复用 Chat 那份），或改只读行视觉（无输入框描边）。
+→ **已落地（R2，2026-09-27）**：复用通用下拉组件（`UiComponents.kt`，由 `ModelPicker` 更名 `LabeledDropdown`），
+候选 `Backend.entries`；实测点开列出 `CPU / GPU / OPENCL / NPU_HTP / AUTO`，选中后落盘并回显，
+`uiautomator` 里该节点由纯 `EditText` 变为带 `android.widget.Spinner` 子节点（真的成了下拉）。
 
 **P0-4 数值输入框吞掉中间态**（`SettingsScreen.kt:310-381` 六处 `OutlinedTextField`；`ChatScreen.kt` 采样面板）
 `v.toFloatOrNull()?.let{}` 直接拒掉 `"0."`，且值由外部 state 回灌 → 把 `0.7` 改成 `0.75` 时手感发粘。
 **修法**：本地 buffer + 失焦/IME 完成再解析写回。MnnLlmChat 有现成参考 `modelsettings/NumericInputParser.kt`。
+→ **已落地（R2，2026-09-27）**：抽 `ui/components/NumericField`，Settings 五处 + Chat 采样面板五处共用。
+**动手时实测推翻了上面这条修法**（"失焦/IME 完成再解析"在本 App 里根本不触发），两条反直觉事实：
+
+1. **触屏模式下点按钮不会移动焦点**。实测点「深色」按钮后输入框 `focused` 仍为 `true`，`onFocusChanged`
+   不触发；改用 `DisposableEffect(onDispose)` 兜底也不行（切底部 tab 时编辑直接丢：0.75 → 回来变 0.7）。
+   所以**不能依赖失焦**，改为**每次输入即提交**，本地 buffer 只负责让 `0.` 这类中间态留在屏幕上。
+2. **`"0.".toFloatOrNull()` 是合法的**（= `0.0f`，不是 null）。所以"解析失败就不提交"这道门槛挡不住半截
+   输入：把 `0.7` 删成 `0.` 会**静默把 temp 写成 `0.0`**（实测到了，切页回来显示 `0.0`）。
+   补一条"末尾是小数点就不提交"的判断（唯一需要挡的形态，`-` / `e` / `.` 单独出现时 `toFloatOrNull` 本就返回 null）。
+
+模拟器实测：`0.75 → 删位 → 显示 0.`（不再被弹回）→ 切页再回 = `0.7`（半截状态不污染存储）→ 补成 `0.75` 并切页往返 = `0.75`。
 
 **P0-5 长回复不跟随滚动**（真缺陷）
 `ChatScreen.kt:85` 用 `LaunchedEffect(messages.size)`，但流式 token 是**替换最后一条**（`ChatViewModel.kt:369-376`、`395-401`、`425-430` 的 `dropLast(1) + bubble`），`size` 全程不变 → 只在新增用户消息时滚一次，生成过程列表不动。
 **修法**：照抄 §3.2 模式 5 三件套（新内容即滚 / 上滚停跟随 / 悬浮回底部按钮）。
+→ **已落地（R2，2026-09-27）**：`LaunchedEffect(lastIndex, tailLength)`（按尾条内容长度触发，而非 `size`）+
+`derivedStateOf` 判定是否停在底部（停则跟随，上滚即放手）+ 列表视口内右下角「回到底部」图标按钮。
+**模拟器无法验证**（需要真实流式回复 → 需要模型 load，见 `docs/mnn.md` §5.1），**待真机**。
 
 **P0-6 结果表左右是两份独立 `Column`**（`UiComponents.kt:312-342`，外层 `Column` + 内层横向 `Column`）
 `TableCell.maxLines=2` 换行时行高不联动 → 错行风险；`UI_DESIGN §7` 承诺的"行展开看样本"未实现。
+→ **已落地（R2，2026-09-27）**：不试图同步两个 pane 的行高，而是把所有 `TableCell` 钉在**同一个固定行高**
+（`UiComponents.kt` `TableRowHeight = 52.dp`，容 2 行 `labelMedium` + 内边距）——固定即不可能错行。
+"行展开看样本"仍未实现，留待 R4。
 
 **P0-7 表格数字无单位**：Load/TTFT 是 ms、RSS peak 是 MB、温度是 ℃，表头与数据都没写。
+→ **已落地（R2，2026-09-27）**：表头改为 `Load ms / TTFT ms / Prefill tok/s / Decode tok/s / RSS peak MB / 温度 ℃`。
 
 ### 4.2 P1 · 体验
 
@@ -265,7 +286,7 @@ activity_main.xml          DrawerLayout
 | Models | 列表条目加**厂商 logo** avatar（§7.1，命中 74%，未命中文字兜底） | 可识别性 |
 | Models | 空态改「插图 + 说明 + 按钮」 | 空态不统一 |
 | Benchmark | 引擎卡 → 置顶"选模型"卡 + 紧凑引擎行（模式 8） | "开始评测"回首屏 |
-| Settings | `backend` 假输入框 → 下拉；数值框加本地 buffer | P0-3 / P0-4 |
+| Settings | ~~`backend` 假输入框 → 下拉；数值框加本地 buffer~~ **已完成（R2）** | P0-3 / P0-4 |
 | Chat | 采样参数折叠卡 → 输入卡上方一个 chip + 点击开 sheet（模式 7） | 再省约 64dp |
 | 全局 | **底部导航保持 4 tab 常驻**（决策 1：宽度充裕，不改） | — |
 
@@ -273,13 +294,13 @@ activity_main.xml          DrawerLayout
 
 ## 6. 落地顺序
 
-分四步，每步可独立验证；**R1 全部是纯改名/小改，建议先做**。
+分四步，每步可独立验证；**R1 / R1.5 / R2 已完成**，下一步 R3。
 
 | 步骤 | 内容 | 覆盖 | 风险 |
 |---|---|---|---|
 | **R1** ✅ | 引擎显示名统一（`EngineId.displayName`，**6 处**展示面改走它） | P0-1 | 极低，纯改名（**已完成 2026-09-27**） |
 | **R1.5** ✅ | Models **三行**等宽按钮 → `ChoiceChipRow`（横向滚动 chip），根治 `LiteRT-LM` / `llama.cpp` / `ModelScope` 断字 | P0-2 | 极低（**已完成 2026-09-27**，从 R4 提前） |
-| **R2** | 五个小改纯收益项：数值输入 buffer（P0-4）、跟随滚动三件套（P0-5）、表格单位（P0-7）、`backend` 假输入框（P0-3）、表格行高联动（P0-6） | P0-3~7 | 低，逐个可验 |
+| **R2** ✅ | 五个小改纯收益项：数值输入 buffer（P0-4）、跟随滚动三件套（P0-5）、表格单位（P0-7）、`backend` 假输入框（P0-3）、表格行高联动（P0-6） | P0-3~7 | 低（**已完成 2026-09-27**；P0-5 待真机验，见 §4.1） |
 | **R3** | 三层控件体系 + Chat 顶栏重构（作用域条 + 两级 BottomSheet，引擎 chip 带**状态点 ●**〔决策 2〕）+ 采样参数收成 chip 并**点击开 BottomSheet**〔决策 4〕 | §4.2 首条 / §5.1 | 中，需同步回写 `UI_DESIGN.md` |
 | **R4** | 评测页密度重构（§4.2）+ **厂商 logo 资产接入（§7.1，含 `docs/LICENSING.md` 增记商标条目）** + 空态统一 + 其余打磨。~~Models 引擎 chip 行~~ 已由 **R1.5** 提前完成 | §4.2 / §4.3 | 中 |
 

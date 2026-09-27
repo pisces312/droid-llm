@@ -53,6 +53,8 @@ import io.github.pisces312.droidllm.engineapi.Backend
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.ProbeContext
+import io.github.pisces312.droidllm.ui.components.LabeledDropdown
+import io.github.pisces312.droidllm.ui.components.NumericField
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
 import io.github.pisces312.droidllm.ui.models.FileBrowserDialog
@@ -307,66 +309,82 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                NumericField(
+                    label = "temp",
                     value = settings.temperature.toString(),
-                    onValueChange = { v ->
-                        v.toFloatOrNull()?.let { vm.setSampling(temperature = it, topK = null, topP = null, threads = null, maxNewTokens = null, backend = null) }
+                    decimal = true,
+                    onCommit = { v ->
+                        v.toFloatOrNull()?.let {
+                            vm.setSampling(temperature = it, topK = null, topP = null, threads = null, maxNewTokens = null, backend = null)
+                        }
                     },
-                    label = { Text("temp") },
-                    singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
-                OutlinedTextField(
+                NumericField(
+                    label = "top_k",
                     value = settings.topK.toString(),
-                    onValueChange = { v ->
-                        v.toIntOrNull()?.let { vm.setSampling(temperature = null, topK = it, topP = null, threads = null, maxNewTokens = null, backend = null) }
+                    onCommit = { v ->
+                        v.toIntOrNull()?.let {
+                            vm.setSampling(temperature = null, topK = it, topP = null, threads = null, maxNewTokens = null, backend = null)
+                        }
                     },
-                    label = { Text("top_k") },
-                    singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                NumericField(
+                    label = "top_p",
                     value = settings.topP.toString(),
-                    onValueChange = { v ->
-                        v.toFloatOrNull()?.let { vm.setSampling(temperature = null, topK = null, topP = it, threads = null, maxNewTokens = null, backend = null) }
+                    decimal = true,
+                    onCommit = { v ->
+                        v.toFloatOrNull()?.let {
+                            vm.setSampling(temperature = null, topK = null, topP = it, threads = null, maxNewTokens = null, backend = null)
+                        }
                     },
-                    label = { Text("top_p") },
-                    singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
-                OutlinedTextField(
+                NumericField(
+                    label = "threads",
                     value = settings.threads.toString(),
-                    onValueChange = { v ->
-                        v.toIntOrNull()?.let { vm.setSampling(temperature = null, topK = null, topP = null, threads = it, maxNewTokens = null, backend = null) }
+                    onCommit = { v ->
+                        v.toIntOrNull()?.let {
+                            vm.setSampling(temperature = null, topK = null, topP = null, threads = it, maxNewTokens = null, backend = null)
+                        }
                     },
-                    label = { Text("threads") },
-                    singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                NumericField(
+                    label = "maxNewTokens",
                     value = settings.maxNewTokens.toString(),
-                    onValueChange = { v ->
-                        v.toIntOrNull()?.let { vm.setSampling(temperature = null, topK = null, topP = null, threads = null, maxNewTokens = it, backend = null) }
+                    onCommit = { v ->
+                        v.toIntOrNull()?.let {
+                            vm.setSampling(temperature = null, topK = null, topP = null, threads = null, maxNewTokens = it, backend = null)
+                        }
                     },
-                    label = { Text("maxNewTokens") },
-                    singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
-                OutlinedTextField(
-                    value = settings.backend.name,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("backend") },
-                    singleLine = true,
+                LabeledDropdown(
+                    label = "backend",
+                    options = Backend.entries.map { it.name to it.name },
+                    selectedKey = settings.backend.name,
+                    onSelected = { key ->
+                        vm.setSampling(temperature = null, topK = null, topP = null, threads = null, maxNewTokens = null, backend = Backend.valueOf(key))
+                    },
+                    emptyText = "—",
                     modifier = Modifier.weight(1f),
                 )
             }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "backend 是默认值，AUTO 由引擎自行决定；某个引擎实际支持哪几项、哪项不生效，" +
+                    "见聊天页「展开采样参数」里的灰显说明。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         SectionCard("系统提示词") {

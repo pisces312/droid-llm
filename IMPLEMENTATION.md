@@ -12,7 +12,7 @@
 | P3 | ✅ 完成 | 2026-09-26 | genie，见「P3 交付说明」 |
 | P4 | ✅ 完成，待审阅 | 2026-09-26 | 核心 + UI 已通；见「P4 交付说明」 |
 | P5 | ✅ 完成，待审阅 | 2026-09-26 | 打磨；见「P5 交付说明」 |
-| P6 | 🔄 进行中（R1 ✅、R1.5 ✅） | 2026-09-27 | UI/UX 重构；审查与方案见 [`docs/UI_REVIEW.md`](docs/UI_REVIEW.md)，见 §8d |
+| P6 | 🔄 进行中（R1 ✅、R1.5 ✅、R2 ✅） | 2026-09-27 | UI/UX 重构；审查与方案见 [`docs/UI_REVIEW.md`](docs/UI_REVIEW.md)，见 §8d |
 
 ### P0 交付摘要（2026-09-26）
 
@@ -212,7 +212,7 @@
 4. 导出 JSON 到 `Android/data/.../files/benchmark/`，Snackbar 提示文件名
 5. 历史列表出现本次记录，可清空
 
-**阶段状态**：P0–P5 均已完成（P5+ / P5++ 增量亦完成）。**P6（UI/UX 重构）进行中：R1 ✅、R1.5 ✅，下一步 R2**，见 §8d。剩余为真机 DoD 与 README 截图。
+**阶段状态**：P0–P5 均已完成（P5+ / P5++ 增量亦完成）。**P6（UI/UX 重构）进行中：R1 ✅、R1.5 ✅、R2 ✅，下一步 R3**，见 §8d。剩余为真机 DoD 与 README 截图。
 
 ---
 
@@ -257,7 +257,7 @@
 | P3 | `:engine:genie`（可跳过编译） | 骁龙真机四引擎，M2 达成 | 2–4 天 |
 | P4 | Benchmark L/P/D/T + Room + JSON 导出 | 一键出对比表，M3 达成 | 1–2 天 |
 | P5 | 校验/错误提示/文档打磨 | 可交付 | 1 天 |
-| P6 | UI/UX 重构（R1–R4，见 §8d）；**R1 ✅ / R1.5 ✅** | 控件语义分层 + 顶栏单入口 + 各页密度合理 | 待估 |
+| P6 | UI/UX 重构（R1–R4，见 §8d）；**R1 ✅ / R1.5 ✅ / R2 ✅** | 控件语义分层 + 顶栏单入口 + 各页密度合理 | 待估 |
 
 **顺序纪律**：llamacpp 先行（生态最成熟、调试最快），mnn 次之；litert 纯 Kotlin 最快；genie 最后且有跳过开关。每个引擎接入都走同一模板：probe → load → generate 流式 → metrics → smoke test。
 
@@ -580,9 +580,9 @@
 
 ---
 
-## 8d. P6 增量：UI/UX 重构（**进行中**，R1 ✅ / R1.5 ✅）
+## 8d. P6 增量：UI/UX 重构（**进行中**，R1 ✅ / R1.5 ✅ / R2 ✅）
 
-**状态：🔄 进行中（2026-09-27 立项；R1 ✅、R1.5 ✅，下一步 R2）**
+**状态：🔄 进行中（2026-09-27 立项；R1 ✅、R1.5 ✅、R2 ✅，下一步 R3）**
 
 > **权威输入**：[`docs/UI_REVIEW.md`](docs/UI_REVIEW.md) —— 现状盘点 + 问题清单（含文件:行号）+ 布局方案 + 与 MnnLlmChat 的逐条对照。
 > 本节只做落地拆解，不重复论证。**动手前先通读该文档**；契约约束见 `DESIGN.md` §1.2，界面权威见 `UI_DESIGN.md`。
@@ -623,7 +623,7 @@
 | 步骤 | 内容 | 覆盖问题 | 风险 |
 |---|---|---|---|
 | **R1** ✅ | **引擎显示名统一**：`engine-api` 加 `val EngineId.displayName`，各引擎 `override val displayName` 改为返回它（**单一来源**）；**6 处展示面**全改走它（`labelledName` 仅留给需版本号的场合）。**已完成**，见下方「R1 交付说明」；配套补丁 **R1.5**（Models 三行 chip）见「R1.5 交付说明」 | P0-1 | 极低，纯改名零行为变更 |
-| **R2** | 五个小改纯收益项：①数值输入本地 buffer（失焦/IME 完成再解析，参考 MnnLlmChat `NumericInputParser.kt`）②跟随滚动三件套（新内容即滚 / 上滚停跟随 / 悬浮「回到底部」）③结果表补单位 ④`Settings` 的 `backend` 只读框 → 下拉 ⑤`ResultTable` 行高联动 | P0-3~7 | 低，逐个可验 |
+| **R2** ✅ | 五个小改纯收益项：①数值输入本地 buffer（`NumericField`，**每次输入即提交**——非"失焦再解析"，见交付说明）②跟随滚动三件套 ③结果表补单位 ④`Settings` 的 `backend` 只读框 → 下拉 ⑤`ResultTable` 固定行高。**已完成**，见下方「R2 交付说明」 | P0-3~7 | 低（**已完成 2026-09-27**；②待真机验） |
 | **R3** | **三层控件体系**（筛选 Chip / 一屏仅一个 Filled 主操作 / 次级 Outlined）+ Chat 顶栏重构（作用域条 + 两级 BottomSheet，引擎 chip 带**状态点 ●**〔决策 2〕）+ 采样参数收成输入卡上方 chip 并**点击开 BottomSheet**〔决策 4〕 | §4.2 首条 + §5.1 | 中，**需同步回写 `UI_DESIGN.md`** |
 | **R4** | 评测页密度重构（置顶"选模型"卡 + 紧凑引擎行，让「开始评测」回首屏）+ **厂商 logo 资产接入**〔决策 3，含压缩与 `docs/LICENSING.md` 增记〕+ 空态统一为「插图 + 说明 + 按钮」+ 其余打磨。~~Models 引擎 chip 行~~ **已由 R1.5 提前完成** | §4.2 / §4.3 | 中 |
 
@@ -682,6 +682,37 @@
 
 
 
+### R2 交付说明（2026-09-27，✅ 完成）
+
+五项小改，都在 `:app` 的 UI 层，共 6 个文件。
+
+| # | 项 | 改动 |
+|---|---|---|
+| ① | 数值输入 buffer（P0-4） | 新增 `ui/components/NumericField`，替代 `SettingsScreen` 5 处 + `ChatScreen` 采样面板 5 处原生 `OutlinedTextField`；删除 `ChatScreen` 里的私有 `NumberField` |
+| ② | 跟随滚动三件套（P0-5） | `ChatScreen`：触发键由 `messages.size` 改为 `(lastIndex, 尾条内容长度)`；新增 `derivedStateOf` 判「是否停在底部」；列表视口右下角加「回到底部」按钮 |
+| ③ | 结果表补单位（P0-7） | `BenchmarkScreen` 表头 → `Load ms` / `TTFT ms` / `Prefill tok/s` / `Decode tok/s` / `RSS peak MB` / `温度 ℃` |
+| ④ | `backend` 假输入框（P0-3） | `SettingsScreen` 的 `readOnly` 框改为下拉；顺带把通用组件 `ModelPicker` 更名为 `LabeledDropdown`（它现在也服务非模型场景，原名字与用途不符） |
+| ⑤ | 结果表行高（P0-6） | `UiComponents.TableRowHeight = 52.dp`，所有 `TableCell` 固定同高 |
+
+**① 为什么不是"失焦再解析"（推翻了原方案）**：原计划写的是"本地 buffer + 失焦/IME 完成再解析写回"，
+动手实测发现本 App 里**失焦事件基本不触发**，两条证据：
+
+1. **触屏模式下点按钮不移动焦点**——点「深色」按钮后 `uiautomator` 里输入框仍是 `focused="true"`，
+   `onFocusChanged` 不回调；用 `DisposableEffect(onDispose)` 兜底也无效（切底部 tab 时编辑直接丢：
+   屏幕 `0.75` → 切页回来 `0.7`）。→ 改为**每次输入即提交**，本地 buffer 只负责把 `0.` 这类中间态留在屏幕上。
+2. **`"0.".toFloatOrNull()` 返回 `0.0f`，不是 null**——所以"解析失败就不提交"挡不住半截输入：
+   把 `0.7` 删成 `0.` 会**静默把 temp 写成 `0.0`**（实测到了）。补一条"末尾是小数点就不提交"的判断。
+
+**模拟器实测**（`emulator-5554`）：`0.75` → 删 1 位显示 `0.`（不再被弹回）→ 删到 `0.` 后切页再回 = `0.7`
+（半截状态不污染存储）→ 补成 `0.75` 切页往返 = `0.75`；输入非法 `abc` 后焦点移走回退为规范值。
+④：`backend` 点开列出 `CPU / GPU / OPENCL / NPU_HTP / AUTO`，选中落盘回显（节点从纯 `EditText` 变成带
+`android.widget.Spinner` 子节点）。截图 `build/uicheck/20_chat_sampling.png`。
+
+**未能在模拟器验证**：②跟随滚动需要真实流式回复（要 load 模型，模拟器跑不了，见 `docs/mnn.md` §5.1）、
+③⑤需要跑一次评测才有结果表。**三项均待真机 arm64 手测。**
+
+
+
 ### 参考实现（本机源码，只借交互不借实现）
 
 `MNN_LLM_CHAT_ROOT=D:\3rd-party-projects\MNN\apps\Android\MnnLlmChat`（Java + XML View；我们是 Compose）
@@ -703,6 +734,8 @@
 ### 验收（每步独立）
 
 - R1 / R2：`gradlew :app:assembleDebug` BUILD SUCCESSFUL；四个界面同一引擎显示一致（**截图比对**）；`Settings` 改 `0.7 → 0.75` 不再吞掉中间态；生成长回复时列表持续跟到底部。
+  - R1 的"同一引擎显示一致"**已截图验证**；R2 的数值框**已在模拟器验证**（含半截状态不污染存储）；
+  - R2 剩下的**跟随滚动**（需流式回复）与**结果表单位/行高**（需跑一次评测）**必须真机 arm64**——模拟器跑不了评测，见 `docs/mnn.md` §5.1。
 - R3 / R4：顶栏单入口可开两级弹层（引擎 chip 状态点三态正确）；**选引擎/模型不触发自动 load**（`DESIGN §1.2` 回归）；采样 chip 点击开 sheet 且**取消不落盘**；评测页「开始评测」在首屏；模型条目厂商 logo 命中/兜底均正常；`UI_DESIGN.md` 已补"控件三层职责"；`LICENSING.md` 已记 logo 商标条目。
 
 ### 决策状态
@@ -710,7 +743,8 @@
 ✅ **4 条已全部拍板（2026-09-27）**，见上方「已拍板决策」表，明细依据在 `UI_REVIEW.md` §7。
 ✅ **R1 已完成**（构建 + 单测全绿，提交 `1e45553`）。
 ✅ **R1.5 已完成**（Models 三行 chip；模拟器实测三行文字全部单行）。
-**当前进度：R1 ✅ → R1.5 ✅ → 下一步 R2**（五个小改纯收益项，见上表）。
+✅ **R2 已完成**（5 项 UI 小改；模拟器验证 ①数值框 ④backend 下拉，②③⑤待真机）。
+**当前进度：R1 ✅ → R1.5 ✅ → R2 ✅ → 下一步 R3**（三层控件体系 + Chat 顶栏重构，见上表）。
 
 ---
 

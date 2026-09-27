@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -32,6 +33,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -45,13 +47,14 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,8 +65,10 @@ import io.github.pisces312.droidllm.engineapi.ConfigApplicability
 import io.github.pisces312.droidllm.engineapi.ConfigField
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.ui.components.MetricPill
+import io.github.pisces312.droidllm.ui.components.NumericField
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
 import io.github.pisces312.droidllm.ui.theme.DroidTheme
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
@@ -82,8 +87,24 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
     val loading = sessionState == SessionState.LOADING
 
     val listState = rememberLazyListState()
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    val scope = rememberCoroutineScope()
+    // A streamed reply *replaces* the last bubble instead of appending one, so keying on
+    // messages.size never fires mid-reply and the list stops following. Key on the tail's
+    // length instead, and only follow while the user is still at the bottom.
+    val lastIndex = messages.lastIndex
+    val tailLength = messages.lastOrNull()?.content?.length ?: 0
+    val atBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()
+            last == null || (
+                last.index >= info.totalItemsCount - 1 &&
+                    last.offset + last.size <= info.viewportEndOffset
+                )
+        }
+    }
+    LaunchedEffect(lastIndex, tailLength) {
+        if (lastIndex >= 0 && atBottom) listState.animateScrollToItem(lastIndex)
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -114,25 +135,40 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
                 onUpdate = vm::updateSampling,
             )
             Spacer(Modifier.height(8.dp))
-            if (messages.isEmpty()) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) {
+                if (messages.isEmpty()) {
                     Text(
                         "先在「模型」页添加模型，再回到这里启动它",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = 24.dp),
                     )
-                }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(messages) { msg ->
-                        MessageBubble(msg)
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(messages) { msg ->
+                            MessageBubble(msg)
+                        }
+                    }
+                    if (!atBottom) {
+                        FilledTonalIconButton(
+                            onClick = { scope.launch { listState.animateScrollToItem(lastIndex) } },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(8.dp),
+                        ) {
+                            Icon(Icons.Filled.ArrowDownward, contentDescription = "回到底部")
+                        }
                     }
                 }
             }
@@ -501,40 +537,52 @@ private fun SamplingPanel(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
-                NumberField(
+                NumericField(
                     label = "temperature",
                     value = sampling.temperature.toString(),
+                    decimal = true,
                     enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TEMPERATURE),
                     note = id?.let { ConfigApplicability.note(it, ConfigField.TEMPERATURE) },
-                    onChange = { v -> onUpdate { it.copy(temperature = v.toFloatOrNull() ?: it.temperature) } },
+                    onCommit = { v ->
+                        v.toFloatOrNull()?.let { n -> onUpdate { it.copy(temperature = n) } }
+                    },
                 )
-                NumberField(
+                NumericField(
                     label = "top_k",
                     value = sampling.topK.toString(),
                     enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TOP_K),
                     note = id?.let { ConfigApplicability.note(it, ConfigField.TOP_K) },
-                    onChange = { v -> onUpdate { it.copy(topK = v.toIntOrNull() ?: it.topK) } },
+                    onCommit = { v ->
+                        v.toIntOrNull()?.let { n -> onUpdate { it.copy(topK = n) } }
+                    },
                 )
-                NumberField(
+                NumericField(
                     label = "top_p",
                     value = sampling.topP.toString(),
+                    decimal = true,
                     enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TOP_P),
                     note = id?.let { ConfigApplicability.note(it, ConfigField.TOP_P) },
-                    onChange = { v -> onUpdate { it.copy(topP = v.toFloatOrNull() ?: it.topP) } },
+                    onCommit = { v ->
+                        v.toFloatOrNull()?.let { n -> onUpdate { it.copy(topP = n) } }
+                    },
                 )
-                NumberField(
+                NumericField(
                     label = "threads",
                     value = sampling.threads.toString(),
                     enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.THREADS),
                     note = id?.let { ConfigApplicability.note(it, ConfigField.THREADS) },
-                    onChange = { v -> onUpdate { it.copy(threads = v.toIntOrNull() ?: it.threads) } },
+                    onCommit = { v ->
+                        v.toIntOrNull()?.let { n -> onUpdate { it.copy(threads = n) } }
+                    },
                 )
-                NumberField(
+                NumericField(
                     label = "maxNewTokens",
                     value = sampling.maxNewTokens.toString(),
                     enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.MAX_NEW_TOKENS),
                     note = id?.let { ConfigApplicability.note(it, ConfigField.MAX_NEW_TOKENS) },
-                    onChange = { v -> onUpdate { it.copy(maxNewTokens = v.toIntOrNull() ?: it.maxNewTokens) } },
+                    onCommit = { v ->
+                        v.toIntOrNull()?.let { n -> onUpdate { it.copy(maxNewTokens = n) } }
+                    },
                 )
                 BackendField(
                     selected = sampling.backend,
@@ -542,29 +590,6 @@ private fun SamplingPanel(
                     onSelect = { b -> onUpdate { it.copy(backend = b) } },
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun NumberField(
-    label: String,
-    value: String,
-    enabled: Boolean,
-    note: String?,
-    onChange: (String) -> Unit,
-) {
-    Column(Modifier.alpha(if (enabled) 1f else 0.45f)) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = onChange,
-            enabled = enabled,
-            label = { Text(label) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (!enabled && note != null) {
-            Text(note, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

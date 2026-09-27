@@ -45,8 +45,8 @@ import io.github.pisces312.droidllm.benchmark.TargetResult
 import io.github.pisces312.droidllm.engineapi.displayName
 import io.github.pisces312.droidllm.engineapi.engineIdFromStorage
 import io.github.pisces312.droidllm.ui.components.EngineStatusCard
+import io.github.pisces312.droidllm.ui.components.LabeledDropdown
 import io.github.pisces312.droidllm.ui.components.MetricPill
-import io.github.pisces312.droidllm.ui.components.ModelPicker
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
 import io.github.pisces312.droidllm.ui.components.ProgressHeader
@@ -205,7 +205,7 @@ private fun EngineConfigSection(
                                 TextButton(onClick = onGoToModels) { Text("去 Models 页") }
                             }
                         } else {
-                            ModelPicker(
+                            LabeledDropdown(
                                 label = "模型",
                                 options = row.models.map { it.id to it.displayName },
                                 selectedKey = row.selectedModelId,
@@ -318,7 +318,10 @@ private fun ResultSection(report: BenchmarkReport) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("结果表", style = MaterialTheme.typography.titleMedium)
         ResultTable(
-            headers = listOf("引擎", "模型", "Quant", "Load", "TTFT", "Prefill", "Decode", "RSS peak", "温度"),
+            headers = listOf(
+                "引擎", "模型", "Quant", "Load ms", "TTFT ms", "Prefill tok/s", "Decode tok/s",
+                "RSS peak MB", "温度 ℃",
+            ),
             rows = report.targets.map { it.toRow() },
         )
         Text(
