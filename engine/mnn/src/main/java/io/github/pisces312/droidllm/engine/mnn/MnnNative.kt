@@ -8,8 +8,12 @@ internal object MnnNative {
         System.loadLibrary("mnn_chat_jni")
     }
 
-    /** 0 on failure. */
-    external fun nativeCreate(modelDir: String): Long
+    /**
+     * 0 on failure. [configJson] is applied with `set_config` **before** `load()`,
+     * because the backend / thread count are read while the runtime is built.
+     * Pass an empty string to keep the model's own config.json values.
+     */
+    external fun nativeCreate(modelDir: String, configJson: String): Long
     external fun nativeDestroy(handle: Long)
     external fun nativeSetConfig(handle: Long, configJson: String)
     external fun nativeReset(handle: Long)

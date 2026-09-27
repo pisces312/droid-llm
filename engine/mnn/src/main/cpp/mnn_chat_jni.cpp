@@ -105,7 +105,8 @@ std::string jstring_to_std(JNIEnv* env, jstring value) {
 extern "C" {
 
 JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreate)(JNIEnv* env, jclass,
-                                                 jstring jmodel_dir) {
+                                                 jstring jmodel_dir,
+                                                 jstring jconfig_json) {
   const std::string model_dir = jstring_to_std(env, jmodel_dir);
   if (model_dir.empty()) {
     throw_java(env, "java/lang/IllegalArgumentException", "model dir empty");
@@ -118,6 +119,15 @@ JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreate)(JNIEnv* env, jclass,
     LOGE("createLLM returned null");
     delete session;
     return 0;
+  }
+  // Llm::load() snapshots backend_type / thread_num when it builds the runtime
+  // (llm.cpp: `config.type = backend_type_convert(mConfig->backend_type())`),
+  // so a set_config() issued after load() only changes sampling — the chosen
+  // backend silently stays whatever config.json said. MNN's own Android demo
+  // applies the config at the same point (llm_session.cpp LlmSession::Load()).
+  const std::string cfg = jstring_to_std(env, jconfig_json);
+  if (!cfg.empty()) {
+    session->llm->set_config(cfg);
   }
   if (!session->llm->load()) {
     LOGE("llm->load() failed");

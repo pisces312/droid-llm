@@ -116,11 +116,12 @@ class MnnEngine @Inject constructor() : LlmEngine {
         // Llm::createLLM takes either `<dir>/` or `<dir>/config.json` and derives
         // every other path by string concatenation onto base_dir. A bare directory
         // yields `<dir>tokenizer.txt`, so always hand it the config file.
-        val handle = MnnNative.nativeCreate(configFile.absolutePath)
+        // The config is passed in with the create call so it reaches `set_config`
+        // before `load()`; see MnnNative.nativeCreate.
+        val handle = MnnNative.nativeCreate(configFile.absolutePath, buildConfigJson(config))
         if (handle == 0L) {
             throw EngineException.LoadFailed("Llm::createLLM/load failed for $path")
         }
-        applyConfig(handle, config)
         val loadMs = (System.nanoTime() - start) / 1_000_000
         val rssAfter = RssReader.rssMb()
         val session = MnnSession(
@@ -252,14 +253,17 @@ class MnnEngine @Inject constructor() : LlmEngine {
         }
     }
 
-    private fun applyConfig(handle: Long, config: InferenceConfig) {
+    private fun applyConfig(handle: Long, config: InferenceConfig) =
+        MnnNative.nativeSetConfig(handle, buildConfigJson(config))
+
+    private fun buildConfigJson(config: InferenceConfig): String {
         val backend = when (config.backend) {
             Backend.CPU, Backend.AUTO -> "cpu"
             Backend.OPENCL, Backend.GPU -> "opencl"
             Backend.NPU_HTP ->
                 throw EngineException.UnsupportedBackend("MNN does not use NPU_HTP; got ${config.backend}")
         }
-        val json = buildString {
+        return buildString {
             append('{')
             append("\"backend_type\":\"").append(backend).append("\",")
             append("\"thread_num\":").append(config.threads).append(',')
@@ -269,7 +273,6 @@ class MnnEngine @Inject constructor() : LlmEngine {
             append("\"top_p\":").append(config.topP)
             append('}')
         }
-        MnnNative.nativeSetConfig(handle, json)
     }
 
     private fun warningsFor(config: InferenceConfig, rssBefore: Long? = null): List<String> {
