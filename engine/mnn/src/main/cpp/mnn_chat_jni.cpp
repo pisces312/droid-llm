@@ -216,6 +216,17 @@ JNIEXPORT void JNICALL JNI_METHOD(nativeGenerate)(
   });
   std::ostream os(&stream_buf);
 
+  // A finished turn leaves the context in NORMAL_FINISHED / MAX_TOKENS_FINISHED,
+  // and the next response() then decodes nothing. MNN's own Android demo applies
+  // the same local reset because it links a prebuilt libMNN.so runtime.
+  {
+    auto* ctx = session->llm->getContext();
+    if (ctx != nullptr && ctx->status != MNN::Transformer::LlmStatus::RUNNING) {
+      const_cast<MNN::Transformer::LlmContext*>(ctx)->status =
+          MNN::Transformer::LlmStatus::RUNNING;
+    }
+  }
+
   try {
     // `end_with` is written to the stream verbatim when generation hits a stop
     // token. MNN defaults it to "\n" for nullptr, which would surface as a
