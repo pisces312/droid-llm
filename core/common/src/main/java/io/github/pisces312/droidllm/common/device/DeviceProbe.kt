@@ -62,6 +62,10 @@ class DeviceProbe @Inject constructor(
         return if (tenths == Int.MIN_VALUE) null else tenths / 10f
     }
 
+    /**
+     * Default shared model root: `files/models/`. Engines use named subfolders
+     * under this root (`llamacpp/`, `mnn/`, …) when scanning.
+     */
     fun defaultModelRoot(): File {
         val base = context.getExternalFilesDir("models") ?: File(context.filesDir, "models")
         base.mkdirs()

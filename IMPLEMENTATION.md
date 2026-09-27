@@ -492,6 +492,61 @@
 
 ---
 
+## 8c. P5++ 增量：权限时机、共享模型根目录 + 模型市场、三方仓库环境变量
+
+**状态：✅ 完成，待审阅（2026-09-26）**
+
+### 需求
+
+1. 「所有文件访问」不再首启弹窗；改为**用户决定修改模型根目录时**再引导（降低安装/首启打扰）。
+2. 模型根目录**简化回单一共享根**（所有引擎同一根，下分子目录），便于下载落盘；增加模型市场：HF / ModelScope 切换、浏览下载、本地已有模型自动关联。
+3. 构建定位第三方仓库改为**本机环境变量**，仓库内不写死绝对路径；`AGENTS.md` 只记 git 地址。
+
+### 交付
+
+**1. 权限时机**（`MainActivity` / `SettingsScreen` / `FileBrowserRules`）
+
+- 删除首启 `storageGuideSeen` 主界面弹窗。
+- Settings → 数据 →「修改」时：未授权先弹「需要所有文件访问」引导（去授权 / 稍后再说）；`openAllFilesAccessSettings` 带 `package:` URI + 三级 fallback（`MANAGE_APP_ALL_FILES_ACCESS` → `MANAGE_ALL_FILES_ACCESS` → `APPLICATION_DETAILS_SETTINGS`）。
+- FileBrowser 内未授权仍显示「去系统设置授权」按钮（同修复）。
+- **注意**：`MANAGE_EXTERNAL_STORAGE` 写在 manifest 里，部分安装器/商店仍可能在安装时提示「所有文件访问」；推迟的是 App 内引导，不一定消除系统安装警告。
+
+**2. 共享模型根目录 + 模型市场**
+
+- `AppSettings.modelRootPath`（单根，null = `DeviceProbe.defaultModelRoot()` = `files/models/`）。引擎子目录：`llamacpp/` `mnn/` `litert/` `genie/`。
+- 迁移契约不变（`ModelRootMigrator`：永不删目标、重名跳过、可不迁移）。
+- **模型市场**（Models 页 Tab「模型市场」）：
+  - 目录 `assets/model_catalog.json`（`CatalogModel`：id/name/engine/size/kind=repo|file/localPath/sources）。
+  - 源切换 **HuggingFace / ModelScope**（仿 MnnLlmChat `SourceSelectionDialog`）；URL：
+    - HF 文件 `https://huggingface.co/{repo}/resolve/main/{path}`；目录树 `.../api/models/{repo}/tree/main?recursive=true`
+    - MS 文件 `https://modelscope.cn/api/v1/models/{repo}/repo?FilePath={path}`；文件列表 `.../repo/files?Recursive=1`
+  - 下载器 `ModelDownloader`（HttpURLConnection + `.part` 临时文件 + 进度 StateFlow；同源 URL 见上）。MNN 走 `kind=repo`（整仓文件列表），LiteRT/GGUF 走 `kind=file`（Gallery allowlist / HF 单文件风格）。
+  - **本地关联**：扫描共享根下 `<engine>/<localPath>`（repo 看 marker 文件，file 看文件存在）→ 条目标「已下载 · 添加到列表」，否则「下载」。
+- **Gallery 模型来源**：Google AI Edge Gallery 的模型**在 HuggingFace**（allowlist + `https://huggingface.co/{modelId}/resolve/{commit}/{modelFile}`），**没有 ModelScope 源**；MNN 社区模型才有 HF（`taobao-mnn/*`）+ ModelScope（`MNN/*`）双源。市场条目已按此配置。
+
+**3. 三方仓库环境变量**
+
+- `engine/mnn`：`MNN_ROOT` / `droid.mnnRoot`，**无默认路径**，缺失直接 `error(...)`。
+- `engine/genie`：`QAIRT_PATH` / `QAIRT_SDK_ROOT` / `droid.qairtSdkRoot`，缺失自动跳过 native。
+- Windows 用户级 `setx`：`MNN_ROOT` `QAIRT_PATH` `GALLERY_ROOT` `AI_HUB_APPS_ROOT` `CHATTERUI_ROOT` `MNN_LLM_CHAT_ROOT`。
+- `AGENTS.md` 新增「第三方仓库（只记 git 地址）」表；`gradle.properties` 示例路径改为占位。
+
+### 验收（构建）
+
+- `:app:compileDebugKotlin` / `:app:assembleDebug` BUILD SUCCESSFUL
+- `:core:common:testDebugUnitTest` 通过
+- manifest 增加 `INTERNET`（市场下载）
+
+### 真机 DoD 检查单
+
+1. 冷启动**无**权限引导弹窗；Settings → 修改模型根目录时出现「去授权」引导，按钮能打开系统「所有文件访问」页
+2. Settings 显示单一共享根；修改/恢复默认 + 迁移/不迁移/跳过重名流程与 8b 相同
+3. 模型市场：切 HF/ModelScope；对有双源的 MNN 条目换源可下载；Gallery 条目仅 HF（MS 提示无源）
+4. 已 push 到根目录的模型显示「已下载」，点「添加到列表」进入已导入 Tab
+5. 断网/半截下载失败后状态为「下载失败」，`.part` 不残留为正式文件
+
+---
+
 ## 9. 执行者注意事项（坑位速查）
 
 1. **GitHub 直连不稳**：submodule/大文件优先 `gh-proxy.com` 镜像；失败重试前先 `rm -rf` 残留目录
@@ -501,3 +556,4 @@
 5. **Genie 只支持骁龙 HTP**：开发机/模拟器上必须优雅降级，所有 P0–P2、P4 工作不依赖 Genie 可用
 6. **不要扩大范围**：功耗测量、Dynamic Feature、雷达图、质量评测、OpenAI 兼容 API 均明确不做（API 是 P5+ 可选增强，不在本计划内）
 7. **目录改名**：仓库建立后工作目录可从 `LlmChatAndroid` 改为 `droid-llm`，改名时同步 `DESIGN.md` 头部说明
+8. **第三方路径**：一律走环境变量（`MNN_ROOT` / `QAIRT_PATH` 等，见 AGENTS.md「第三方仓库」表），禁止把 `D:\...` 写进仓库

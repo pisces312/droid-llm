@@ -2,6 +2,7 @@ package io.github.pisces312.droidllm.ui.models
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Environment
 import android.provider.Settings
 import androidx.compose.foundation.clickable
@@ -92,6 +93,26 @@ object FileBrowserRules {
         if (hasAllFilesAccess() && storage.isDirectory) list += storage
         return list.distinctBy { it.absolutePath }
     }
+
+    /**
+     * Open the system "All files access" page. The bare ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
+     * intent is a no-op on some devices; always attach the package URI and fall back.
+     */
+    fun openAllFilesAccessSettings(context: Context) {
+        val pkg = context.packageName
+        val candidates = listOf(
+            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:$pkg")),
+            Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")),
+        )
+        for (intent in candidates) {
+            val ok = runCatching {
+                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                true
+            }.getOrDefault(false)
+            if (ok) return
+        }
+    }
 }
 
 /**
@@ -104,11 +125,15 @@ fun FileBrowserDialog(
     engineId: EngineId,
     onPick: (File) -> Unit,
     onDismiss: () -> Unit,
+    startDir: File? = null,
 ) {
     val context = LocalContext.current
-    var current by remember { mutableStateOf(FileBrowserRules.rootDirs(context).first()) }
+    var current by remember {
+        val preferred = startDir?.takeIf { it.isDirectory }
+        mutableStateOf(preferred ?: FileBrowserRules.rootDirs(context).first())
+    }
     var entries by remember { mutableStateOf(emptyList<FileEntry>()) }
-    val authorized = remember { FileBrowserRules.hasAllFilesAccess() }
+    var authorized by remember { mutableStateOf(FileBrowserRules.hasAllFilesAccess()) }
 
     LaunchedEffect(current) {
         entries = listEntries(current, engineId)
@@ -138,11 +163,7 @@ fun FileBrowserDialog(
                         color = DroidTheme.extra.warn,
                     )
                     TextButton(onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION),
-                            )
-                        }
+                        FileBrowserRules.openAllFilesAccessSettings(context)
                     }) { Text("去系统设置授权") }
                 }
                 Spacer(Modifier.height(8.dp))

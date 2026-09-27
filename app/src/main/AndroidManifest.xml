@@ -3,6 +3,8 @@
 
     <!-- Needed to read ACTION_BATTERY_CHANGED sticky intent and file stats. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Model market download (HuggingFace / ModelScope). -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Model browsing via direct path needs storage access on older APIs. -->
     <uses-permission

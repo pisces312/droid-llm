@@ -23,10 +23,33 @@
 | Gradle | wrapper 8.13（Tencent 镜像）+ AGP 8.13.2；Kotlin 2.2.21 + KSP 2.3.6（litertlm 0.11.0 需要 ≥2.2 metadata） |
 | 构建命令 | `cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android_sdk&& gradlew.bat :app:assembleDebug"` |
 | GitHub | 直连易 reset，用 `https://gh-proxy.com/https://github.com/...` |
-| MNN 预编译 | `droid.mnnRoot` 属性或 `MNN_ROOT` 环境变量，默认 `D:/3rd-party-projects/MNN`（`project/android/build_64/lib/libMNN.so`） |
+| 第三方仓库定位 | **只用环境变量 / gradle 属性，仓库内不写死本机绝对路径**。编译只需 `MNN_ROOT`（必需）+ `QAIRT_PATH`（可选）；其余参考用变量见「第三方仓库」A/B 两节 |
 | llama.cpp 源码 | 已 vendored 到 `third_party/llama.cpp/`（勿用 submodule） |
 
-**目录约定**（用户全局规则）：开发工具 `D:\dev`，便携软件 `D:\software`，本项目 `D:\my-projects`，第三方 clone `D:\3rd-party-projects`。修改 SDK 路径 / JDK / Gradle 配置前必须先问用户。
+**目录约定**（用户全局规则）：开发工具 `D:\dev`，便携软件 `D:\software`，本项目 `D:\my-projects`，第三方 clone 自定位置。修改 SDK 路径 / JDK / Gradle 配置前必须先问用户。**本机 clone 路径写在环境变量里（见下表），不要写进仓库。**
+
+## 第三方仓库
+
+本地位置用环境变量定位（本机已 `setx`），文档与构建脚本都不写死绝对路径。GitHub 直连不稳时用镜像前缀 `https://gh-proxy.com/`。
+
+### A. 编译必需 / 可选（Gradle 会读）
+
+| 环境变量（或 gradle 属性） | 指向 | 用途 | 缺失时 |
+|------|------|------|------|
+| `MNN_ROOT`（`droid.mnnRoot`） | MNN 源码树（含 `project/android/build_64/lib/libMNN.so`，需 `MNN_BUILD_LLM=ON`） | `:engine:mnn` 链预编译 `libMNN.so`、CMake 找头文件。git: `https://github.com/alibaba/MNN` | **直接报错**，无法构建 mnn 引擎 |
+| `QAIRT_PATH` / `QAIRT_SDK_ROOT`（`droid.qairtSdkRoot`） | Qualcomm QAIRT/QNN SDK 发布包（非 git） | `:engine:genie` 链 `libGenie.so` + QNN HTP runtime | Genie native **自动跳过**（Kotlin 仍编译，UI 报 MissingDependency） |
+| （无需环境变量） | `third_party/llama.cpp/` | llama.cpp 已 vendored，`add_subdirectory` 静态编入。上游: `https://github.com/ggml-org/llama.cpp` | — |
+
+### B. 仅参考源码（Gradle **不读**，编译不需要）
+
+这些变量只是本机参考 clone 的快捷定位，方便改代码时对照实现；**删掉也不影响构建**。
+
+| 环境变量 | 参考项目（git） | 参考什么 |
+|------|------|------|
+| `GALLERY_ROOT` | `https://github.com/google-ai-edge/gallery` | LiteRT-LM 接入、Gallery 模型 allowlist / HF 下载 URL、`LlmChatModelHelper` |
+| `MNN_LLM_CHAT_ROOT` | `https://github.com/alibaba/MNN` → `apps/Android/MnnLlmChat` | 模型市场（`model_market.json`）、HF/ModelScope 双源切换、下载器、目录扫描识别已下载 |
+| `AI_HUB_APPS_ROOT` | `https://github.com/qualcomm/ai-hub-apps` | Genie `chatapp_android`：`genie_config.json` 解析、prompt tags、QAIRT 打包布局 |
+| `CHATTERUI_ROOT` | `https://github.com/Vali-98/ChatterUI` | llama.cpp Android 集成与 GGUF 模型管理 |
 
 ## 构建与验证
 

@@ -6,10 +6,15 @@ plugins {
 }
 
 // Path to MNN tree with prebuilt libMNN.so (MNN_BUILD_LLM=ON).
-// Override via gradle.properties: droid.mnnRoot=D:/path/to/MNN
+// Located via local env — do not hardcode machine paths in the repo:
+//   MNN_ROOT  or gradle property droid.mnnRoot
 val mnnRoot: String = (findProperty("droid.mnnRoot") as String?)
     ?: System.getenv("MNN_ROOT")
-    ?: "D:/3rd-party-projects/MNN"
+    ?: error(
+        "MNN_ROOT is not set. Point it at a local MNN checkout with " +
+            "project/android/build_64/lib/libMNN.so (MNN_BUILD_LLM=ON), " +
+            "or set gradle property droid.mnnRoot.",
+    )
 
 android {
     namespace = "io.github.pisces312.droidllm.engine.mnn"

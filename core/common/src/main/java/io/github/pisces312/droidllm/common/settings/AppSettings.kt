@@ -38,8 +38,13 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** false = single-model residency: switch unloads the previous session (DESIGN §3.3). */
     val multiModelResidency: Boolean = false,
-    /** null = DeviceProbe.defaultModelRoot(); otherwise a user-picked absolute directory. */
+    /**
+     * Shared model root for every engine. Null = [io.github.pisces312.droidllm.common.device.DeviceProbe.defaultModelRoot].
+     * Engines keep their own subfolder names under this root when scanning.
+     */
     val modelRootPath: String? = null,
+    /** true = the all-files-access guide was already shown (shown on first model-root change). */
+    val storageGuideSeen: Boolean = false,
     val temperature: Float = 0.7f,
     val topK: Int = 40,
     val topP: Float = 0.95f,
@@ -63,6 +68,7 @@ interface AppSettingsStore {
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setMultiModelResidency(enabled: Boolean)
     suspend fun setModelRoot(path: String?)
+    suspend fun setStorageGuideSeen(seen: Boolean)
     suspend fun setSampling(
         temperature: Float,
         topK: Int,
@@ -85,7 +91,8 @@ class DataStoreAppSettingsStore @Inject constructor(
     private object Keys {
         val themeMode = stringPreferencesKey("theme_mode")
         val multiResidency = booleanPreferencesKey("multi_model_residency")
-        val modelRootPath = stringPreferencesKey("model_root_path")
+        val modelRoot = stringPreferencesKey("model_root_path")
+        val storageGuideSeen = booleanPreferencesKey("storage_guide_seen")
         val temperature = floatPreferencesKey("temperature")
         val topK = intPreferencesKey("top_k")
         val topP = floatPreferencesKey("top_p")
@@ -98,7 +105,8 @@ class DataStoreAppSettingsStore @Inject constructor(
         AppSettings(
             themeMode = ThemeMode.from(prefs[Keys.themeMode]),
             multiModelResidency = prefs[Keys.multiResidency] ?: false,
-            modelRootPath = prefs[Keys.modelRootPath],
+            modelRootPath = prefs[Keys.modelRoot]?.takeIf { it.isNotBlank() },
+            storageGuideSeen = prefs[Keys.storageGuideSeen] ?: false,
             temperature = prefs[Keys.temperature] ?: 0.7f,
             topK = prefs[Keys.topK] ?: 40,
             topP = prefs[Keys.topP] ?: 0.95f,
@@ -122,9 +130,13 @@ class DataStoreAppSettingsStore @Inject constructor(
 
     override suspend fun setModelRoot(path: String?) {
         context.appSettingsDataStore.edit { prefs ->
-            if (path.isNullOrBlank()) prefs.remove(Keys.modelRootPath)
-            else prefs[Keys.modelRootPath] = path
+            if (path.isNullOrBlank()) prefs.remove(Keys.modelRoot)
+            else prefs[Keys.modelRoot] = path
         }
+    }
+
+    override suspend fun setStorageGuideSeen(seen: Boolean) {
+        context.appSettingsDataStore.edit { it[Keys.storageGuideSeen] = seen }
     }
 
     override suspend fun setSampling(

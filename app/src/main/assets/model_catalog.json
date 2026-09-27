@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "qwen2.5-0.5b-instruct-mnn",
+      "name": "Qwen2.5-0.5B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化对话模型，目录含 config.json + llm.mnn 等",
+      "sizeBytes": 400000000,
+      "kind": "repo",
+      "localPath": "Qwen2.5-0.5B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-0.5B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2.5-0.5B-Instruct-MNN"
+      }
+    },
+    {
+      "id": "qwen2.5-1.5b-instruct-mnn",
+      "name": "Qwen2.5-1.5B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 1.5B 对话模型，目录含 config.json + llm.mnn 等",
+      "sizeBytes": 900000000,
+      "kind": "repo",
+      "localPath": "Qwen2.5-1.5B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-1.5B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2.5-1.5B-Instruct-MNN"
+      }
+    },
+    {
+      "id": "gemma3-1b-it-q4-task",
+      "name": "Gemma3-1B-IT q4 (.task)",
+      "engine": "LITERT",
+      "vendor": "Google",
+      "description": "LiteRT-LM / MediaPipe 模型包（Gallery allowlist 同源）",
+      "sizeBytes": 554661246,
+      "kind": "file",
+      "localPath": "Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task",
+      "fileInRepo": "Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task",
+      "sources": {
+        "HuggingFace": "litert-community/Gemma3-1B-IT"
+      }
+    },
+    {
+      "id": "qwen2.5-1.5b-instruct-q8-task",
+      "name": "Qwen2.5-1.5B-Instruct q8 (.task)",
+      "engine": "LITERT",
+      "vendor": "Qwen",
+      "description": "LiteRT-LM 量化模型包",
+      "sizeBytes": 1625493432,
+      "kind": "file",
+      "localPath": "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+      "fileInRepo": "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+      "sources": {
+        "HuggingFace": "litert-community/Qwen2.5-1.5B-Instruct"
+      }
+    },
+    {
+      "id": "qwen2.5-1.5b-instruct-q4k-gguf",
+      "name": "Qwen2.5-1.5B-Instruct Q4_K_M (gguf)",
+      "engine": "LLAMACPP",
+      "vendor": "Qwen",
+      "description": "llama.cpp GGUF 量化权重",
+      "sizeBytes": 1120000000,
+      "kind": "file",
+      "localPath": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+      "fileInRepo": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+      "sources": {
+        "HuggingFace": "Qwen/Qwen2.5-1.5B-Instruct-GGUF"
+      }
+    }
+  ]
+}

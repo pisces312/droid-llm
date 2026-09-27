@@ -34,6 +34,9 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.LIGHT -> false
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
+
+            // All-files-access is requested lazily when the user opts into a custom
+            // model root (Settings → 数据 → 修改), not at first launch.
             DroidLlmTheme(darkTheme = dark) {
                 DroidLlmRoot()
             }

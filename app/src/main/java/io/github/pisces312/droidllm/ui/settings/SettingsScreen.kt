@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -46,6 +47,7 @@ import io.github.pisces312.droidllm.engineapi.ProbeContext
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
 import io.github.pisces312.droidllm.ui.models.FileBrowserDialog
+import io.github.pisces312.droidllm.ui.models.FileBrowserRules
 import io.github.pisces312.droidllm.ui.theme.DroidTheme
 import java.io.File
 import javax.inject.Inject
@@ -82,7 +84,8 @@ class SettingsViewModel @Inject constructor(
     fun modelRoot(): String =
         settings.value.modelRootPath ?: deviceProbe.defaultModelRoot().absolutePath
 
-    fun defaultModelRootPath(): String = deviceProbe.defaultModelRoot().absolutePath
+    fun defaultModelRootPath(): String =
+        deviceProbe.defaultModelRoot().absolutePath
 
     fun benchmarkDir(): String = deviceProbe.defaultModelRoot().parentFile
         ?.resolve("benchmark")?.absolutePath
@@ -124,12 +127,20 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun markStorageGuideSeen() {
+        viewModelScope.launch { settingsStore.setStorageGuideSeen(true) }
+    }
+
     /**
-     * Switch model root to [newRoot].
+     * Switch the shared model root to [newRoot].
      * @param migrate true = move old-root data; false = leave source files in place.
      * @param skipConflicts true = leave name-collision items in the source (never overwrite).
      */
-    fun changeModelRoot(newRoot: String, migrate: Boolean, skipConflicts: Boolean = true) {
+    fun changeModelRoot(
+        newRoot: String,
+        migrate: Boolean,
+        skipConflicts: Boolean = true,
+    ) {
         val oldPath = modelRoot()
         val source = File(oldPath)
         val target = File(newRoot)
@@ -183,10 +194,12 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val probe by vm.probe.collectAsState()
     val settings by vm.settings.collectAsState()
     val message by vm.message.collectAsState()
+    val context = LocalContext.current
     var showBrowser by remember { mutableStateOf(false) }
     var pendingRoot by remember { mutableStateOf<String?>(null) }
     var migratePrompt by remember { mutableStateOf(false) }
     var conflictPrompt by remember { mutableStateOf<List<String>>(emptyList()) }
+    var storagePrompt by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -303,24 +316,33 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
         }
 
         SectionCard("数据") {
+            val root = vm.modelRoot()
+            val def = vm.defaultModelRootPath()
             Text("模型根目录", style = MaterialTheme.typography.labelSmall)
             Text(
-                settings.modelRootPath ?: vm.modelRoot(),
-                style = MaterialTheme.typography.bodySmall,
+                "所有引擎共享同一根目录（其下按引擎分子目录）。改路径时不删目标文件，重名跳过，可不迁移原数据。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(root, style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PrimaryButton(
-                    "修改路径",
-                    onClick = { showBrowser = true },
+                    "修改",
+                    onClick = {
+                        // Request all-files-access only when the user opts into a custom root.
+                        if (!FileBrowserRules.hasAllFilesAccess()) {
+                            storagePrompt = true
+                        } else {
+                            showBrowser = true
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedToolButton(
                     "恢复默认",
                     onClick = {
-                        val def = vm.defaultModelRootPath()
-                        val cur = settings.modelRootPath ?: def
-                        if (cur == def) {
+                        if (root == def) {
                             // already default
                         } else {
                             pendingRoot = def
@@ -330,12 +352,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     modifier = Modifier.weight(1f),
                 )
             }
-            Text(
-                "改路径时：不删除目标已有文件；重名需你确认是否跳过；原目录有数据会询问是否迁移，可不迁移。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
             Text("评测导出目录", style = MaterialTheme.typography.labelSmall)
             Text(
                 vm.benchmarkDir() + "/bench_*.json",
@@ -381,9 +398,38 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
         Spacer(Modifier.height(8.dp))
     }
 
+    if (storagePrompt) {
+        AlertDialog(
+            onDismissRequest = { storagePrompt = false },
+            shape = RoundedCornerShape(12.dp),
+            title = { Text("需要「所有文件访问」权限") },
+            text = {
+                Text(
+                    "改到自定义模型根目录需要浏览外部存储。\n" +
+                        "系统不提供普通弹窗，请在设置里打开「所有文件访问」。\n" +
+                        "未授权时仅能使用 App 私有目录作为模型根目录。",
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    storagePrompt = false
+                    vm.markStorageGuideSeen()
+                }) { Text("稍后再说") }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    storagePrompt = false
+                    vm.markStorageGuideSeen()
+                    FileBrowserRules.openAllFilesAccessSettings(context)
+                }) { Text("去授权") }
+            },
+        )
+    }
+
     if (showBrowser) {
         FileBrowserDialog(
             engineId = EngineId.FAKE,
+            startDir = File(vm.modelRoot()),
             onPick = { file ->
                 showBrowser = false
                 if (file.isDirectory) {
@@ -397,7 +443,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
 
     val targetRoot = pendingRoot
     if (migratePrompt) {
-        val oldRoot = settings.modelRootPath ?: vm.defaultModelRootPath()
+        val oldRoot = vm.modelRoot()
         val sourceItems = remember(targetRoot, oldRoot) {
             File(oldRoot).listFiles()?.size ?: 0
         }

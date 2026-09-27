@@ -5,13 +5,13 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// QAIRT/QNN SDK root — same convention as local-dream: env QAIRT_PATH,
-// default D:/dev/qairt/2.50.0.260828. Override via gradle.properties
-// `droid.qairtSdkRoot` or env QAIRT_SDK_ROOT / QAIRT_PATH.
+// QAIRT/QNN SDK root. Located via local env — do not hardcode machine paths:
+//   droid.qairtSdkRoot  or  QAIRT_PATH  or  QAIRT_SDK_ROOT
+// Missing SDK auto-skips the native build (Kotlin still compiles).
 val qairtSdkRoot: String = (findProperty("droid.qairtSdkRoot") as String?)
     ?: System.getenv("QAIRT_PATH")
     ?: System.getenv("QAIRT_SDK_ROOT")
-    ?: "D:/dev/qairt/2.50.0.260828"
+    ?: ""
 
 val qairtLibDir = File(qairtSdkRoot, "lib/aarch64-android")
 val libGenie = File(qairtLibDir, "libGenie.so")
@@ -22,15 +22,15 @@ val genieHeaders = File(qairtSdkRoot, "include/Genie")
 val skipGenieProp = (
     (findProperty("droid.skipGenie") as String?) ?: (findProperty("skipGenie") as String?)
     )?.toBoolean() == true
-val qairtReady = libGenie.isFile && genieHeaders.isDirectory
+val qairtReady = qairtSdkRoot.isNotBlank() && libGenie.isFile && genieHeaders.isDirectory
 val skipGenie = skipGenieProp || !qairtReady
 if (skipGenieProp) {
     logger.lifecycle(":engine:genie native build SKIPPED (droid.skipGenie=true)")
 } else if (!qairtReady) {
     logger.warn(
-        ":engine:genie native build SKIPPED — QAIRT SDK not found at $qairtSdkRoot " +
+        ":engine:genie native build SKIPPED — QAIRT SDK not found " +
             "(need lib/aarch64-android/libGenie.so + include/Genie). " +
-            "Set droid.qairtSdkRoot or QAIRT_SDK_ROOT."
+            "Set env QAIRT_PATH (or QAIRT_SDK_ROOT / droid.qairtSdkRoot).",
     )
 }
 
