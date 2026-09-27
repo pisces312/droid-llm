@@ -202,7 +202,6 @@ class LiteRtEngine @Inject constructor(
                                 text.append(piece)
                                 lastIndex[0] += 1
                                 onEvent(EngineEvent.Token(piece, lastIndex[0]))
-                                RssReader.rssMb()?.let { if (it > rssPeakRef[0]) rssPeakRef[0] = it }
                             }
                         }
 
@@ -231,6 +230,9 @@ class LiteRtEngine @Inject constructor(
                     )
                 }
 
+                // One sample per turn: a per-token /proc/self/status read would
+                // sit on the streaming hot path and inflate latency.
+                RssReader.rssMb()?.let { if (it > rssPeakRef[0]) rssPeakRef[0] = it }
                 val generated = lastIndex[0].coerceAtLeast(0)
                 val metrics = collector.build(
                     generatedTokens = generated,

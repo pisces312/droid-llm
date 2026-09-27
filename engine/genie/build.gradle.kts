@@ -82,6 +82,24 @@ android {
         }
     }
 
+    // Keep the native shim optimised in debug builds too: AGP would otherwise
+    // pass CMAKE_BUILD_TYPE=Debug (-O0) and skew cross-engine comparison.
+    if (!skipGenie) {
+        buildTypes {
+            debug {
+                externalNativeBuild {
+                    cmake {
+                        arguments += listOf(
+                            "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                            "-DCMAKE_CXX_FLAGS_DEBUG=-g -O2",
+                            "-DCMAKE_C_FLAGS_DEBUG=-g -O2",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

@@ -1,15 +1,20 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(mnn_chat_jni)
 
-# MNN_ROOT: path to MNN source/build tree that contains
+# MNN_ROOT: path to an MNN source/build tree that contains
 #   include/MNN/...
 #   transformers/llm/engine/include/llm/llm.hpp
 #   project/android/build_64/lib/libMNN.so   (MNN_BUILD_LLM=ON)
+#
+# Never defaulted to a machine-specific path: the Gradle build forwards
+# -DMNN_ROOT=$MNN_ROOT (or the droid.mnnRoot property). See AGENTS.md.
 if (NOT DEFINED MNN_ROOT)
     if (DEFINED ENV{MNN_ROOT})
         set(MNN_ROOT "$ENV{MNN_ROOT}")
     else()
-        set(MNN_ROOT "D:/3rd-party-projects/MNN")
+        message(FATAL_ERROR
+            "MNN_ROOT is not set. Build with -DMNN_ROOT=<path to MNN tree> or export "
+            "MNN_ROOT in the environment (see AGENTS.md / engine/mnn/build.gradle.kts).")
     endif()
 endif()
 

@@ -200,8 +200,10 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
                         onEvent(EngineEvent.Token(piece, generated))
                         generated++
                     }
-                    RssReader.rssMb()?.let { if (it > rssPeakRef[0]) rssPeakRef[0] = it }
                 }
+                // Sampled once per turn: a per-token /proc/self/status read sits on
+                // the decode hot path and inflates the reported decode latency.
+                RssReader.rssMb()?.let { if (it > rssPeakRef[0]) rssPeakRef[0] = it }
 
                 val metrics = collector.build(
                     generatedTokens = generated,

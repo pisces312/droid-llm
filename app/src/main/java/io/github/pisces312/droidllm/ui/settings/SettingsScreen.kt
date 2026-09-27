@@ -1,5 +1,8 @@
 package io.github.pisces312.droidllm.ui.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -28,17 +33,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.pisces312.droidllm.common.bench.BenchmarkDao
 import io.github.pisces312.droidllm.common.device.DeviceProbe
 import io.github.pisces312.droidllm.common.model.ModelPathStore
 import io.github.pisces312.droidllm.common.model.ModelRootMigrator
 import io.github.pisces312.droidllm.common.settings.AppSettings
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
+import io.github.pisces312.droidllm.common.settings.DEFAULT_SYSTEM_PROMPT
 import io.github.pisces312.droidllm.common.settings.ThemeMode
 import io.github.pisces312.droidllm.data.catalog.ModelAutoImporter
 import io.github.pisces312.droidllm.engineapi.Backend
@@ -51,6 +59,7 @@ import io.github.pisces312.droidllm.ui.models.FileBrowserDialog
 import io.github.pisces312.droidllm.ui.models.FileBrowserRules
 import io.github.pisces312.droidllm.ui.theme.DroidTheme
 import java.io.File
+import java.security.MessageDigest
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,8 +70,23 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * One packaged shared library, as installed on this device.
+ *
+ * The MD5 is the point: comparing it against the same-named `.so` inside
+ * another app answers "do we actually link the same binary?" without
+ * guessing at build flags — see `docs/mnn.md`.
+ */
+data class NativeLibraryInfo(
+    val name: String,
+    val sizeBytes: Long,
+    /** Lowercase hex MD5, or "—" when the file could not be hashed. */
+    val md5: String,
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val deviceProbe: DeviceProbe,
     private val settingsStore: AppSettingsStore,
     private val benchmarkDao: BenchmarkDao,
@@ -72,6 +96,10 @@ class SettingsViewModel @Inject constructor(
 
     private val _probe = MutableStateFlow<ProbeContext?>(null)
     val probe: StateFlow<ProbeContext?> = _probe.asStateFlow()
+
+    /** Null until [loadLibraries] runs — hashing several MB is not free. */
+    private val _libraries = MutableStateFlow<List<NativeLibraryInfo>?>(null)
+    val libraries: StateFlow<List<NativeLibraryInfo>?> = _libraries.asStateFlow()
 
     val settings: StateFlow<AppSettings> = settingsStore.observe()
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
@@ -132,6 +160,47 @@ class SettingsViewModel @Inject constructor(
     fun markStorageGuideSeen() {
         viewModelScope.launch { settingsStore.setStorageGuideSeen(true) }
     }
+
+    fun setSystemPrompt(prompt: String) {
+        viewModelScope.launch { settingsStore.setSystemPrompt(prompt) }
+    }
+
+    /**
+     * Hash every packaged `.so` once per session so the About panel can be
+     * compared against the same-named libraries shipped by other apps.
+     */
+    fun loadLibraries() {
+        if (_libraries.value != null) return
+        viewModelScope.launch {
+            _libraries.value = withContext(Dispatchers.IO) {
+                val dir = File(context.applicationInfo.nativeLibraryDir)
+                dir.listFiles()
+                    ?.filter { it.isFile && it.name.endsWith(".so") }
+                    ?.sortedBy { it.name }
+                    ?.map { file ->
+                        NativeLibraryInfo(
+                            name = file.name,
+                            sizeBytes = file.length(),
+                            md5 = md5Of(file),
+                        )
+                    }
+                    .orEmpty()
+            }
+        }
+    }
+
+    private fun md5Of(file: File): String = runCatching {
+        val digest = MessageDigest.getInstance("MD5")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        digest.digest().joinToString("") { "%02x".format(it) }
+    }.getOrDefault("—")
 
     /**
      * Switch the shared model root to [newRoot].
@@ -203,12 +272,15 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val probe by vm.probe.collectAsState()
     val settings by vm.settings.collectAsState()
     val message by vm.message.collectAsState()
+    val libraries by vm.libraries.collectAsState()
     val context = LocalContext.current
     var showBrowser by remember { mutableStateOf(false) }
     var pendingRoot by remember { mutableStateOf<String?>(null) }
     var migratePrompt by remember { mutableStateOf(false) }
     var conflictPrompt by remember { mutableStateOf<List<String>>(emptyList()) }
     var storagePrompt by remember { mutableStateOf(false) }
+    var metricsHelp by remember { mutableStateOf(false) }
+    var aboutExpanded by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -292,6 +364,37 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     readOnly = true,
                     label = { Text("backend") },
                     singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
+        SectionCard("系统提示词") {
+            Text(
+                "作为首条 system 消息随每次请求发给引擎。多数模型的 chat template 只在首条消息为 " +
+                    "system 时才渲染 system 段；在 MNN 上留空会让极短的首轮问话（如 hi）直接命中 " +
+                    "EOS，出现空回复。详见 docs/mnn.md。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = settings.systemPrompt,
+                onValueChange = vm::setSystemPrompt,
+                label = { Text("system") },
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedToolButton(
+                    "恢复默认",
+                    onClick = { vm.setSystemPrompt(DEFAULT_SYSTEM_PROMPT) },
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedToolButton(
+                    "清空（不注入）",
+                    onClick = { vm.setSystemPrompt("") },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -385,6 +488,20 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             }
         }
 
+        SectionCard("指标说明") {
+            Text(
+                "聊天页每个回复下方展示的都是引擎回报的性能指标。这里说明它们的口径与定义。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedToolButton(
+                "查看指标定义",
+                onClick = { metricsHelp = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
         SectionCard("关于") {
             Text(
                 "droid-llm：同一台真机上四引擎（LiteRT-LM / MNN / Genie / llama.cpp）实测对比。",
@@ -398,6 +515,44 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(8.dp))
+            OutlinedToolButton(
+                if (aboutExpanded) "收起原生库信息" else "展开原生库信息（含 MD5）",
+                onClick = {
+                    aboutExpanded = !aboutExpanded
+                    if (aboutExpanded) vm.loadLibraries()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (aboutExpanded) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "本 APK 打包的原生库（名称 / 大小 / MD5）。拿它和别的 app 里同名 .so 比对，" +
+                        "可以直接判断是否链接了同一个二进制，不必再猜编译参数。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                val libs = libraries
+                when {
+                    libs == null -> Text("计算中…", style = MaterialTheme.typography.labelSmall)
+                    libs.isEmpty() -> Text(
+                        "未找到 .so（可能使用压缩打包）",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    else -> {
+                        libs.forEach { lib ->
+                            NativeLibraryRow(lib)
+                            HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                        }
+                        OutlinedToolButton(
+                            "复制全部",
+                            onClick = { copyNativeLibraries(context, libs) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
         }
 
         if (message.isNotEmpty()) {
@@ -405,6 +560,60 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             Text(message, style = MaterialTheme.typography.labelMedium)
         }
         Spacer(Modifier.height(8.dp))
+    }
+
+    if (metricsHelp) {
+        AlertDialog(
+            onDismissRequest = { metricsHelp = false },
+            shape = RoundedCornerShape(12.dp),
+            title = { Text("指标定义") },
+            text = {
+                Column(
+                    Modifier
+                        .heightIn(max = 440.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    MetricDefinition(
+                        "TTFT（首 token 延迟）",
+                        "从 generate() 请求发出到首个 token 回调。不含模型加载与模板格式化。" +
+                            "引擎自报 prefill 耗时时优先采用（如 MNN 的 prefill_us），否则退回墙钟计时。",
+                    )
+                    MetricDefinition(
+                        "prefill（输入处理速率）",
+                        "promptTokens ÷ prefill 耗时。衡量模型读完输入的速度；prompt 越长，这项越重要。",
+                    )
+                    MetricDefinition(
+                        "decode（生成速率）",
+                        "(generatedTokens − 1) ÷ decode 耗时。逐 token 生成的速度，端侧对比最常用的一项。",
+                    )
+                    MetricDefinition(
+                        "p50（单 token 中位耗时）",
+                        "相邻 token 回调间隔的中位数，反映生成过程的稳定度，越小越稳。",
+                    )
+                    MetricDefinition(
+                        "prompt → gen tok",
+                        "本轮输入的 token 数与生成的 token 数。",
+                    )
+                    MetricDefinition(
+                        "引擎口径差异",
+                        "· MNN：直接读引擎 prefill_us / decode_us，是纯计算耗时，不含 JNI 回调与界面派发，" +
+                            "可与 MnnLlmChat 日志里的 PERF 行对比。\n" +
+                            "· Genie：流式回调为文本片段而非离散 token，generatedTokens 为回调次数近似值。\n" +
+                            "· LiteRT-LM / llama.cpp：引擎不回报分段耗时，使用墙钟口径，" +
+                            "因此数值天然低于纯计算速率。",
+                    )
+                    Text(
+                        "同一模型下墙钟口径会低于引擎口径，因为每 token 的 JNI 回调与界面派发都计入前者。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { metricsHelp = false }) { Text("知道了") }
+            },
+        )
     }
 
     if (storagePrompt) {
@@ -578,4 +787,60 @@ private fun ThemeModeRow(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun NativeLibraryRow(lib: NativeLibraryInfo) {
+    Column {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                lib.name,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                formatBytes(lib.sizeBytes),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            lib.md5,
+            style = MaterialTheme.typography.labelSmall,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun MetricDefinition(term: String, body: String) {
+    Column {
+        Text(term, style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            body,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024 -> "%.1f MB".format(bytes / 1024.0 / 1024.0)
+    bytes >= 1024L -> "%.0f KB".format(bytes / 1024.0)
+    else -> "$bytes B"
+}
+
+private fun copyNativeLibraries(context: Context, libs: List<NativeLibraryInfo>) {
+    val text = buildString {
+        appendLine("droid-llm native libraries")
+        libs.forEach { appendLine("${it.name}\t${it.sizeBytes}\t${it.md5}") }
+    }
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText("droid-llm native libraries", text))
 }

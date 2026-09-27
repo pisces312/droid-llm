@@ -283,8 +283,12 @@ class BenchmarkRunner @Inject constructor(
             else -> spec.maxNewTokens
         }
         val request = GenerateRequest(
-            messages = listOf(ChatMessage(ChatRole.USER, promptText)),
-            config = InferenceConfig(maxNewTokens = maxNew),
+            messages = buildList {
+                spec.systemPrompt?.takeIf { it.isNotBlank() }
+                    ?.let { add(ChatMessage(ChatRole.SYSTEM, it)) }
+                add(ChatMessage(ChatRole.USER, promptText))
+            },
+            config = InferenceConfig(maxNewTokens = maxNew, systemPrompt = spec.systemPrompt),
         )
 
         val resultRef = AtomicReference<GenerateResult?>(null)

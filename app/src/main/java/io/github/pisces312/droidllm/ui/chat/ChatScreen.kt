@@ -444,15 +444,34 @@ private fun MessageBubble(msg: ChatUiMessage) {
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            if (!isUser && (msg.ttftMs != null || msg.decodeTps != null)) {
+            val hasMetrics = !isUser &&
+                (msg.ttftMs != null || msg.prefillTps != null || msg.decodeTps != null)
+            if (hasMetrics) {
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     msg.ttftMs?.let {
                         MetricPill("TTFT", "${it}ms")
                     }
-                    msg.decodeTps?.let {
-                        MetricPill("tok/s", "%.1f".format(it))
+                    msg.prefillTps?.let {
+                        MetricPill("prefill", "%.1f tok/s".format(it))
                     }
+                }
+                msg.decodeTps?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        MetricPill("decode", "%.1f tok/s".format(it))
+                        msg.perTokenMsP50?.let { p50 ->
+                            MetricPill("p50", "%.0f ms".format(p50))
+                        }
+                    }
+                }
+                if (msg.promptTokens > 0 || msg.generatedTokens > 0) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "${msg.promptTokens} prompt → ${msg.generatedTokens} gen tok",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

@@ -238,11 +238,13 @@ class GenieEngine @Inject constructor(
                                 collector.onToken()
                                 text.append(piece)
                                 onEvent(EngineEvent.Token(piece, text.length))
-                                RssReader.rssMb()?.let { if (it > rssPeakRef[0]) rssPeakRef[0] = it }
                             }
                         },
                         metricsOut,
                     )
+                    // One sample per attempt: a per-token /proc/self/status read
+                    // would sit on the streaming hot path and inflate latency.
+                    RssReader.rssMb()?.let { if (it > rssPeakRef[0]) rssPeakRef[0] = it }
                     produced = ok && text.isNotEmpty()
                 }
 

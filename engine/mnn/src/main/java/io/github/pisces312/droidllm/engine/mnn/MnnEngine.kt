@@ -6,6 +6,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import io.github.pisces312.droidllm.common.metrics.MetricsCollector
+import io.github.pisces312.droidllm.common.metrics.NativeTiming
 import io.github.pisces312.droidllm.common.metrics.RssReader
 import io.github.pisces312.droidllm.engineapi.Availability
 import io.github.pisces312.droidllm.engineapi.Backend
@@ -176,7 +177,6 @@ class MnnEngine @Inject constructor() : LlmEngine {
                             collector.onToken()
                             text.append(piece)
                             onEvent(EngineEvent.Token(piece, text.length))
-                            RssReader.rssMb()?.let { if (it > rssPeakRef[0]) rssPeakRef[0] = it }
                         }
                     },
                     metricsOut,
@@ -186,6 +186,10 @@ class MnnEngine @Inject constructor() : LlmEngine {
                 val generatedNative = metricsOut[1].toInt().coerceAtLeast(0)
                 collector.onPromptTokenCount(promptTokens)
                 val generated = if (generatedNative > 0) generatedNative else text.length
+                // RSS is sampled once around the whole turn: reading /proc/self/status
+                // inside the token callback would add file IO to the hot path and
+                // inflate the very latency this panel reports.
+                RssReader.rssMb()?.let { if (it > rssPeakRef[0]) rssPeakRef[0] = it }
                 val metrics = collector.build(
                     generatedTokens = generated,
                     loadMs = session.loadMs,
@@ -193,6 +197,16 @@ class MnnEngine @Inject constructor() : LlmEngine {
                     rssMbPeak = rssPeakRef[0],
                     effectiveConfig = request.config,
                     warnings = warningsFor(request.config),
+                    // MNN instruments its own stages: prefill_us / decode_us cover
+                    // pure compute, so these rates are directly comparable with
+                    // MnnLlmChat's `PERF | prefill: ... decode: ...` log line.
+                    // ttfa_us stays 0 on the plain ArGeneration path (only omni
+                    // fills it), so TTFT falls back to prefill_us.
+                    native = NativeTiming(
+                        prefillUs = metricsOut[2].coerceAtLeast(0),
+                        decodeUs = metricsOut[3].coerceAtLeast(0),
+                        ttfaUs = metricsOut[4].coerceAtLeast(0),
+                    ),
                 )
                 session.metrics = metrics
                 onEvent(

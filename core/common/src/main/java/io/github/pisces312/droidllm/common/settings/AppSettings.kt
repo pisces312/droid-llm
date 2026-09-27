@@ -31,6 +31,16 @@ enum class ThemeMode {
 }
 
 /**
+ * Prepended to every request as a `system` message (设置 → 系统提示词).
+ *
+ * Engines format the conversation with the model's own chat template, and most
+ * templates only emit a system block when the **first** message has role
+ * `system` — see `docs/mnn.md`. Without it a very short first turn (`hi`) can
+ * make a small model emit EOS immediately and produce a blank reply.
+ */
+const val DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
+
+/**
  * User defaults persisted in DataStore. Sampling values seed the Chat
  * sampling panel and can be overridden per session (UI_DESIGN §5.4).
  */
@@ -51,6 +61,8 @@ data class AppSettings(
     val threads: Int = 4,
     val maxNewTokens: Int = 128,
     val backend: Backend = Backend.AUTO,
+    /** Blank = no system message is sent at all. */
+    val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
 ) {
     fun toInferenceConfig(): InferenceConfig = InferenceConfig(
         maxNewTokens = maxNewTokens,
@@ -59,6 +71,7 @@ data class AppSettings(
         topP = topP,
         threads = threads,
         backend = backend,
+        systemPrompt = systemPrompt.takeIf { it.isNotBlank() },
     )
 }
 
@@ -69,6 +82,7 @@ interface AppSettingsStore {
     suspend fun setMultiModelResidency(enabled: Boolean)
     suspend fun setModelRoot(path: String?)
     suspend fun setStorageGuideSeen(seen: Boolean)
+    suspend fun setSystemPrompt(prompt: String)
     suspend fun setSampling(
         temperature: Float,
         topK: Int,
@@ -99,6 +113,7 @@ class DataStoreAppSettingsStore @Inject constructor(
         val threads = intPreferencesKey("threads")
         val maxNewTokens = intPreferencesKey("max_new_tokens")
         val backend = stringPreferencesKey("backend")
+        val systemPrompt = stringPreferencesKey("system_prompt")
     }
 
     override fun observe(): Flow<AppSettings> = context.appSettingsDataStore.data.map { prefs ->
@@ -115,6 +130,7 @@ class DataStoreAppSettingsStore @Inject constructor(
             backend = prefs[Keys.backend]?.let { raw ->
                 Backend.entries.firstOrNull { it.name == raw }
             } ?: Backend.AUTO,
+            systemPrompt = prefs[Keys.systemPrompt] ?: DEFAULT_SYSTEM_PROMPT,
         )
     }
 
@@ -137,6 +153,10 @@ class DataStoreAppSettingsStore @Inject constructor(
 
     override suspend fun setStorageGuideSeen(seen: Boolean) {
         context.appSettingsDataStore.edit { it[Keys.storageGuideSeen] = seen }
+    }
+
+    override suspend fun setSystemPrompt(prompt: String) {
+        context.appSettingsDataStore.edit { it[Keys.systemPrompt] = prompt }
     }
 
     override suspend fun setSampling(

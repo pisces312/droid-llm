@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.pisces312.droidllm.common.model.ModelPathStore
 import io.github.pisces312.droidllm.common.settings.AppSettings
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
+import io.github.pisces312.droidllm.common.settings.DEFAULT_SYSTEM_PROMPT
 import io.github.pisces312.droidllm.engineapi.Availability
 import io.github.pisces312.droidllm.engineapi.Backend
 import io.github.pisces312.droidllm.engineapi.ChatMessage
@@ -49,12 +50,16 @@ data class ModelChoice(
  */
 enum class SessionState { IDLE, LOADING, READY, FAILED }
 
-/** One chat turn, with optional metrics attached to the assistant bubble. */
+/** One chat turn, with every performance metric the engine reported attached to the assistant bubble. */
 data class ChatUiMessage(
     val role: ChatRole,
     val content: String,
     val ttftMs: Long? = null,
+    val prefillTps: Double? = null,
     val decodeTps: Double? = null,
+    val promptTokens: Int = 0,
+    val generatedTokens: Int = 0,
+    val perTokenMsP50: Double? = null,
     val error: String? = null,
 )
 
@@ -65,6 +70,7 @@ data class SamplingUiState(
     val threads: Int = 4,
     val maxNewTokens: Int = 128,
     val backend: Backend = Backend.AUTO,
+    val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
 )
 
 @HiltViewModel
@@ -158,6 +164,7 @@ class ChatViewModel @Inject constructor(
         threads = threads,
         maxNewTokens = maxNewTokens,
         backend = backend,
+        systemPrompt = systemPrompt,
     )
 
     /** Picking an engine releases any running model; the new one waits for [startModel]. */
@@ -336,8 +343,14 @@ class ChatViewModel @Inject constructor(
         }
         if (_generating.value) return
         val config = _sampling.value.toConfig()
-        val history = _messages.value.map { ChatMessage(it.role, it.content) } +
-            ChatMessage(ChatRole.USER, text)
+        // The system turn is materialised here instead of being stored in the
+        // transcript: chat templates read the system instruction from
+        // messages[0], while the bubble list stays user/assistant only.
+        val history = buildList {
+            config.systemPrompt?.let { add(ChatMessage(ChatRole.SYSTEM, it)) }
+            addAll(_messages.value.map { ChatMessage(it.role, it.content) })
+            add(ChatMessage(ChatRole.USER, text))
+        }
         _messages.value = _messages.value + ChatUiMessage(ChatRole.USER, text)
         _status.value = "生成中…"
         _generating.value = true
@@ -367,33 +380,34 @@ class ChatViewModel @Inject constructor(
                     val ttft = m.ttftMs ?: if (firstTokenNs > 0) {
                         (firstTokenNs - startedAt) / 1_000_000
                     } else null
-                    val tps = m.decodeTps
                     val emptyReply = sb.isBlank()
                     val content = sb.toString().ifBlank { "（空回复，可重试）" }
+                    val bubble = ChatUiMessage(
+                        role = ChatRole.ASSISTANT,
+                        content = content,
+                        ttftMs = ttft,
+                        prefillTps = m.prefillTps,
+                        decodeTps = m.decodeTps,
+                        promptTokens = m.promptTokens,
+                        generatedTokens = m.generatedTokens,
+                        perTokenMsP50 = m.perTokenMsP50,
+                    )
                     val last = _messages.value.lastOrNull()
                     if (last?.role == ChatRole.ASSISTANT) {
-                        _messages.value = _messages.value.dropLast(1) +
-                            ChatUiMessage(
-                                role = ChatRole.ASSISTANT,
-                                content = content,
-                                ttftMs = ttft,
-                                decodeTps = tps,
-                            )
+                        _messages.value = _messages.value.dropLast(1) + bubble
                     } else if (emptyReply) {
                         // Nothing was streamed (the model stopped before emitting
                         // any text). Add a bubble so the turn is not silently blank.
-                        _messages.value = _messages.value +
-                            ChatUiMessage(
-                                role = ChatRole.ASSISTANT,
-                                content = content,
-                                ttftMs = ttft,
-                                decodeTps = tps,
-                            )
+                        _messages.value = _messages.value + bubble
                     }
                     _status.value = buildString {
                         append(if (emptyReply) "完成（无输出）" else "完成")
-                        ttft?.let { append(" · 首 token 延迟（TTFT）${it}ms") }
-                        tps?.let { append(" · %.1f tok/s".format(it)) }
+                        ttft?.let { append(" · TTFT ${it}ms") }
+                        m.prefillTps?.let { append(" · prefill %.1f tok/s".format(it)) }
+                        m.decodeTps?.let { append(" · decode %.1f tok/s".format(it)) }
+                        if (m.promptTokens > 0 || m.generatedTokens > 0) {
+                            append(" · ${m.promptTokens}→${m.generatedTokens} tok")
+                        }
                         if (m.warnings.isNotEmpty()) append(" · ").append(m.warnings.joinToString("；"))
                     }
                     _generating.value = false
@@ -432,5 +446,6 @@ class ChatViewModel @Inject constructor(
         topP = topP,
         threads = threads,
         backend = backend,
+        systemPrompt = systemPrompt.takeIf { it.isNotBlank() },
     )
 }

@@ -1,5 +1,6 @@
 package io.github.pisces312.droidllm.benchmark
 
+import io.github.pisces312.droidllm.common.settings.DEFAULT_SYSTEM_PROMPT
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.LocalModel
 
@@ -33,6 +34,14 @@ data class BenchmarkSpec(
     /** Short prompt for D/T (prefill uses the long [prompt]). */
     val decodePromptText: String = "用一句话介绍你自己。",
     val sustainRounds: Int = 3,
+    /**
+     * Prepended as a `system` message for every case; null/blank = none.
+     *
+     * Kept on by default: cases send a single user turn with no history, which is
+     * exactly the shape that makes a small model (LFM2-350M on MNN) emit EOS
+     * immediately and score 0 tok/s. See `docs/mnn.md` §2.
+     */
+    val systemPrompt: String? = DEFAULT_SYSTEM_PROMPT,
 ) {
     init {
         require(targets.isNotEmpty()) { "targets must not be empty" }

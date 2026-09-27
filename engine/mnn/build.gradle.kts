@@ -84,6 +84,26 @@ android {
         }
     }
 
+    // AGP maps the debug variant to CMAKE_BUILD_TYPE=Debug, i.e. -O0. The JNI
+    // shim sits on the per-token callback path, so an unoptimised build is
+    // measurable and would make this engine look slower than peers shipped as
+    // Release. RelWithDebInfo keeps symbols while optimising; the *_FLAGS_DEBUG
+    // pair is a belt-and-braces override in case AGP still injects its own
+    // Debug build type.
+    buildTypes {
+        debug {
+            externalNativeBuild {
+                cmake {
+                    arguments += listOf(
+                        "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                        "-DCMAKE_CXX_FLAGS_DEBUG=-g -O2",
+                        "-DCMAKE_C_FLAGS_DEBUG=-g -O2",
+                    )
+                }
+            }
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

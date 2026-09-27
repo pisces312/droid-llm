@@ -32,10 +32,11 @@ Fake 只作 `LlmEngine` 契约的可执行规格（`FakeEngineTest`）与写新�
 
 ## 2. MNN（阿里）
 
-- **依赖**：预编译 `libMNN.so`（须含 LLM 组件）。默认查找：
-  1. Gradle `-Pdroid.mnnRoot=...`
-  2. env `MNN_ROOT`
-  3. 默认 `D:/3rd-party-projects/MNN` → `project/android/build_64/lib/libMNN.so`
+- **依赖**：预编译 `libMNN.so`（须含 LLM 组件）。查找顺序：
+  1. Gradle 属性 `-Pdroid.mnnRoot=...`
+  2. 环境变量 `MNN_ROOT`
+  3. 两者都没有 → **构建失败**（不再回退到任何本机绝对路径）
+  产物路径固定为 `<MNN_ROOT>/project/android/build_64/lib/libMNN.so`
 - **编译**：`engine/mnn/src/main/cpp/` 编 `libmnn_chat_jni.so`；Gradle `copyMnnJniLibs` 把 `libMNN.so` 打进 `jniLibs`
 - **模型导出**（目录型）：
   ```
@@ -50,28 +51,26 @@ Fake 只作 `LlmEngine` 契约的可执行规格（`FakeEngineTest`）与写新�
 
 ### 2.1 MNN 实测行为与排障（2026-09-27）
 
-排查「模拟器上 MNN 发 `hi` 助手回复为空」时逐项对照 MNN 源码与官方 Android demo
+> **完整版见 `docs/mnn.md`** —— 空回复根因、计时字段可信度、`end_with` 语义、
+> so 溯源与 MD5 比对、调试手法都在那里。本节只留结论速查。
+
+排查「MNN 发 `hi` 助手回复为空」时逐项对照 MNN 源码与官方 Android demo
 （`apps/Android/MnnLlmChat`）得出的结论。代码依据位置：
 
 | 结论 | 依据 | 本仓库处理 |
 |------|------|-----------|
 | `set_config` 必须在 `load()` **之前** | `llm.cpp` 的 `Llm::load()` 里 `config.type = backend_type_convert(mConfig->backend_type())`、`config.numThread = mConfig->thread_num()` 在构建 runtime 时读取；`set_config` 只做 `config_.merge()`，load 之后再调只影响采样参数 | `MnnNative.nativeCreate(dir, configJson)` 内 `createLLM → set_config → load`（与 `llm_session.cpp::LlmSession::Load()` 一致） |
-| `response()` 的 `end_with` 传 `nullptr` 会写出 `"\n"` | MNN 对 nullptr 默认 "\n"，命中停止符时把该串原样写进流 | 传空串 `""`，避免只有换行符的假回复 |
+| `response()` 的 `end_with` 传 `nullptr` 会写出 `"\n"` | MNN 对 nullptr 默认 "\n"，命中停止符时把该串**原样写进流**；它**不参与停止判定**（判定走 tokenizer 的 stop 列表） | 传空串 `""`，避免只有换行符的假回复 |
 | 每轮生成前需把 `context->status` 复位成 `RUNNING` | 上一轮结束后停在 `NORMAL_FINISHED` / `MAX_TOKENS_FINISHED`，下一轮 `response()` 直接不解码 | `nativeGenerate` 内取 `getContext()`，非 RUNNING 则置 RUNNING（对齐 demo 的 `restoreAndroidSteppingStatusIfNeeded`） |
 | `createLLM` 要传 `config.json` 绝对路径 | 传纯目录会拼出 `<dir>tokenizer.txt`（缺分隔符），tokenizer 加载失败 | Kotlin 侧传 `File(dir, "config.json").absolutePath` |
 
-**首句 `hi` 空回复不是「第一轮特殊处理」**。对照实验（干净会话）：
+**首句 `hi` 空回复的根因**：模型自带的 jinja `chat_template` 只在 `messages[0]["role"] == "system"`
+时才渲染 system 段，而纯 `hi` 渲染出的 prompt 只有 9 token → LFM2-350M 第一步采样即落在 EOS。
+MnnLlmChat 之所以不空，是因为它**无条件注入**了一条 system。对照实验与代码依据见 `docs/mnn.md` §2。
 
-- 首句 `What is 2+2?` → 正常生成 128 token；
-- 首句 `hi` → `gen_seq_len == 1`，第一个 token 就是 EOS，输出为空；
-- 第二次 `hi` 有内容，是因为 history 里已有一条（空的）assistant turn 提供了上下文。
-
-即：**极短 prompt 下该模型（LFM2-350M）本身倾向立刻出 EOS**，是模型/采样行为，不是 JNI 或轮次 bug。
-MnnLlmChat 之所以看起来更稳，差异在于：默认注入 system prompt、用 `"<eop>"` 哨兵手动 `generate(1)` 循环、
-以及（现在已对齐的）`set_config` 顺序。**注**：模拟器为 x86_64 + `libndk_translation.so` 二进制翻译执行
-arm64 产物，数值/采样结果不可信——上述结论须在真机 arm64 上复核。
-
-待评估（未实施，属产品行为变更）：是否照 demo 注入默认 system prompt。
+**本项目处理**：设置 → 系统提示词，默认注入 `"You are a helpful assistant."`，可改可清空。
+**注**：模拟器为 x86_64 + `libndk_translation.so` 二进制翻译执行 arm64 产物，
+数值与采样结果不可信——性能结论须在真机 arm64 上复核。
 
 ## 3. Genie / QNN（Qualcomm）
 

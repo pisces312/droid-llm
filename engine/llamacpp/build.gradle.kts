@@ -50,6 +50,23 @@ android {
         }
     }
 
+    // AGP maps the debug variant to CMAKE_BUILD_TYPE=Debug (-O0) while the other
+    // engines' native libraries ship prebuilt and optimised. Building the debug
+    // shim with -O0 skewed cross-engine comparison, so use RelWithDebInfo.
+    buildTypes {
+        debug {
+            externalNativeBuild {
+                cmake {
+                    arguments += listOf(
+                        "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                        "-DCMAKE_CXX_FLAGS_DEBUG=-g -O2",
+                        "-DCMAKE_C_FLAGS_DEBUG=-g -O2",
+                    )
+                }
+            }
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

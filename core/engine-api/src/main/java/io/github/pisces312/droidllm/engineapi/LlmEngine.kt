@@ -62,6 +62,15 @@ data class InferenceConfig(
     val threads: Int = 4,
     val backend: Backend = Backend.AUTO,
     val seed: Long? = null,
+    /**
+     * System instruction for this turn, or null to send none.
+     *
+     * Resolved by the app layer, which prepends it as the first
+     * [ChatMessage] with role `system` — see [GenerateRequest.messages].
+     * Adapters must NOT prepend it again. Prepend rather than append: chat
+     * templates commonly only render a system block when the **first** message
+     * carries that role (see `docs/mnn.md`).
+     */
     val systemPrompt: String? = null,
 )
 
