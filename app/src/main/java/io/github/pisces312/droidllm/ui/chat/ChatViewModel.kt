@@ -20,11 +20,13 @@ import io.github.pisces312.droidllm.engineapi.LocalModel
 import io.github.pisces312.droidllm.engineapi.SessionHandle
 import io.github.pisces312.droidllm.engineapi.labelledName
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class EngineChoice(
     val engine: LlmEngine,
@@ -225,7 +227,7 @@ class ChatViewModel @Inject constructor(
             val handle = session
             val engine = sessionEngine
             if (_sessionState.value == SessionState.READY && handle != null && engine != null) {
-                runCatching { engine.reset(handle) }
+                runCatching { withContext(Dispatchers.IO) { engine.reset(handle) } }
                 _status.value = "已新建会话（上下文已清空）"
             } else {
                 _status.value = "模型未启动，已清空聊天记录"
@@ -290,7 +292,12 @@ class ChatViewModel @Inject constructor(
         _sessionState.value = SessionState.LOADING
         _status.value = "加载中…"
         runCatching {
-            val handle = engine.load(model, _sampling.value.toConfig())
+            // Adapters call straight into native load()/unload(), which run for
+            // seconds. Keep them off the main thread so the LOADING state can
+            // actually be rendered instead of freezing the frame.
+            val handle = withContext(Dispatchers.IO) {
+                engine.load(model, _sampling.value.toConfig())
+            }
             session = handle
             sessionEngine = engine
             sessionRegistry.register(engine, handle)
@@ -310,7 +317,7 @@ class ChatViewModel @Inject constructor(
         if (multiResidency) return
         val handle = session ?: return
         val engine = sessionEngine ?: _selectedEngine.value?.engine
-        runCatching { engine?.unload(handle) }
+        engine?.let { runCatching { withContext(Dispatchers.IO) { it.unload(handle) } } }
         sessionRegistry.unregister(handle)
         session = null
         sessionEngine = null
@@ -361,7 +368,8 @@ class ChatViewModel @Inject constructor(
                         (firstTokenNs - startedAt) / 1_000_000
                     } else null
                     val tps = m.decodeTps
-                    val content = sb.toString().ifEmpty { "（空回复，可重试）" }
+                    val emptyReply = sb.isBlank()
+                    val content = sb.toString().ifBlank { "（空回复，可重试）" }
                     val last = _messages.value.lastOrNull()
                     if (last?.role == ChatRole.ASSISTANT) {
                         _messages.value = _messages.value.dropLast(1) +
@@ -371,9 +379,19 @@ class ChatViewModel @Inject constructor(
                                 ttftMs = ttft,
                                 decodeTps = tps,
                             )
+                    } else if (emptyReply) {
+                        // Nothing was streamed (the model stopped before emitting
+                        // any text). Add a bubble so the turn is not silently blank.
+                        _messages.value = _messages.value +
+                            ChatUiMessage(
+                                role = ChatRole.ASSISTANT,
+                                content = content,
+                                ttftMs = ttft,
+                                decodeTps = tps,
+                            )
                     }
                     _status.value = buildString {
-                        append("完成")
+                        append(if (emptyReply) "完成（无输出）" else "完成")
                         ttft?.let { append(" · 首 token 延迟（TTFT）${it}ms") }
                         tps?.let { append(" · %.1f tok/s".format(it)) }
                         if (m.warnings.isNotEmpty()) append(" · ").append(m.warnings.joinToString("；"))

@@ -217,7 +217,11 @@ JNIEXPORT void JNICALL JNI_METHOD(nativeGenerate)(
   std::ostream os(&stream_buf);
 
   try {
-    session->llm->response(messages, &os, nullptr, max_new_tokens);
+    // `end_with` is written to the stream verbatim when generation hits a stop
+    // token. MNN defaults it to "\n" for nullptr, which would surface as a
+    // bogus newline-only "response". Pass an empty string instead so a stopped
+    // generation contributes no text at all.
+    session->llm->response(messages, &os, "", max_new_tokens);
     processor.flush();
   } catch (const std::exception& e) {
     session->generating = false;
