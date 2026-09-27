@@ -1,6 +1,8 @@
 package io.github.pisces312.droidllm.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +26,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +34,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
@@ -73,74 +79,78 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
     val sessionState by vm.sessionState.collectAsState()
     val canStart = selectedModel != null && selectedEngine?.available == true
     val canSend = sessionState == SessionState.READY && !generating
+    val loading = sessionState == SessionState.LOADING
 
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-    ) {
-        Spacer(Modifier.height(8.dp))
-        TopBar(
-            engines = engines,
-            selectedEngine = selectedEngine,
-            onEngine = vm::selectEngine,
-            models = models,
-            selectedModel = selectedModel,
-            onModel = vm::selectModel,
-            sessionState = sessionState,
-            canStart = canStart,
-            onStart = vm::startModel,
-            onStop = vm::stopModel,
-            onNewSession = vm::newSession,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            availability + " · " + status,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(8.dp))
-        SamplingPanel(
-            engineId = selectedEngine?.engine?.id,
-            sampling = sampling,
-            onUpdate = vm::updateSampling,
-        )
-        Spacer(Modifier.height(8.dp))
-        if (messages.isEmpty()) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text(
-                    "先在「模型」页添加模型，再回到这里启动它",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(messages) { msg ->
-                    MessageBubble(msg)
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+        ) {
+            Spacer(Modifier.height(8.dp))
+            TopBar(
+                engines = engines,
+                selectedEngine = selectedEngine,
+                onEngine = vm::selectEngine,
+                models = models,
+                selectedModel = selectedModel,
+                onModel = vm::selectModel,
+                statusText = availability + " · " + status,
+                sessionState = sessionState,
+                canStart = canStart,
+                onStart = vm::startModel,
+                onStop = vm::stopModel,
+                onNewSession = vm::newSession,
+            )
+            Spacer(Modifier.height(8.dp))
+            SamplingPanel(
+                engineId = selectedEngine?.engine?.id,
+                sampling = sampling,
+                onUpdate = vm::updateSampling,
+            )
+            Spacer(Modifier.height(8.dp))
+            if (messages.isEmpty()) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(
+                        "先在「模型」页添加模型，再回到这里启动它",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(messages) { msg ->
+                        MessageBubble(msg)
+                    }
                 }
             }
+            Spacer(Modifier.height(8.dp))
+            Composer(
+                generating = generating,
+                canSend = canSend,
+                onSend = vm::send,
+                onStop = vm::stopGenerate,
+            )
+            Spacer(Modifier.height(8.dp))
         }
-        Spacer(Modifier.height(8.dp))
-        Composer(
-            generating = generating,
-            canSend = canSend,
-            onSend = vm::send,
-            onStop = vm::stopGenerate,
-        )
-        Spacer(Modifier.height(8.dp))
+        // Model load blocks the calling thread in every adapter and cannot be
+        // cancelled midway, so block the whole page and report progress instead
+        // of letting the user queue up conflicting actions.
+        if (loading) {
+            LoadingOverlay(modelName = selectedModel?.displayName)
+        }
     }
 }
 
@@ -153,6 +163,7 @@ private fun TopBar(
     models: List<ModelChoice>,
     selectedModel: ModelChoice?,
     onModel: (ModelChoice) -> Unit,
+    statusText: String,
     sessionState: SessionState,
     canStart: Boolean,
     onStart: () -> Unit,
@@ -160,10 +171,9 @@ private fun TopBar(
     onNewSession: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    // Two rows: the pickers need the full width, so the status line and the
+    // controls get their own row instead of squeezing in beside them.
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         EngineModelPickers(
             engines = engines,
             selectedEngine = selectedEngine,
@@ -171,25 +181,93 @@ private fun TopBar(
             models = models,
             selectedModel = selectedModel,
             onModel = onModel,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
         )
-        SessionToggleButton(
-            state = sessionState,
-            canStart = canStart,
-            onStart = onStart,
-            onStop = onStop,
-        )
-        Box {
-            IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                statusText,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+            )
+            SessionToggleButton(
+                state = sessionState,
+                canStart = canStart,
+                onStart = onStart,
+                onStop = onStop,
+            )
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("新建会话") },
+                        onClick = {
+                            menuOpen = false
+                            onNewSession()
+                        },
+                    )
+                }
             }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text("新建会话") },
-                    onClick = {
-                        menuOpen = false
-                        onNewSession()
-                    },
+        }
+    }
+}
+
+/**
+ * Full-page scrim shown while [SessionState.LOADING]. Swallows touch input so
+ * nothing else on the page can be triggered; the bottom navigation sits outside
+ * this component and therefore stays reachable.
+ */
+@Composable
+private fun LoadingOverlay(modelName: String?) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
+        ) {
+            Column(
+                Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(32.dp),
+                    strokeWidth = 3.dp,
+                )
+                Text(
+                    "正在加载模型…",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                modelName?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                Text(
+                    "首次加载需数十秒，请勿离开此页",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
                 )
             }
         }
@@ -220,8 +298,14 @@ private fun SessionToggleButton(
             onClick = {},
             enabled = false,
             shape = shape,
-            modifier = Modifier.height(40.dp),
+            modifier = Modifier.height(40.dp).widthIn(min = 88.dp),
         ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = LocalContentColor.current,
+            )
+            Spacer(Modifier.width(8.dp))
             Text("加载中")
         }
         SessionState.IDLE, SessionState.FAILED -> Button(
@@ -259,6 +343,7 @@ private fun EngineModelPickers(
                 value = selectedEngine?.label ?: "引擎",
                 onValueChange = {},
                 readOnly = true,
+                singleLine = true,
                 label = { Text("引擎") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(engineExpanded) },
                 modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable),
@@ -296,6 +381,7 @@ private fun EngineModelPickers(
                 value = selectedModel?.displayName ?: "模型",
                 onValueChange = {},
                 readOnly = true,
+                singleLine = true,
                 label = { Text("模型") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(modelExpanded) },
                 modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable),
