@@ -13,6 +13,7 @@ import io.github.pisces312.droidllm.engineapi.Availability
 import io.github.pisces312.droidllm.engineapi.Backend
 import io.github.pisces312.droidllm.engineapi.ChatMessage
 import io.github.pisces312.droidllm.engineapi.ChatRole
+import io.github.pisces312.droidllm.engineapi.displayName
 import io.github.pisces312.droidllm.engineapi.EngineEvent
 import io.github.pisces312.droidllm.engineapi.EngineException
 import io.github.pisces312.droidllm.engineapi.EngineId
@@ -48,7 +49,7 @@ import kotlinx.coroutines.launch
 class LlamaCppEngine @Inject constructor() : LlmEngine {
 
     override val id: EngineId = EngineId.LLAMACPP
-    override val displayName: String = "llama.cpp"
+    override val displayName: String get() = id.displayName
     override val version: EngineVersion = EngineVersion(
         version = BuildConfig.ENGINE_VERSION.takeIf { it.isNotBlank() },
         commit = BuildConfig.ENGINE_COMMIT.takeIf { it.isNotBlank() },

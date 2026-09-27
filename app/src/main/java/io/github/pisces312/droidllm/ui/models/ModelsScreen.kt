@@ -33,6 +33,8 @@ import io.github.pisces312.droidllm.data.catalog.DownloadStatus
 import io.github.pisces312.droidllm.data.catalog.ModelSource
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.ModelLocation
+import io.github.pisces312.droidllm.engineapi.displayName
+import io.github.pisces312.droidllm.engineapi.engineIdFromStorage
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
 
@@ -222,7 +224,7 @@ private fun LocalModelsTab(
                 Column(Modifier.padding(12.dp)) {
                     Text(model.displayName, style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "${model.engineId} · ${model.formatHint ?: "-"}" +
+                        "${model.engineId.displayName} · ${model.formatHint ?: "-"}" +
                             (model.quantHint?.let { " · $it" } ?: ""),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -298,11 +300,13 @@ private fun MarketTab(vm: ModelsViewModel) {
         Spacer(Modifier.height(8.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(rows, key = { it.model.id }) { row ->
+                // catalog stores the raw EngineId.name; resolve it for display.
+                val engineLabel = engineIdFromStorage(row.model.engine)?.displayName ?: row.model.engine
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
                         Text(row.model.name, style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "${row.model.engine} · ${row.model.vendor}" +
+                            "$engineLabel · ${row.model.vendor}" +
                                 (if (row.model.sizeBytes > 0) {
                                     " · " + formatSize(row.model.sizeBytes)
                                 } else {
@@ -378,13 +382,13 @@ private fun EngineIdDropdown(selected: EngineId, onSelected: (EngineId) -> Unit)
             val isSelected = id == selected
             if (isSelected) {
                 PrimaryButton(
-                    text = id.name,
+                    text = id.displayName,
                     onClick = { onSelected(id) },
                     modifier = Modifier.weight(1f),
                 )
             } else {
                 OutlinedToolButton(
-                    text = id.name,
+                    text = id.displayName,
                     onClick = { onSelected(id) },
                     modifier = Modifier.weight(1f),
                 )

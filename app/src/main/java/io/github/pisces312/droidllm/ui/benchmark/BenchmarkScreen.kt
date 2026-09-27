@@ -42,6 +42,8 @@ import io.github.pisces312.droidllm.benchmark.BenchmarkPrompts
 import io.github.pisces312.droidllm.benchmark.BenchmarkReport
 import io.github.pisces312.droidllm.benchmark.CaseResult
 import io.github.pisces312.droidllm.benchmark.TargetResult
+import io.github.pisces312.droidllm.engineapi.displayName
+import io.github.pisces312.droidllm.engineapi.engineIdFromStorage
 import io.github.pisces312.droidllm.ui.components.EngineStatusCard
 import io.github.pisces312.droidllm.ui.components.MetricPill
 import io.github.pisces312.droidllm.ui.components.ModelPicker
@@ -379,12 +381,14 @@ private fun HistorySection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
             Text("暂无历史", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             state.history.take(8).forEach { item ->
+                // engineId is persisted as EngineId.name; resolve it for display.
+                val engineLabel = engineIdFromStorage(item.engineId)?.displayName ?: item.engineId
                 Card(
                     shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                 ) {
                     Column(Modifier.padding(10.dp)) {
-                        Text("${item.engineId} · ${item.modelName}", style = MaterialTheme.typography.labelMedium)
+                        Text("$engineLabel · ${item.modelName}", style = MaterialTheme.typography.labelMedium)
                         Text(
                             "decode=${item.decodeTps?.let { "%.1f".format(it) } ?: "—"} tok/s · " +
                                 "ttft=${item.ttftMs ?: "—"} ms · rssPeak=${item.rssMbPeak ?: "—"} MB",

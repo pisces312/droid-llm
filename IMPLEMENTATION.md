@@ -12,6 +12,7 @@
 | P3 | ✅ 完成 | 2026-09-26 | genie，见「P3 交付说明」 |
 | P4 | ✅ 完成，待审阅 | 2026-09-26 | 核心 + UI 已通；见「P4 交付说明」 |
 | P5 | ✅ 完成，待审阅 | 2026-09-26 | 打磨；见「P5 交付说明」 |
+| P6 | 🔄 进行中（R1 ✅） | 2026-09-27 | UI/UX 重构；审查与方案见 [`docs/UI_REVIEW.md`](docs/UI_REVIEW.md)，见 §8d |
 
 ### P0 交付摘要（2026-09-26）
 
@@ -211,7 +212,7 @@
 4. 导出 JSON 到 `Android/data/.../files/benchmark/`，Snackbar 提示文件名
 5. 历史列表出现本次记录，可清空
 
-**阶段状态**：P0–P5 均已完成。P5+ 增量（debug/release 共存、正式版签名、模型路径安全迁移）已完成。剩余为真机 DoD 与 README 截图。
+**阶段状态**：P0–P5 均已完成（P5+ / P5++ 增量亦完成）。P6（UI/UX 重构）已规划，见 §8d。剩余为真机 DoD 与 README 截图。
 
 ---
 
@@ -256,6 +257,7 @@
 | P3 | `:engine:genie`（可跳过编译） | 骁龙真机四引擎，M2 达成 | 2–4 天 |
 | P4 | Benchmark L/P/D/T + Room + JSON 导出 | 一键出对比表，M3 达成 | 1–2 天 |
 | P5 | 校验/错误提示/文档打磨 | 可交付 | 1 天 |
+| P6 | UI/UX 重构（R1–R4，见 §8d） | 控件语义分层 + 顶栏单入口 + 各页密度合理 | 待估 |
 
 **顺序纪律**：llamacpp 先行（生态最成熟、调试最快），mnn 次之；litert 纯 Kotlin 最快；genie 最后且有跳过开关。每个引擎接入都走同一模板：probe → load → generate 流式 → metrics → smoke test。
 
@@ -575,6 +577,112 @@
 4. 已 push 到根目录的模型显示「已下载」，点「添加到列表」进入已导入 Tab；列表项显示实际命中路径
 5. **市场下载完成的对话模型**立即出现在「已导入」Tab 和聊天模型选择器（无需重启/切页）；ImageGen/AudioGen 不自动入库
 5. 断网/半截下载失败后状态为「下载失败」，`.part` 不残留为正式文件
+
+---
+
+## 8d. P6 增量：UI/UX 重构（**进行中**，R1 ✅）
+
+**状态：🔜 计划中（2026-09-27 立项）**
+
+> **权威输入**：[`docs/UI_REVIEW.md`](docs/UI_REVIEW.md) —— 现状盘点 + 问题清单（含文件:行号）+ 布局方案 + 与 MnnLlmChat 的逐条对照。
+> 本节只做落地拆解，不重复论证。**动手前先通读该文档**；契约约束见 `DESIGN.md` §1.2，界面权威见 `UI_DESIGN.md`。
+
+### 立项依据（两句话）
+
+1. **控件语义混乱**：同一个主色填充按钮被复用于"选中 / 主操作 / 次级"12+ 处 → 每页一排紫块，大数字与主按钮被淹没。
+2. **信息密度错配**：工具型 App 却把说明文字与宽松大卡片堆在首屏（最典型：评测页「开始评测」不在首屏）。
+
+外加一组一致性硬伤：**同一个引擎在四个界面有四种写法**（`MNN 3.6.1 #c0461933` / `LLAMACPP` / `LITERT` / 失败行 `LITERT`）。
+
+### 关键设计结论（已定，勿反复）
+
+| 结论 | 说明 |
+|---|---|
+| **引擎 + 模型合并成一个入口** | 顶部"作用域条"整行可点 → 一个 BottomSheet 管两级（引擎 chip 切作用域 + 该引擎模型列表）。对上 `DESIGN §1.2` 的从属关系 |
+| **入口本体不用图标** | 实测 MnnLlmChat `ModelSwitcherView` 就是"文字 + 下拉箭头"（`view_model_switcher.xml`）；图标只出现在弹层**列表条目**里 |
+| **不把引擎/模型移到输入框旁** | 会话级配置（切换 = unload + 重新 load，秒级阻塞）与每条消息级开关（采样等）语义不同，位置即语义 |
+| **弹层只做"选中"，不自动 load** | 选引擎/模型仅释放旧会话回 `IDLE`，加载仍由主按钮触发。外壳换了，`DESIGN §1.2` 契约不动 |
+| **模型不做专属图形，但用厂商 logo** | 每个模型一个图标不可行；改为"**厂商** logo（命中约 74%）+ 文字兜底"，见下方决策 3 |
+| **底部导航保持 4 tab 常驻** | 当前宽度充裕，不降级为 2 tab + 溢出菜单，见下方决策 1 |
+
+### 已拍板决策（2026-09-27）
+
+| # | 决定 | 落地要点 |
+|---|---|---|
+| 1 | **4 tab 全部常驻**，不改底部导航 | 无改动项；`DroidLlmRoot.kt` 导航结构不动 |
+| 2 | 引擎标识用**状态点 ●** | 复用 `EngineStatusCard` 已有三态色（绿=可用 / 灰=不可用 / 琥珀=忙）；顺带替掉单独占一行的"可用 · 已加载"。映射表见 `UI_REVIEW.md` §7.2 |
+| 3 | **引入厂商 logo** | logo 源 = MnnLlmChat `res/drawable-nodpi/*_icon.{png,webp}`（17 个文件约 900KB，`smolm_icon.png` 单文件 417KB 需压缩）。**我们的 `assets/model_catalog.json` 已有 `vendor` 字段**（162 条 / 28 家厂商），市场模型直接读字段，用户自导入才子串兜底。命中率约 **120/162 ≈ 74%**（Qwen 一家 63 条）。厂商分布表见 `UI_REVIEW.md` §7.1 |
+| 4 | 采样参数**搬进 BottomSheet** | Chat 输入卡上方只留一个 chip，点击开 sheet（与 MnnLlmChat 模式 7 一致） |
+
+> **决策 3 的合规项**：厂商 logo 是各公司**商标**，MNN 仓库的 Apache-2.0 **不覆盖商标**；用于标识模型出处属指示性使用（业界普遍做法）。**R4 落地时须在 `docs/LICENSING.md` 增记一条**（来源、用途、商标归各厂商所有）。
+> **决策 1 不产生改动项**。
+
+
+### 分步计划
+
+| 步骤 | 内容 | 覆盖问题 | 风险 |
+|---|---|---|---|
+| **R1** ✅ | **引擎显示名统一**：`engine-api` 加 `val EngineId.displayName`，各引擎 `override val displayName` 改为返回它（**单一来源**）；**6 处展示面**全改走它（`labelledName` 仅留给需版本号的场合）。**已完成**，见上方「R1 交付说明」 | P0-1 | 极低，纯改名零行为变更 |
+| **R2** | 五个小改纯收益项：①数值输入本地 buffer（失焦/IME 完成再解析，参考 MnnLlmChat `NumericInputParser.kt`）②跟随滚动三件套（新内容即滚 / 上滚停跟随 / 悬浮「回到底部」）③结果表补单位 ④`Settings` 的 `backend` 只读框 → 下拉 ⑤`ResultTable` 行高联动 | P0-3~7 | 低，逐个可验 |
+| **R3** | **三层控件体系**（筛选 Chip / 一屏仅一个 Filled 主操作 / 次级 Outlined）+ Chat 顶栏重构（作用域条 + 两级 BottomSheet，引擎 chip 带**状态点 ●**〔决策 2〕）+ 采样参数收成输入卡上方 chip 并**点击开 BottomSheet**〔决策 4〕 | §4.2 首条 + §5.1 | 中，**需同步回写 `UI_DESIGN.md`** |
+| **R4** | 评测页密度重构（置顶"选模型"卡 + 紧凑引擎行，让「开始评测」回首屏）+ Models 引擎 chip 行（根治 `LITER T` 断行）+ **厂商 logo 资产接入**〔决策 3，含压缩与 `docs/LICENSING.md` 增记〕+ 空态统一为「插图 + 说明 + 按钮」+ 其余打磨 | §4.2 / §4.3 | 中 |
+
+### R1 交付说明（2026-09-27，✅ 完成）
+
+**问题**：同一个引擎，**六个界面六种写法**（`LLAMACPP` / `LITERT` / `MNN 3.6.1 #c0461933` 混用）。
+
+**改动**（8 个文件 + 1 个新增测试）
+
+| 文件 | 改动 |
+|---|---|
+| `core/engine-api/.../LlmEngine.kt` | 新增 `val EngineId.displayName`（**唯一来源**，5 个 id 全覆盖）+ `fun engineIdFromStorage(raw)` 反解持久化字符串 |
+| `engine/{mnn,litert,genie,llamacpp}/...*Engine.kt` | `override val displayName` 四处硬编码字符串 → `get() = id.displayName`（各加一个 import） |
+| `ui/models/ModelsScreen.kt` | 三处：已导入列表 `${model.engineId}`、引擎按钮 `id.name`×2、**市场列表** `${row.model.engine}` |
+| `ui/benchmark/BenchmarkScreen.kt` | **历史卡** `${item.engineId}`（经 `engineIdFromStorage` 反解） |
+| `core/benchmark/.../BenchmarkRunner.kt` | 失败 fallback `target.engineId.name`、`not registered` 错误串 |
+| `ui/benchmark/BenchmarkViewModel.kt` | 失败提示 `${p.engineId.name}` |
+| `core/engine-api/src/test/.../EngineIdDisplayNameTest.kt` | **新增** 3 例：displayName 全非空、适配器与共享表一致、`fromStorage` 往返/大小写/未知值 |
+
+**比原计划多修 2 处**：原审查只列 4 处，实施时发现**市场列表**与**评测历史卡**也各自泄漏——这两处存的是 **`EngineId.name`（机器可读 ID）而非展示名**，故新增 `engineIdFromStorage` 反解后再取 `displayName`。
+
+**明确保留 `.name` 的位置**（持久化 / 机器可读，**不得改**）：`ModelsViewModel.engineDir`（目录名，写成 `mnn/` `litert/` …）、`DataStoreModelPathStore:82`、`BenchmarkRunner:418,420`（Room 字段）、`JsonExporter:31`（JSON `engineId`，与 `engineDisplayName` 成对）。**Chat 顶栏仍用 `labelledName`**（版本号在那里有用）。
+
+**验收**
+- `:app:assembleDebug` BUILD SUCCESSFUL（`app-debug.apk` 161.5 MB）
+- `:core:engine-api:testDebugUnitTest` 4 tests、`:core:benchmark:testDebugUnitTest` 4 tests，**全绿 0 失败**
+- 真机截图比对**未做**（需用户手测：四个界面同一引擎应显示同一串文字）
+
+**踩坑**：Kotlin 对**没有显式 companion** 的枚举，`EngineId.Companion` 作类型引用会 `Unresolved reference 'Companion'` → 反解函数改为顶层函数 `engineIdFromStorage`。
+
+
+
+### 参考实现（本机源码，只借交互不借实现）
+
+`MNN_LLM_CHAT_ROOT=D:\3rd-party-projects\MNN\apps\Android\MnnLlmChat`（Java + XML View；我们是 Compose）
+
+| 借鉴点 | 源文件 |
+|---|---|
+| 顶栏中央单入口切换器 | `res/layout/view_model_switcher.xml` + `widgets/ModelSwitcherView.kt` |
+| 模型选择 BottomSheet + 条目 | `res/layout/fragment_choose_model.xml`、`list_item_model_selection.xml` |
+| 复合输入卡（预览 + EditText + 一行按钮） | `res/layout/activity_chat.xml:86-305` |
+| 自动滚动 + 悬浮回底部 | `res/layout/activity_chat.xml:306-329`、`chat/chatlist/ChatListComponent.kt:216,228-229` |
+| 参数 BottomSheet + 显式保存 | `res/layout/fragment_settings_sheet.xml` |
+| 数值输入中间态处理 | `modelsettings/NumericInputParser.kt` |
+| 统一空态 | `res/layout/chat_layout_empty_view.xml`、`fragment_modellist.xml` |
+| 评测页置顶"选模型"卡 | `res/layout/fragment_benchmark.xml` |
+| 引擎 chip（筛选） | `res/layout/chip_filter_item.xml` |
+| **厂商 logo 资产**（决策 3） | `res/drawable-nodpi/*_icon.{png,webp}`（17 个，约 900KB） |
+| 厂商匹配逻辑（子串兜底） | `model/ModelUtils.kt:81+`（`getDrawableId`）、`model/ModelVendors.kt` |
+
+### 验收（每步独立）
+
+- R1 / R2：`gradlew :app:assembleDebug` BUILD SUCCESSFUL；四个界面同一引擎显示一致（**截图比对**）；`Settings` 改 `0.7 → 0.75` 不再吞掉中间态；生成长回复时列表持续跟到底部。
+- R3 / R4：顶栏单入口可开两级弹层（引擎 chip 状态点三态正确）；**选引擎/模型不触发自动 load**（`DESIGN §1.2` 回归）；采样 chip 点击开 sheet 且**取消不落盘**；评测页「开始评测」在首屏；模型条目厂商 logo 命中/兜底均正常；`UI_DESIGN.md` 已补"控件三层职责"；`LICENSING.md` 已记 logo 商标条目。
+
+### 决策状态
+
+✅ **4 条已全部拍板（2026-09-27）**，见上方「已拍板决策」表，明细依据在 `UI_REVIEW.md` §7。
+✅ **R1 已完成**（构建 + 单测全绿）。**当前进度：R1 ✅ → 下一步 R2**（五个小改纯收益项，见上表）。
 
 ---
 

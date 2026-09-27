@@ -14,6 +14,7 @@ import io.github.pisces312.droidllm.engineapi.GenerateResult
 import io.github.pisces312.droidllm.engineapi.InferenceConfig
 import io.github.pisces312.droidllm.engineapi.LlmEngine
 import io.github.pisces312.droidllm.engineapi.LocalModel
+import io.github.pisces312.droidllm.engineapi.displayName
 import io.github.pisces312.droidllm.engineapi.labelledName
 import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.SessionHandle
@@ -103,7 +104,7 @@ class BenchmarkRunner @Inject constructor(
         val engine = engines.firstOrNull { it.id == target.engineId }
             ?: return TargetResult(
                 engineId = target.engineId,
-                engineDisplayName = target.engineId.name,
+                engineDisplayName = target.engineId.displayName,
                 model = target.model,
                 cases = emptyMap(),
                 rssMbBaseline = rssBaseline,
@@ -111,7 +112,7 @@ class BenchmarkRunner @Inject constructor(
                 rssMbPeak = null,
                 tempCStart = deviceProbe.batteryTempC()?.toDouble(),
                 tempCEnd = null,
-                error = "engine not registered: ${target.engineId}",
+                error = "engine not registered: ${target.engineId.displayName}",
             )
 
         val tempStart = deviceProbe.batteryTempC()?.toDouble()

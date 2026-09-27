@@ -22,6 +22,7 @@ import io.github.pisces312.droidllm.engineapi.Availability
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.LlmEngine
 import io.github.pisces312.droidllm.engineapi.LocalModel
+import io.github.pisces312.droidllm.engineapi.displayName
 import io.github.pisces312.droidllm.engineapi.labelledName
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -328,7 +329,7 @@ class BenchmarkViewModel @Inject constructor(
                 )
             }
             is BenchProgress.TargetFinished -> {
-                val msg = p.error?.let { "${p.engineId.name} 失败：$it" }
+                val msg = p.error?.let { "${p.engineId.displayName} 失败：$it" }
                 _state.value = _state.value.copy(statusMessage = msg ?: _state.value.statusMessage)
             }
             is BenchProgress.Finished -> {

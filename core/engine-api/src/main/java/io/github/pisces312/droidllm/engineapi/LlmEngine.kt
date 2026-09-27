@@ -13,6 +13,37 @@ enum class EngineId {
 }
 
 /**
+ * Human-readable engine name — **the single source of truth for every UI surface**
+ * (chat picker, models list, benchmark table, error messages).
+ *
+ * Each adapter MUST return this from [LlmEngine.displayName] instead of hard-coding its own
+ * string; otherwise the screens drift apart (e.g. `LLAMACPP` in one place, `MNN 3.6.1 #c0461933`
+ * in another). [LlmEngine.labelledName] builds version+commit on top of it.
+ *
+ * Do **not** use this for persistence or directory names — those use [EngineId.name]
+ * (see `ModelsViewModel.engineDir`), which must stay stable across releases.
+ */
+val EngineId.displayName: String
+    get() = when (this) {
+        // Test-only double; mirrors `FakeEngine.displayName`.
+        EngineId.FAKE -> "FakeEngine"
+        EngineId.LITERT -> "LiteRT-LM"
+        EngineId.MNN -> "MNN"
+        EngineId.GENIE -> "Genie"
+        EngineId.LLAMACPP -> "llama.cpp"
+    }
+
+/**
+ * Inverse of the persisted form: resolves a stored [EngineId.name] back to its enum
+ * (case-insensitive), or null when the string was written by a different release.
+ *
+ * UI that reads persisted rows (e.g. the benchmark history list) must go through this and
+ * then [displayName] — never print the raw stored string.
+ */
+fun engineIdFromStorage(raw: String?): EngineId? =
+    raw?.let { stored -> EngineId.entries.firstOrNull { it.name.equals(stored, ignoreCase = true) } }
+
+/**
  * Build provenance of an engine backend.
  *
  * Every part is optional: sources that cannot be resolved at build time
