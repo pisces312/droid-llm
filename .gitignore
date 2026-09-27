@@ -40,3 +40,6 @@ Thumbs.db
 desktop.ini
 *.swp
 *~
+
+# WorkBuddy workspace metadata (local agent memory, never published)
+.workbuddy/
