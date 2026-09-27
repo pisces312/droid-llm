@@ -7,6 +7,7 @@
 | 文档 | 作用 |
 |------|------|
 | `DESIGN.md` | 设计决策唯一权威。与实施计划冲突时以 DESIGN.md 为准 |
+| `UI_DESIGN.md` | 界面与交互权威（StreamClip + PixelPlayerOSS token） |
 | `IMPLEMENTATION.md` | 可执行实施计划、阶段进度、DoD 清单。每阶段完成后更新 |
 
 动手前先读 DESIGN.md §1.2（引擎接口契约）、§10（不可变默认决策）、§6（符号冲突对策）。
@@ -30,17 +31,22 @@
 ## 构建与验证
 
 ```powershell
-# 完整 APK
+# Debug（applicationId 后缀 .debug，可与正式版并存）
 cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android_sdk&& gradlew.bat :app:assembleDebug"
 
+# 正式版（读环境变量签名，勿写口令进仓库）
+# KEY_STORE / KEY_STORE_LOCATION / KEY_STORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD
+cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android_sdk&& gradlew.bat :app:assembleRelease"
+
 # 单元测试
-cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android_sdk&& gradlew.bat :core:engine-api:testDebugUnitTest"
+cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android_sdk&& gradlew.bat :core:engine-api:testDebugUnitTest :core:common:testDebugUnitTest"
 
 # 跳过 Genie native（QAIRT 未配置时）
 # gradlew.bat :app:assembleDebug -PskipGenie=true   (or -Pdroid.skipGenie=true)
 ```
 
 - 目标 ABI 仅 `arm64-v8a`，单 APK 全打，不做 Dynamic Feature。
+- debug：`io.github.pisces312.droidllm.debug` / 名称 `droid-llm debug`；release：`io.github.pisces312.droidllm` / 名称 `droid-llm`，可同机安装。
 - 真机 adb：`D:\dev\android_sdk\platform-tools\adb.exe`（不在 PATH）。
 - Gradle 若因目录改名出现 "outside root directory"，先 `gradlew clean` 再构建。
 
@@ -64,10 +70,11 @@ third_party/llama.cpp    vendored 源码树
 1. **模型格式不互通**：每个引擎独立配置自己的模型文件/目录，不做「一份模型跑四家」。
 2. **Backend 映射**见 DESIGN.md §1.2。不支持的 Backend **显式拒绝**，禁止静默回退。
 3. **TTFT 口径**：从 `generate()` 请求发出到首个 token 回调；含 prefill，不含 load 与模板格式化。各引擎统一走 `MetricsCollector`，不得自行其是。
-4. **单模型驻留**：同一时刻只加载一个模型，切换 = 卸载旧的。
+4. **单模型驻留**：同一时刻只加载一个模型，切换 = 卸载旧的（Settings 可开多模型驻留）。
 5. **Session 线程安全**：generate / unload 互斥。
 6. **符号隔离**：每个 native 库 `CXX_VISIBILITY_PRESET hidden` + `-Wl,--exclude-libs,ALL`；跨引擎 so 共存必须过 `EngineCoexistenceTest`。
-7. **不做**：功耗测量、DFM、雷达图、质量评测、OpenAI 兼容 API（P5+ 才可选）。
+7. **模型根目录迁移**（`ModelRootMigrator`）：**永不删除/覆盖目标已有文件**；重名交用户跳过或取消；原目录有数据询问是否迁移，可不迁移。
+8. **不做**：功耗测量、DFM、雷达图、质量评测、OpenAI 兼容 API（P5+ 才可选）。
 
 ## 阶段流程
 
@@ -79,7 +86,8 @@ third_party/llama.cpp    vendored 源码树
 
 - 脚本（`.ps1` / `.bat`）默认写英文。
 - 新建工程必须有 `.gitignore` 与 `AGENTS.md`。
-- 密钥/口令不入库（keystore 口令等只存在于用户本地配置，勿写入仓库）。
+- 密钥/口令不入库（keystore 口令等只存在于用户本地环境变量 `KEY_*`，勿写入仓库）。
+- 应用图标：adaptive icon（`mipmap-anydpi-v26` + 各密度 `ic_launcher_foreground/monochrome`）；debug 用 `src/debug` 覆盖背景色区分。
 
 ## 常见坑
 

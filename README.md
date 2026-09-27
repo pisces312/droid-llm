@@ -31,13 +31,28 @@
 ```powershell
 $env:JAVA_HOME = "D:\dev\AndroidStudio\jbr"
 $env:ANDROID_HOME = "D:\dev\android_sdk"
+
+# Debug（applicationId 后缀 .debug，可与正式版并存）
 .\gradlew.bat :app:assembleDebug
 
 # 开发机 / 无 QAIRT（Genie 灰显）
 .\gradlew.bat :app:assembleDebug -Pdroid.skipGenie=true
+
+# 正式版（读环境变量签名）
+.\gradlew.bat :app:assembleRelease
 ```
 
+**正式版签名**（环境变量，不写进仓库）：
+
+| 变量 | 说明 |
+|------|------|
+| `KEY_STORE` / `KEY_STORE_LOCATION` | keystore 路径 |
+| `KEY_STORE_PASSWORD` | store 密码 |
+| `KEY_ALIAS` | key alias |
+| `KEY_PASSWORD` | key 密码 |
+
 - arm64-v8a only，单 APK，无 Dynamic Feature
+- debug：`io.github.pisces312.droidllm.debug` / 名称 `droid-llm debug`；release：`io.github.pisces312.droidllm` / 名称 `droid-llm`，可同机安装
 - QAIRT：`QAIRT_PATH=D:\dev\qairt\2.50.0.260828`（见 `docs/ENGINE_INTEGRATION.md`）
 - 工具链：AGP 8.13.2 / Kotlin 2.2.21 + KSP 2.3.6 / Compose BOM 2025.05.00
 

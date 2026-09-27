@@ -211,7 +211,7 @@
 4. 导出 JSON 到 `Android/data/.../files/benchmark/`，Snackbar 提示文件名
 5. 历史列表出现本次记录，可清空
 
-**阶段状态**：P0–P5 均已完成。剩余为真机 DoD 与 README 截图（见「P5 交付说明」）。
+**阶段状态**：P0–P5 均已完成。P5+ 增量（debug/release 共存、正式版签名、模型路径安全迁移）已完成。剩余为真机 DoD 与 README 截图。
 
 ---
 
@@ -429,6 +429,66 @@
 | Material You 动态取色 | UI_DESIGN §2.2 可选增强，默认关闭且未做开关 |
 | OpenAI 兼容 API | 明确不做（P5+ 可选，不在范围） |
 | 真机截图入 README | 待用户手测后补 |
+
+---
+
+## 8b. P5+ 增量：debug/release 共存、正式版签名、模型路径安全迁移
+
+**状态：✅ 完成，待审阅（2026-09-26）**
+
+### 需求
+
+1. debug 与正式版可同时安装在一台设备上
+2. 正式版用用户环境变量签名（不写死密码进仓库）
+3. 修改模型路径时：**不删除目标路径中的文件**；重名交用户处理；原目录有数据询问是否迁移，可不迁移
+
+### 交付
+
+**1. debug/release 共存 + 环境变量签名**（`app/build.gradle.kts`）
+
+| 项 | debug | release |
+|----|-------|---------|
+| applicationId | `io.github.pisces312.droidllm.debug` | `io.github.pisces312.droidllm` |
+| versionName | `0.1.0-P0-debug` | `0.1.0-P0` |
+| app_name | `droid-llm debug` | `droid-llm` |
+| 签名 | 默认 debug key | `signingConfigs.release` |
+
+环境变量（本机已有）：
+
+| 变量 | 用途 |
+|------|------|
+| `KEY_STORE` 或 `KEY_STORE_LOCATION` | keystore 路径 |
+| `KEY_STORE_PASSWORD` | store 密码 |
+| `KEY_ALIAS` | key alias |
+| `KEY_PASSWORD` | key 密码 |
+
+缺 env 时 release 回退未自定义签名（AGP 默认），不把密码写进仓库。`app_name` 改由 buildType `resValue` 提供（`strings.xml` 仅保留注释）。
+
+**2. 模型根目录可改 + 安全迁移**（`ModelRootMigrator` + Settings）
+
+- `AppSettings.modelRootPath`（DataStore，null = `DeviceProbe.defaultModelRoot()`）
+- Settings → 数据：「修改路径」（FileBrowser 选目录）+「恢复默认」
+- 迁移契约（`core/common/.../ModelRootMigrator.kt`）：
+  1. **永不删除/覆盖目标已有文件**
+  2. 重名（顶层同名）→ 弹窗列出，用户选「跳过重名并迁移」或「取消」；跳过项留在原目录
+  3. 原目录有 N 项数据 → 询问「迁移 / 不迁移 / 取消」；**不迁移**则只改根路径，原数据不动
+  4. 迁移成功后按 `remapPath` 改写 `ModelPathStore` 中落在旧根下的 `FilePath` 登记项
+- 拒绝新旧路径互相包含；跨文件系统 rename 失败时 copy+删源（源副本，不动目标）
+- 单测：`ModelRootMigratorTest` 8 例（冲突不覆盖、目录树移动、remap 子孙路径、嵌套拒绝等）
+
+### 验收（构建）
+
+- `:core:common:testDebugUnitTest` 通过（8 tests）
+- `:app:assembleDebug` / `:app:assembleRelease` BUILD SUCCESSFUL
+- `apksigner verify --print-certs`：release 使用用户 keystore
+- 模拟器同时安装 `io.github.pisces312.droidllm` + `io.github.pisces312.droidllm.debug`
+
+### 真机 DoD 检查单
+
+1. `assembleRelease` 在已导出 `KEY_STORE*` 的环境可出正式包；两包并存，图标名区分
+2. 设置改模型根目录：原目录有数据时出现「迁移/不迁移」；选不迁移后原文件仍在
+3. 目标已存在同名文件时出现重名确认；选择跳过后目标原文件内容不变
+4. 迁移后模型页里指向旧根的条目路径已更新且仍可加载
 
 ---
 

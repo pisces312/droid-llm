@@ -11,15 +11,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -29,27 +34,36 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.pisces312.droidllm.common.bench.BenchmarkDao
 import io.github.pisces312.droidllm.common.device.DeviceProbe
+import io.github.pisces312.droidllm.common.model.ModelPathStore
+import io.github.pisces312.droidllm.common.model.ModelRootMigrator
 import io.github.pisces312.droidllm.common.settings.AppSettings
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
 import io.github.pisces312.droidllm.common.settings.ThemeMode
 import io.github.pisces312.droidllm.engineapi.Backend
+import io.github.pisces312.droidllm.engineapi.EngineId
+import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.ProbeContext
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
+import io.github.pisces312.droidllm.ui.models.FileBrowserDialog
 import io.github.pisces312.droidllm.ui.theme.DroidTheme
+import java.io.File
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val deviceProbe: DeviceProbe,
     private val settingsStore: AppSettingsStore,
     private val benchmarkDao: BenchmarkDao,
+    private val modelStore: ModelPathStore,
 ) : ViewModel() {
 
     private val _probe = MutableStateFlow<ProbeContext?>(null)
@@ -65,7 +79,10 @@ class SettingsViewModel @Inject constructor(
         _probe.value = deviceProbe.probe()
     }
 
-    fun modelRoot(): String = deviceProbe.defaultModelRoot().absolutePath
+    fun modelRoot(): String =
+        settings.value.modelRootPath ?: deviceProbe.defaultModelRoot().absolutePath
+
+    fun defaultModelRootPath(): String = deviceProbe.defaultModelRoot().absolutePath
 
     fun benchmarkDir(): String = deviceProbe.defaultModelRoot().parentFile
         ?.resolve("benchmark")?.absolutePath
@@ -106,6 +123,59 @@ class SettingsViewModel @Inject constructor(
             _message.value = "已清空 benchmark 库"
         }
     }
+
+    /**
+     * Switch model root to [newRoot].
+     * @param migrate true = move old-root data; false = leave source files in place.
+     * @param skipConflicts true = leave name-collision items in the source (never overwrite).
+     */
+    fun changeModelRoot(newRoot: String, migrate: Boolean, skipConflicts: Boolean = true) {
+        val oldPath = modelRoot()
+        val source = File(oldPath)
+        val target = File(newRoot)
+        if (source.absolutePath == target.absolutePath) {
+            _message.value = "路径未变化"
+            return
+        }
+        if (ModelRootMigrator.isSameOrNested(source, target)) {
+            _message.value = "新旧路径不能互相包含"
+            return
+        }
+        viewModelScope.launch {
+            if (migrate) {
+                val result = withContext(Dispatchers.IO) {
+                    ModelRootMigrator.migrate(source, target)
+                }
+                if (result.errors.isNotEmpty()) {
+                    _message.value = "迁移失败：" + result.errors.first()
+                    return@launch
+                }
+                rewriteRegisteredPaths(result.movedPaths)
+                val skipped = if (result.skippedNames.isEmpty()) ""
+                else "；跳过重名：" + result.skippedNames.joinToString("、")
+                settingsStore.setModelRoot(target.absolutePath)
+                _message.value = "已迁移 ${result.movedPaths.size} 项$skipped"
+            } else {
+                // Do not migrate: just point at the new root. Source data stays.
+                if (!target.exists() && !target.mkdirs()) {
+                    _message.value = "无法创建目标目录：${target.absolutePath}"
+                    return@launch
+                }
+                settingsStore.setModelRoot(target.absolutePath)
+                _message.value = "已改模型根目录（未迁移原数据）"
+            }
+        }
+    }
+
+    private suspend fun rewriteRegisteredPaths(moved: Map<String, String>) {
+        if (moved.isEmpty()) return
+        for (model in modelStore.listModels()) {
+            val loc = model.location
+            if (loc !is ModelLocation.FilePath) continue
+            val newPath = ModelRootMigrator.remapPath(loc.path, moved) ?: continue
+            modelStore.upsert(model.copy(location = ModelLocation.FilePath(newPath)))
+        }
+    }
 }
 
 @Composable
@@ -113,6 +183,10 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val probe by vm.probe.collectAsState()
     val settings by vm.settings.collectAsState()
     val message by vm.message.collectAsState()
+    var showBrowser by remember { mutableStateOf(false) }
+    var pendingRoot by remember { mutableStateOf<String?>(null) }
+    var migratePrompt by remember { mutableStateOf(false) }
+    var conflictPrompt by remember { mutableStateOf<List<String>>(emptyList()) }
 
     Column(
         Modifier
@@ -230,8 +304,38 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
 
         SectionCard("数据") {
             Text("模型根目录", style = MaterialTheme.typography.labelSmall)
-            Text(vm.modelRoot(), style = MaterialTheme.typography.bodySmall)
-            Spacer(Modifier.height(4.dp))
+            Text(
+                settings.modelRootPath ?: vm.modelRoot(),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PrimaryButton(
+                    "修改路径",
+                    onClick = { showBrowser = true },
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedToolButton(
+                    "恢复默认",
+                    onClick = {
+                        val def = vm.defaultModelRootPath()
+                        val cur = settings.modelRootPath ?: def
+                        if (cur == def) {
+                            // already default
+                        } else {
+                            pendingRoot = def
+                            migratePrompt = true
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Text(
+                "改路径时：不删除目标已有文件；重名需你确认是否跳过；原目录有数据会询问是否迁移，可不迁移。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
             Text("评测导出目录", style = MaterialTheme.typography.labelSmall)
             Text(
                 vm.benchmarkDir() + "/bench_*.json",
@@ -275,6 +379,114 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             Text(message, style = MaterialTheme.typography.labelMedium)
         }
         Spacer(Modifier.height(8.dp))
+    }
+
+    if (showBrowser) {
+        FileBrowserDialog(
+            engineId = EngineId.FAKE,
+            onPick = { file ->
+                showBrowser = false
+                if (file.isDirectory) {
+                    pendingRoot = file.absolutePath
+                    migratePrompt = true
+                }
+            },
+            onDismiss = { showBrowser = false },
+        )
+    }
+
+    val targetRoot = pendingRoot
+    if (migratePrompt) {
+        val oldRoot = settings.modelRootPath ?: vm.defaultModelRootPath()
+        val sourceItems = remember(targetRoot, oldRoot) {
+            File(oldRoot).listFiles()?.size ?: 0
+        }
+        AlertDialog(
+            onDismissRequest = {
+                migratePrompt = false
+                pendingRoot = null
+            },
+            shape = RoundedCornerShape(12.dp),
+            title = { Text("修改模型根目录") },
+            text = {
+                Text(
+                    buildString {
+                        append("当前：")
+                        appendLine(oldRoot)
+                        append("目标：")
+                        appendLine(targetRoot ?: "—")
+                        if (sourceItems > 0) {
+                            appendLine()
+                            appendLine("原目录有 $sourceItems 项数据，是否一并迁移到新路径？")
+                            append("迁移只移动，不删除目标已有文件；重名会再询问。")
+                        } else {
+                            append("原目录为空，将直接切换。")
+                        }
+                    },
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    migratePrompt = false
+                    pendingRoot = null
+                }) { Text("取消") }
+            },
+            confirmButton = {
+                Row {
+                    if (sourceItems > 0) {
+                        TextButton(onClick = {
+                            migratePrompt = false
+                            targetRoot?.let { vm.changeModelRoot(it, migrate = false) }
+                            pendingRoot = null
+                        }) { Text("不迁移") }
+                    }
+                    TextButton(onClick = {
+                        migratePrompt = false
+                        val target = targetRoot
+                        if (target != null) {
+                            val plan = ModelRootMigrator.analyze(File(oldRoot), File(target))
+                            if (plan.hasConflicts) {
+                                conflictPrompt = plan.conflicts.map { it.name }
+                            } else {
+                                vm.changeModelRoot(target, migrate = true)
+                                pendingRoot = null
+                            }
+                        }
+                    }) { Text("迁移") }
+                }
+            },
+        )
+    }
+
+    if (conflictPrompt.isNotEmpty() && targetRoot != null) {
+        AlertDialog(
+            onDismissRequest = {
+                conflictPrompt = emptyList()
+                pendingRoot = null
+            },
+            shape = RoundedCornerShape(12.dp),
+            title = { Text("目标路径存在重名") },
+            text = {
+                Text(
+                    "以下名称在目标路径已存在：\n" +
+                        conflictPrompt.joinToString("、") +
+                        "\n\n不会删除或覆盖目标文件。继续迁移将跳过这些重名项（原目录保留）。",
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    conflictPrompt = emptyList()
+                    pendingRoot = null
+                }) { Text("取消") }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    conflictPrompt = emptyList()
+                    vm.changeModelRoot(targetRoot, migrate = true, skipConflicts = true)
+                    pendingRoot = null
+                }) { Text("跳过重名并迁移") }
+            },
+        )
     }
 }
 

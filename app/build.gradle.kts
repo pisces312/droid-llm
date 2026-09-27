@@ -25,13 +25,37 @@ android {
         }
     }
 
+    // Release signs with the user's env-var keystore (KEY_STORE / KEY_ALIAS / ...).
+    // Debug keeps the default debug key and a ".debug" applicationId so both can stay installed.
+    signingConfigs {
+        create("release") {
+            val storePath = System.getenv("KEY_STORE") ?: System.getenv("KEY_STORE_LOCATION")
+            if (!storePath.isNullOrBlank()) {
+                storeFile = file(storePath)
+                storePassword = System.getenv("KEY_STORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            resValue("string", "app_name", "droid-llm debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            resValue("string", "app_name", "droid-llm")
+            val storePath = System.getenv("KEY_STORE") ?: System.getenv("KEY_STORE_LOCATION")
+            if (!storePath.isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

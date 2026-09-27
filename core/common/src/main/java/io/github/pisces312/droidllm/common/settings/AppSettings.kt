@@ -38,6 +38,8 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** false = single-model residency: switch unloads the previous session (DESIGN §3.3). */
     val multiModelResidency: Boolean = false,
+    /** null = DeviceProbe.defaultModelRoot(); otherwise a user-picked absolute directory. */
+    val modelRootPath: String? = null,
     val temperature: Float = 0.7f,
     val topK: Int = 40,
     val topP: Float = 0.95f,
@@ -60,6 +62,7 @@ interface AppSettingsStore {
     suspend fun current(): AppSettings
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setMultiModelResidency(enabled: Boolean)
+    suspend fun setModelRoot(path: String?)
     suspend fun setSampling(
         temperature: Float,
         topK: Int,
@@ -82,6 +85,7 @@ class DataStoreAppSettingsStore @Inject constructor(
     private object Keys {
         val themeMode = stringPreferencesKey("theme_mode")
         val multiResidency = booleanPreferencesKey("multi_model_residency")
+        val modelRootPath = stringPreferencesKey("model_root_path")
         val temperature = floatPreferencesKey("temperature")
         val topK = intPreferencesKey("top_k")
         val topP = floatPreferencesKey("top_p")
@@ -94,6 +98,7 @@ class DataStoreAppSettingsStore @Inject constructor(
         AppSettings(
             themeMode = ThemeMode.from(prefs[Keys.themeMode]),
             multiModelResidency = prefs[Keys.multiResidency] ?: false,
+            modelRootPath = prefs[Keys.modelRootPath],
             temperature = prefs[Keys.temperature] ?: 0.7f,
             topK = prefs[Keys.topK] ?: 40,
             topP = prefs[Keys.topP] ?: 0.95f,
@@ -113,6 +118,13 @@ class DataStoreAppSettingsStore @Inject constructor(
 
     override suspend fun setMultiModelResidency(enabled: Boolean) {
         context.appSettingsDataStore.edit { it[Keys.multiResidency] = enabled }
+    }
+
+    override suspend fun setModelRoot(path: String?) {
+        context.appSettingsDataStore.edit { prefs ->
+            if (path.isNullOrBlank()) prefs.remove(Keys.modelRootPath)
+            else prefs[Keys.modelRootPath] = path
+        }
     }
 
     override suspend fun setSampling(
