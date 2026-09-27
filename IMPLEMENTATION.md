@@ -513,15 +513,43 @@
 
 **2. 共享模型根目录 + 模型市场**
 
+- **引擎模型格式互不通用**（不能共用同一份权重，只是共享根目录）：
+
+  | 引擎 | 格式 | 摆放位置 |
+  |------|------|------|
+  | LiteRT-LM | 单文件 `*.task` / `*.litertlm` | `{根}/litert/` |
+  | MNN | 目录 `config.json` + `*.mnn` | `{根}/mnn/` |
+  | Genie | 目录 `genie_config.json` + `*.bin` + `tokenizer.json` | `{根}/genie/` |
+  | llama.cpp | 单文件 `*.gguf` | `{根}/llamacpp/` |
+
 - `AppSettings.modelRootPath`（单根，null = `DeviceProbe.defaultModelRoot()` = `files/models/`）。引擎子目录：`llamacpp/` `mnn/` `litert/` `genie/`。
+- **第三方模型导入**（非市场下载）：
+  - 「仅引用原路径」：校验后把任意绝对路径登记进模型表（不搬文件）。
+  - 「导入并复制到模型目录」：把源文件/目录**复制**到 `{根}/{引擎子目录}/{同名}` 再登记；永不覆盖已有目标（迁移契约）；已在目标位置则只登记。
+  - 也可手动复制到上表位置后用「仅引用原路径」登记。
 - 迁移契约不变（`ModelRootMigrator`：永不删目标、重名跳过、可不迁移）。
 - **模型市场**（Models 页 Tab「模型市场」）：
-  - 目录 `assets/model_catalog.json`（`CatalogModel`：id/name/engine/size/kind=repo|file/localPath/sources）。
-  - 源切换 **HuggingFace / ModelScope**（仿 MnnLlmChat `SourceSelectionDialog`）；URL：
-    - HF 文件 `https://huggingface.co/{repo}/resolve/main/{path}`；目录树 `.../api/models/{repo}/tree/main?recursive=true`
+  - 目录 `assets/model_catalog.json`（`CatalogModel`：id/name/engine/size/kind=repo|file|mnn_repo/localPath/sources/tags）。由 `scripts/gen_model_catalog.py` 从 MnnLlmChat `model_market.json` 生成，当前 **159 条 MNN** + LiteRT/GGUF 共 162 条。
+  - **服务器切换**（模型市场顶部，仿 MnnLlmChat `SourceSelectionDialog`）：**HF官方**（huggingface.co）/ **HF镜像**（hf-mirror.com）/ **ModelScope**（modelscope.cn）。HF 官方与镜像共用 catalog 的 `sources.HuggingFace` 仓库 id，仅 host 不同；URL 按 `ModelSource.host` 拼：
+    - HF 文件 `{host}/{repo}/resolve/main/{path}`；目录树 `{host}/api/models/{repo}/tree/main?recursive=true`
     - MS 文件 `https://modelscope.cn/api/v1/models/{repo}/repo?FilePath={path}`；文件列表 `.../repo/files?Recursive=1`
-  - 下载器 `ModelDownloader`（HttpURLConnection + `.part` 临时文件 + 进度 StateFlow；同源 URL 见上）。MNN 走 `kind=repo`（整仓文件列表），LiteRT/GGUF 走 `kind=file`（Gallery allowlist / HF 单文件风格）。
-  - **本地关联**：扫描共享根下 `<engine>/<localPath>`（repo 看 marker 文件，file 看文件存在）→ 条目标「已下载 · 添加到列表」，否则「下载」。
+  - **下载状态过滤**：市场第二行 **全部 / 已下载 / 未下载**（`DownloadFilter`）。
+  - 下载器 `ModelDownloader`（HttpURLConnection + `.part` 临时文件 + 进度 StateFlow）。MNN 走 `kind=mnn_repo`，LiteRT/GGUF 走 `kind=file`。
+  - **下载即入库**：对话模型下载成功后自动 `registerDownloaded` 写入 `ModelPathStore`（已导入 Tab / 聊天模型选择器可见）；ImageGen/AudioGen 等非对话模型只落盘不入库。按路径去重，重复注册提示「已在模型列表中」。
+  - **本地关联**（`findModelDir`）：按候选相对路径扫描；命中即标「已下载」并显示实际路径。
+  - 聊天页持续 `observeModels()`，市场新下载无需切页/重启即可出现在模型选择器。
+
+- **MNN 存储结构（对齐 MnnLlmChat）**，相对模型根目录。**所有引擎**从 HF/魔塔市场下载都走这套布局：
+
+  ```
+  {sourceDir}/models--{org}--{repo}/snapshots/_no_sha_/   # 新下载（sourceDir = hf | modelscope）
+  {sourceDir}/models--{org}--{repo}/snapshots/{sha}/      # MnnLlmChat HF 提交 sha 也识别
+  mnn/{sourceDir}/models--{org}--{repo}/snapshots/...     # 备选（引擎子目录下）
+  mnn/{name}/  ·  modelscope/{name}/  ·  {name}/          # 旧布局兼容
+  ```
+
+  `kind=file` 的单文件（LiteRT `.task` / GGUF）落在 snapshot 目录内；`kind=repo|mnn_repo` 整仓落 snapshot 目录。`sourceDir`：HF（含镜像）→ `hf/`，ModelScope → `modelscope/`。**把模型根目录指到手机上的 `mnn-models/` 即可识别 MnnLlmChat 已下载的模型**（截图：`mnn-models/modelscope/models--MNN--*`）。第三方导入仍用 `{根}/{引擎子目录}/`。
+
 - **Gallery 模型来源**：Google AI Edge Gallery 的模型**在 HuggingFace**（allowlist + `https://huggingface.co/{modelId}/resolve/{commit}/{modelFile}`），**没有 ModelScope 源**；MNN 社区模型才有 HF（`taobao-mnn/*`）+ ModelScope（`MNN/*`）双源。市场条目已按此配置。
 
 **3. 三方仓库环境变量**
@@ -541,8 +569,9 @@
 
 1. 冷启动**无**权限引导弹窗；Settings → 修改模型根目录时出现「去授权」引导，按钮能打开系统「所有文件访问」页
 2. Settings 显示单一共享根；修改/恢复默认 + 迁移/不迁移/跳过重名流程与 8b 相同
-3. 模型市场：切 HF/ModelScope；对有双源的 MNN 条目换源可下载；Gallery 条目仅 HF（MS 提示无源）
-4. 已 push 到根目录的模型显示「已下载」，点「添加到列表」进入已导入 Tab
+3. 模型市场：可切 **HF官方 / HF镜像 / ModelScope**；**全部/已下载/未下载** 过滤；目录约 162 条（MNN 159，与 MnnLlmChat 对齐）；模型根指到 `mnn-models/` 时 `modelscope/models--MNN--*/snapshots/*/` 显示「已下载」
+4. 已 push 到根目录的模型显示「已下载」，点「添加到列表」进入已导入 Tab；列表项显示实际命中路径
+5. **市场下载完成的对话模型**立即出现在「已导入」Tab 和聊天模型选择器（无需重启/切页）；ImageGen/AudioGen 不自动入库
 5. 断网/半截下载失败后状态为「下载失败」，`.part` 不残留为正式文件
 
 ---

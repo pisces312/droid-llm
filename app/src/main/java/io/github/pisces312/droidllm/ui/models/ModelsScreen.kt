@@ -41,6 +41,7 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
     val models by vm.models.collectAsState()
     val message by vm.message.collectAsState()
     val pendingPath by vm.pendingPath.collectAsState()
+    val modelRoot by vm.root.collectAsState()
     var tab by remember { mutableIntStateOf(0) }
 
     var displayName by remember { mutableStateOf("") }
@@ -55,7 +56,7 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
         Spacer(Modifier.height(8.dp))
         Text("模型管理", style = MaterialTheme.typography.titleLarge)
         Text(
-            "共享模型根目录：${vm.modelRoot()}",
+            "共享模型根目录：${modelRoot.ifEmpty { vm.modelRoot() }}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -97,6 +98,12 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
                     vm.add(engineId, displayName.trim(), pendingPath.trim())
                     displayName = ""
                 },
+                onImport = {
+                    vm.importToModelRoot(engineId, displayName.trim(), pendingPath.trim())
+                    displayName = ""
+                },
+                formatHint = vm.engineFormatHint(engineId),
+                modelRoot = modelRoot.ifEmpty { vm.modelRoot() },
                 onValidate = vm::validate,
                 onDelete = vm::delete,
             )
@@ -133,6 +140,9 @@ private fun LocalModelsTab(
     onPendingPath: (String) -> Unit,
     onBrowse: () -> Unit,
     onAdd: () -> Unit,
+    onImport: () -> Unit,
+    formatHint: String,
+    modelRoot: String,
     onValidate: (String) -> Unit,
     onDelete: (String) -> Unit,
 ) {
@@ -143,9 +153,15 @@ private fun LocalModelsTab(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 Column(Modifier.padding(12.dp)) {
-                    Text("添加模型", style = MaterialTheme.typography.titleMedium)
+                    Text("添加 / 导入第三方模型", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
                     EngineIdDropdown(selected = engineId, onSelected = onEngineId)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "格式：$formatHint",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = displayName,
@@ -156,7 +172,7 @@ private fun LocalModelsTab(
                     OutlinedTextField(
                         value = pendingPath,
                         onValueChange = onPendingPath,
-                        label = { Text("文件或目录绝对路径") },
+                        label = { Text("源文件或目录绝对路径") },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(8.dp))
@@ -167,14 +183,21 @@ private fun LocalModelsTab(
                             modifier = Modifier.weight(1f),
                         )
                         OutlinedToolButton(
-                            text = "校验并添加",
+                            text = "仅引用原路径",
                             onClick = onAdd,
                             modifier = Modifier.weight(1f),
                         )
                     }
+                    Spacer(Modifier.height(6.dp))
+                    PrimaryButton(
+                        text = "导入并复制到模型目录",
+                        onClick = onImport,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "主路径：绝对路径 + 内置浏览器（需「所有文件访问」权限）。SAF 可选，暂未接入。",
+                        "市场下载（HF/魔塔）统一放在「$modelRoot」下 `{hf|modelscope}/models--org--repo/snapshots/`；" +
+                            "第三方导入则复制到 `{根}/{引擎子目录}/`。四种引擎格式互不通用。",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -222,7 +245,10 @@ private fun MarketTab(vm: ModelsViewModel) {
     val source by vm.source.collectAsState()
     val downloaded by vm.downloadedIds.collectAsState()
     val downloadStates by vm.downloadStates.collectAsState()
-    val rows = remember(source, downloaded, downloadStates) { vm.catalogRows() }
+    val downloadFilter by vm.downloadFilter.collectAsState()
+    val rows = remember(source, downloaded, downloadStates, downloadFilter) {
+        vm.catalogRows(downloadFilter)
+    }
 
     Column {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -234,9 +260,25 @@ private fun MarketTab(vm: ModelsViewModel) {
                 }
             }
         }
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DownloadFilter.entries.forEach { f ->
+                val label = when (f) {
+                    DownloadFilter.ALL -> "全部"
+                    DownloadFilter.DOWNLOADED -> "已下载"
+                    DownloadFilter.NOT_DOWNLOADED -> "未下载"
+                }
+                if (f == downloadFilter) {
+                    PrimaryButton(label, onClick = { vm.setDownloadFilter(f) }, modifier = Modifier.weight(1f))
+                } else {
+                    OutlinedToolButton(label, onClick = { vm.setDownloadFilter(f) }, modifier = Modifier.weight(1f))
+                }
+            }
+        }
         Spacer(Modifier.height(4.dp))
         Text(
-            "下载按所选源（HuggingFace / ModelScope）拉取；已存在于根目录的条目会标「已下载」。",
+            "HF官方 = huggingface.co，HF镜像 = hf-mirror.com，ModelScope = modelscope.cn。" +
+                "下载统一存 `{hf|modelscope}/models--org--repo/snapshots/`（MnnLlmChat 同款）。",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -256,8 +298,22 @@ private fun MarketTab(vm: ModelsViewModel) {
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (row.model.tags.isNotEmpty()) {
+                            Text(
+                                row.model.tags.joinToString(" · "),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                         if (row.model.description.isNotBlank()) {
                             Text(row.model.description, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (row.downloaded && row.localPath != null) {
+                            Text(
+                                row.localPath,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         val state = row.downloadState
                         if (state.status == DownloadStatus.DOWNLOADING) {

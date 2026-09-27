@@ -41,13 +41,17 @@ class ModelDownloader {
 
     fun stateOf(id: String): DownloadState = _states.value[id] ?: DownloadState()
 
+    /**
+     * Download [model] from [source] under [root] (the shared model root).
+     * Files land at [CatalogModel.downloadRelPath] so MNN repos match MnnLlmChat layout.
+     */
     suspend fun download(
         model: CatalogModel,
         source: ModelSource,
-        target: File,
+        root: File,
     ): Result<File> = withContext(Dispatchers.IO) {
         val key = model.id
-        if (activeId != null && activeId != key) {
+        if (activeId != null) {
             return@withContext Result.failure(IllegalStateException("已有下载任务进行中"))
         }
         activeId = key
@@ -56,8 +60,8 @@ class ModelDownloader {
             val repo = model.repoPath(source)
                 ?: return@withContext fail(key, "当前源无此模型").let { Result.failure(it) }
             val out = when (model.kind) {
-                "repo" -> downloadRepo(model, source, repo, target)
-                else -> downloadSingle(model, source, repo, target)
+                "repo", "mnn_repo" -> downloadRepo(model, source, repo, root)
+                else -> downloadSingle(model, source, repo, root)
             }
             update(key, DownloadStatus.SUCCESS, 1f, "完成")
             Result.success(out)
@@ -78,10 +82,10 @@ class ModelDownloader {
         model: CatalogModel,
         source: ModelSource,
         repo: String,
-        target: File,
+        root: File,
     ): File {
         val remote = model.fileInRepo ?: model.localPath
-        val out = File(target, model.localPath)
+        val out = File(root, model.downloadRelPath(source))
         out.parentFile?.mkdirs()
         val url = resolveFileUrl(source, repo, remote)
         fetchToFile(url, out, model.id)
@@ -92,9 +96,9 @@ class ModelDownloader {
         model: CatalogModel,
         source: ModelSource,
         repo: String,
-        target: File,
+        root: File,
     ): File {
-        val dir = File(target, model.localPath)
+        val dir = File(root, model.downloadRelPath(source))
         dir.mkdirs()
         val files = listRepoFiles(source, repo)
         if (files.isEmpty()) throw IllegalStateException("仓库文件列表为空")
@@ -108,38 +112,31 @@ class ModelDownloader {
         return dir
     }
 
-    private fun resolveFileUrl(source: ModelSource, repo: String, path: String): String = when (source) {
-        ModelSource.HuggingFace ->
-            "https://huggingface.co/$repo/resolve/main/$path"
-        ModelSource.ModelScope ->
-            "https://modelscope.cn/api/v1/models/$repo/repo?FilePath=$path"
-    }
+    private fun resolveFileUrl(source: ModelSource, repo: String, path: String): String =
+        if (source.isHuggingFace) {
+            "${source.host}/$repo/resolve/main/$path"
+        } else {
+            "${source.host}/api/v1/models/$repo/repo?FilePath=$path"
+        }
 
     private fun listRepoFiles(source: ModelSource, repo: String): List<String> {
-        val body = when (source) {
-            ModelSource.HuggingFace -> {
-                val url = "https://huggingface.co/api/models/$repo/tree/main?recursive=true"
-                readText(url)
-            }
-            ModelSource.ModelScope -> {
-                val url = "https://modelscope.cn/api/v1/models/$repo/repo/files?Recursive=1"
-                readText(url)
-            }
+        val body = if (source.isHuggingFace) {
+            readText("${source.host}/api/models/$repo/tree/main?recursive=true")
+        } else {
+            readText("${source.host}/api/v1/models/$repo/repo/files?Recursive=1")
         }
         return parseFileList(source, body)
     }
 
-    private fun parseFileList(source: ModelSource, body: String): List<String> = when (source) {
-        ModelSource.HuggingFace -> {
+    private fun parseFileList(source: ModelSource, body: String): List<String> =
+        if (source.isHuggingFace) {
             val items = json.decodeFromString<List<HfTreeItem>>(body)
             items.filter { it.type == "file" && !it.path.startsWith(".") }
                 .map { it.path }
-        }
-        ModelSource.ModelScope -> {
+        } else {
             val wrapper = json.decodeFromString<MsFilesResponse>(body)
             wrapper.Data?.Files?.mapNotNull { it.Path }?.filter { !it.startsWith(".") }.orEmpty()
         }
-    }
 
     private fun readText(urlStr: String): String {
         val conn = open(urlStr)
@@ -161,6 +158,7 @@ class ModelDownloader {
                 throw IllegalStateException("HTTP ${conn.responseCode}: $urlStr")
             }
             val total = conn.contentLengthLong
+            var lastUpdateMs = 0L
             conn.inputStream.use { input ->
                 FileOutputStream(tmp).use { output ->
                     val buf = ByteArray(64 * 1024)
@@ -171,8 +169,12 @@ class ModelDownloader {
                         output.write(buf, 0, n)
                         saved += n
                         if (total > 0) {
-                            val p = (saved.toFloat() / total).coerceIn(0f, 1f)
-                            update(id, DownloadStatus.DOWNLOADING, p, "下载 ${out.name}")
+                            val now = System.currentTimeMillis()
+                            if (now - lastUpdateMs >= 200 || saved == total) {
+                                lastUpdateMs = now
+                                val p = (saved.toFloat() / total).coerceIn(0f, 1f)
+                                update(id, DownloadStatus.DOWNLOADING, p, "下载 ${out.name}")
+                            }
                         }
                     }
                 }
@@ -184,7 +186,8 @@ class ModelDownloader {
             }
         } finally {
             conn.disconnect()
-            if (tmp.exists() && !tmp.renameTo(out)) tmp.delete()
+            // A leftover .part is an incomplete download: never promote it to the final name.
+            tmp.delete()
         }
     }
 

@@ -127,6 +127,13 @@ class ChatViewModel @Inject constructor(
                 ?: choices.firstOrNull()
             preferred?.let { selectEngine(it) }
         }
+        // Keep the picker in sync with the model store (e.g. after market download).
+        viewModelScope.launch {
+            modelStore.observeModels().collect { all ->
+                val engine = _selectedEngine.value?.engine ?: return@collect
+                reconcileModels(engine, all)
+            }
+        }
     }
 
     private fun AppSettings.toSamplingUi() = SamplingUiState(
@@ -192,9 +199,17 @@ class ChatViewModel @Inject constructor(
 
     private suspend fun loadModelsFor(engine: LlmEngine) {
         val all = modelStore.observeModels().first()
-        val list = all.filter { it.engineId == engine.id }
+        reconcileModels(engine, all)
+    }
+
+    /**
+     * Rebuild the model picker for [engine] from [all] stored models.
+     * Keeps the Fake default entry, and auto-selects (and opens) the first
+     * model when nothing valid is selected — e.g. right after a download.
+     */
+    private fun reconcileModels(engine: LlmEngine, all: List<LocalModel>) {
+        var list = all.filter { it.engineId == engine.id }
             .map { ModelChoice(it, it.displayName) }
-        _models.value = list
         if (list.isEmpty() && engine.id == io.github.pisces312.droidllm.engineapi.EngineId.FAKE) {
             val fake = LocalModel(
                 id = "fake-default",
@@ -202,12 +217,16 @@ class ChatViewModel @Inject constructor(
                 displayName = "Fake lorem model",
                 location = ModelLocation.AppPrivate("fake"),
             )
-            val choice = ModelChoice(fake, fake.displayName)
-            _models.value = listOf(choice)
-            selectModel(choice)
-        } else {
-            _selectedModel.value = list.firstOrNull()
-            list.firstOrNull()?.let { openSession(it.model) }
+            list = listOf(ModelChoice(fake, fake.displayName))
+        }
+        _models.value = list
+        val current = _selectedModel.value
+        if (current == null || list.none { it.model.id == current.model.id }) {
+            val first = list.firstOrNull()
+            _selectedModel.value = first
+            if (first != null) {
+                viewModelScope.launch { openSession(first.model) }
+            }
         }
     }
 

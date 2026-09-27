@@ -65,11 +65,15 @@ object FileFormatValidator : ModelFormatValidator {
     private fun validateMnnDir(file: File): ValidationResult {
         if (!file.isDirectory) return ValidationResult.Failed("not a directory: ${file.path}")
         val config = File(file, "config.json")
-        val model = File(file, "llm.mnn")
-        return when {
-            !config.isFile -> ValidationResult.Failed("missing config.json in ${file.path}")
-            !model.isFile -> ValidationResult.Failed("missing llm.mnn in ${file.path}")
-            else -> ValidationResult.Ok
+        if (!config.isFile) return ValidationResult.Failed("missing config.json in ${file.path}")
+        // MnnLlmChat-era packs use llm.mnn; newer ones ship llm_config.json + *.mnn shards.
+        val hasWeights = File(file, "llm.mnn").isFile ||
+            File(file, "llm_config.json").isFile ||
+            file.listFiles()?.any { it.isFile && it.extension.equals("mnn", true) } == true
+        return if (!hasWeights) {
+            ValidationResult.Failed("missing *.mnn weights in ${file.path}")
+        } else {
+            ValidationResult.Ok
         }
     }
 

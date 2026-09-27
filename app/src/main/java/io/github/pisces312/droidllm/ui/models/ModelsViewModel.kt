@@ -16,12 +16,14 @@ import io.github.pisces312.droidllm.data.catalog.ModelCatalog
 import io.github.pisces312.droidllm.data.catalog.ModelCatalogLoader
 import io.github.pisces312.droidllm.data.catalog.ModelDownloader
 import io.github.pisces312.droidllm.data.catalog.ModelSource
+import io.github.pisces312.droidllm.data.catalog.findModelDir
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.LocalModel
 import io.github.pisces312.droidllm.engineapi.ModelLocation
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +35,11 @@ data class CatalogRow(
     val model: CatalogModel,
     val downloaded: Boolean,
     val downloadState: DownloadState,
+    /** Absolute path when already present on disk (any recognized layout). */
+    val localPath: String?,
 )
+
+enum class DownloadFilter { ALL, DOWNLOADED, NOT_DOWNLOADED }
 
 @HiltViewModel
 class ModelsViewModel @Inject constructor(
@@ -57,6 +63,9 @@ class ModelsViewModel @Inject constructor(
     private val _source = MutableStateFlow(ModelSource.HuggingFace)
     val source: StateFlow<ModelSource> = _source.asStateFlow()
 
+    private val _downloadFilter = MutableStateFlow(DownloadFilter.ALL)
+    val downloadFilter: StateFlow<DownloadFilter> = _downloadFilter.asStateFlow()
+
     private val _catalog = MutableStateFlow(ModelCatalog())
     val catalog: StateFlow<ModelCatalog> = _catalog.asStateFlow()
 
@@ -65,12 +74,17 @@ class ModelsViewModel @Inject constructor(
     private val _downloadedIds = MutableStateFlow<Set<String>>(emptySet())
     val downloadedIds: StateFlow<Set<String>> = _downloadedIds.asStateFlow()
 
-    /** Shared model root for every engine (configured or default). */
-    fun modelRoot(): String =
-        cachedRoot ?: deviceProbe.defaultModelRoot().absolutePath
+    /** Catalog id → absolute on-disk path, computed off the main thread. */
+    private val _localPaths = MutableStateFlow<Map<String, String>>(emptyMap())
+    val localPaths: StateFlow<Map<String, String>> = _localPaths.asStateFlow()
 
-    @Volatile
-    private var cachedRoot: String? = null
+    private val _root = MutableStateFlow("")
+
+    /** Shared model root for every engine (configured or default). */
+    val root: StateFlow<String> = _root.asStateFlow()
+
+    fun modelRoot(): String =
+        _root.value.ifEmpty { deviceProbe.defaultModelRoot().absolutePath }
 
     fun engineDir(engineId: EngineId): String =
         File(modelRoot(), engineId.name.lowercase()).absolutePath
@@ -78,7 +92,7 @@ class ModelsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             settingsStore.observe().collect { s ->
-                cachedRoot = s.modelRootPath
+                _root.value = s.modelRootPath ?: deviceProbe.defaultModelRoot().absolutePath
                 refreshDownloaded()
             }
         }
@@ -91,31 +105,36 @@ class ModelsViewModel @Inject constructor(
         _source.value = source
     }
 
-    fun refreshDownloaded() {
-        val root = File(modelRoot())
-        val ids = _catalog.value.models.filter { isDownloaded(it, root) }.map { it.id }.toSet()
-        _downloadedIds.value = ids
+    fun setDownloadFilter(filter: DownloadFilter) {
+        _downloadFilter.value = filter
     }
 
-    fun isDownloaded(model: CatalogModel, root: File = File(modelRoot())): Boolean {
-        val engine = model.engine.lowercase()
-        val target = File(File(root, engine), model.localPath)
-        return if (model.kind == "repo") {
-            val marker = model.markerFile ?: "config.json"
-            File(target, marker).exists() || target.isDirectory && (target.listFiles()?.isNotEmpty() == true)
-        } else {
-            target.isFile && target.length() > 0
+    fun refreshDownloaded() {
+        val rootDir = File(modelRoot())
+        val catalogModels = _catalog.value.models
+        viewModelScope.launch(Dispatchers.IO) {
+            val found = HashMap<String, String>(catalogModels.size)
+            catalogModels.forEach { m ->
+                findModelDir(m, rootDir)?.let { found[m.id] = it.absolutePath }
+            }
+            _downloadedIds.value = found.keys
+            _localPaths.value = found
         }
     }
 
-    fun catalogRows(): List<CatalogRow> {
+    fun catalogRows(filter: DownloadFilter = _downloadFilter.value): List<CatalogRow> {
         val downloaded = _downloadedIds.value
+        val paths = _localPaths.value
         val states = downloader.states.value
-        return _catalog.value.models.map { m ->
+        return _catalog.value.models.mapNotNull { m ->
+            val isDl = m.id in downloaded
+            if (filter == DownloadFilter.DOWNLOADED && !isDl) return@mapNotNull null
+            if (filter == DownloadFilter.NOT_DOWNLOADED && isDl) return@mapNotNull null
             CatalogRow(
                 model = m,
-                downloaded = m.id in downloaded,
+                downloaded = isDl,
                 downloadState = states[m.id] ?: DownloadState(),
+                localPath = paths[m.id],
             )
         }
     }
@@ -123,17 +142,23 @@ class ModelsViewModel @Inject constructor(
     fun download(model: CatalogModel) {
         val source = _source.value
         if (model.repoPath(source) == null) {
-            _message.value = "「${model.name}」暂无 ${source.displayName} 源，请切换服务器"
+            val family = if (source.isHuggingFace) "HuggingFace" else "ModelScope"
+            _message.value = "「${model.name}」暂无 $family 源，请切换服务器"
             return
         }
-        val engine = model.engine.lowercase()
-        val target = File(modelRoot(), engine)
-        target.mkdirs()
+        val root = File(modelRoot())
+        root.mkdirs()
         viewModelScope.launch {
-            val result = downloader.download(model, source, target)
-            result.onSuccess {
+            val result = downloader.download(model, source, root)
+            result.onSuccess { out ->
                 refreshDownloaded()
-                _message.value = "已下载：${model.name} → ${it.absolutePath}"
+                val chatable = model.tags.none { it == "ImageGen" || it == "AudioGen" }
+                if (chatable) {
+                    registerDownloaded(model)
+                    _message.value = "已下载并加入模型列表：${model.name}\n$out"
+                } else {
+                    _message.value = "已下载：${model.name}（非对话模型，未自动加入列表）\n$out"
+                }
             }.onFailure {
                 _message.value = "下载失败：${it.message}"
             }
@@ -142,6 +167,82 @@ class ModelsViewModel @Inject constructor(
 
     fun setPendingPath(path: String) {
         _pendingPath.value = path
+    }
+
+    /** Expected layout under the model root, used as UI hint and import target. */
+    fun engineFormatHint(engineId: EngineId): String = when (engineId) {
+        EngineId.LITERT -> "单文件 *.task / *.litertlm → {根}/litert/"
+        EngineId.MNN -> "模型目录（config.json + *.mnn）→ {根}/mnn/"
+        EngineId.GENIE -> "模型目录（genie_config.json + *.bin + tokenizer.json）→ {根}/genie/"
+        EngineId.LLAMACPP -> "单文件 *.gguf → {根}/llamacpp/"
+        EngineId.FAKE -> "任意"
+    }
+
+    /**
+     * Copy [sourcePath] into `<modelRoot>/<engine>/<name>` then register it.
+     * Never overwrites an existing target (same contract as model-root migration).
+     */
+    fun importToModelRoot(engineId: EngineId, displayName: String, sourcePath: String) {
+        val name = displayName.trim()
+        val src = File(sourcePath.trim())
+        if (name.isEmpty()) {
+            _message.value = "显示名不能为空"
+            return
+        }
+        if (!src.exists()) {
+            _message.value = "路径不存在：$sourcePath"
+            return
+        }
+        val validation = FileFormatValidator.validatePath(engineId, src)
+        if (validation is ValidationResult.Failed) {
+            _message.value = "格式校验失败：${validation.reason}"
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val engineDir = File(engineDir(engineId))
+            engineDir.mkdirs()
+            val dest = File(engineDir, src.name)
+            val finalPath = try {
+                when {
+                    src.canonicalPath == dest.canonicalPath -> src.absolutePath
+                    dest.exists() -> {
+                        val ok = FileFormatValidator.validatePath(engineId, dest)
+                        if (ok is ValidationResult.Ok || ok is ValidationResult.Unknown) {
+                            dest.absolutePath
+                        } else {
+                            _message.value = "目标已存在且无效，未覆盖：${dest.absolutePath}"
+                            return@launch
+                        }
+                    }
+                    else -> {
+                        if (src.isDirectory) src.copyRecursively(dest, overwrite = false)
+                        else src.copyTo(dest, overwrite = false)
+                        dest.absolutePath
+                    }
+                }
+            } catch (e: Exception) {
+                _message.value = "导入失败：${e.message}"
+                return@launch
+            }
+            val finalFile = File(finalPath)
+            val result = FileFormatValidator.validatePath(engineId, finalFile)
+            if (result is ValidationResult.Failed) {
+                _message.value = "导入后校验失败：${result.reason}"
+                return@launch
+            }
+            modelStore.upsert(
+                LocalModel(
+                    id = UUID.randomUUID().toString(),
+                    engineId = engineId,
+                    displayName = name,
+                    location = ModelLocation.FilePath(finalPath),
+                    formatHint = formatHint(engineId),
+                    fileSizeBytes = if (finalFile.isFile) finalFile.length() else null,
+                ),
+            )
+            _pendingPath.value = finalPath
+            _message.value = "已导入：$name → $finalPath"
+        }
     }
 
     fun add(engineId: EngineId, displayName: String, path: String) {
@@ -177,16 +278,27 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun registerDownloaded(model: CatalogModel) {
-        val file = File(File(modelRoot(), model.engine.lowercase()), model.localPath)
-        if (!file.exists()) {
-            _message.value = "本地不存在：${file.absolutePath}"
-            return
+        viewModelScope.launch(Dispatchers.IO) {
+            val file = _localPaths.value[model.id]?.let(::File)?.takeIf { it.exists() }
+                ?: findModelDir(model, File(modelRoot()))
+            if (file == null || !file.exists()) {
+                _message.value = "本地不存在：${model.name}"
+                return@launch
+            }
+            val path = file.absolutePath
+            val existing = models.value.firstOrNull { m ->
+                (m.location as? ModelLocation.FilePath)?.path == path
+            }
+            if (existing != null) {
+                _message.value = "已在模型列表中：${existing.displayName}"
+                return@launch
+            }
+            add(
+                engineId = EngineId.entries.firstOrNull { it.name.equals(model.engine, true) } ?: EngineId.LLAMACPP,
+                displayName = model.name,
+                path = path,
+            )
         }
-        add(
-            engineId = EngineId.entries.firstOrNull { it.name.equals(model.engine, true) } ?: EngineId.LLAMACPP,
-            displayName = model.name,
-            path = file.absolutePath,
-        )
     }
 
     fun validate(modelId: String) {

@@ -1,35 +1,3331 @@
 {
-  "version": 1,
+  "version": 2,
   "models": [
     {
-      "id": "qwen2.5-0.5b-instruct-mnn",
+      "id": "mnn-gemma-4-e2b-it-mnn",
+      "name": "gemma-4-E2B-it-MNN",
+      "engine": "MNN",
+      "vendor": "Gemma",
+      "description": "Vision、Audio",
+      "sizeBytes": 3739999029,
+      "kind": "mnn_repo",
+      "localPath": "gemma-4-E2B-it-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gemma-4-E2B-it-MNN",
+        "ModelScope": "MNN/gemma-4-E2B-it-MNN"
+      },
+      "tags": [
+        "Vision",
+        "Audio"
+      ],
+      "categories": [
+        "chat",
+        "gemma"
+      ]
+    },
+    {
+      "id": "mnn-gemma-4-e4b-it-mnn",
+      "name": "gemma-4-E4B-it-MNN",
+      "engine": "MNN",
+      "vendor": "Gemma",
+      "description": "Vision、Audio",
+      "sizeBytes": 5542173790,
+      "kind": "mnn_repo",
+      "localPath": "gemma-4-E4B-it-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gemma-4-E4B-it-MNN",
+        "ModelScope": "MNN/gemma-4-E4B-it-MNN"
+      },
+      "tags": [
+        "Vision",
+        "Audio"
+      ],
+      "categories": [
+        "chat",
+        "gemma"
+      ]
+    },
+    {
+      "id": "mnn-gemma-4-26b-a4b-it-mnn",
+      "name": "gemma-4-26B-A4B-it-MNN",
+      "engine": "MNN",
+      "vendor": "Gemma",
+      "description": "Vision",
+      "sizeBytes": 16542648227,
+      "kind": "mnn_repo",
+      "localPath": "gemma-4-26B-A4B-it-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gemma-4-26B-A4B-it-MNN",
+        "ModelScope": "MNN/gemma-4-26B-A4B-it-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "gemma"
+      ]
+    },
+    {
+      "id": "mnn-gemma-4-31b-it-mnn",
+      "name": "gemma-4-31B-it-MNN",
+      "engine": "MNN",
+      "vendor": "Gemma",
+      "description": "Vision",
+      "sizeBytes": 19893380963,
+      "kind": "mnn_repo",
+      "localPath": "gemma-4-31B-it-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gemma-4-31B-it-MNN",
+        "ModelScope": "MNN/gemma-4-31B-it-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "gemma"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-350m-mnn",
+      "name": "LFM2-350M-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 223529599,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-350M-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-350M-MNN",
+        "ModelScope": "MNN/LFM2-350M-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-700m-mnn",
+      "name": "LFM2-700M-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 466368851,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-700M-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-700M-MNN",
+        "ModelScope": "MNN/LFM2-700M-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-1-2b-mnn",
+      "name": "LFM2-1.2B-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 734112071,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-1.2B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-1.2B-MNN",
+        "ModelScope": "MNN/LFM2-1.2B-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-1-2b-extract-mnn",
+      "name": "LFM2-1.2B-Extract-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 734111769,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-1.2B-Extract-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-1.2B-Extract-MNN",
+        "ModelScope": "MNN/LFM2-1.2B-Extract-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-1-2b-rag-mnn",
+      "name": "LFM2-1.2B-RAG-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 734111982,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-1.2B-RAG-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-1.2B-RAG-MNN",
+        "ModelScope": "MNN/LFM2-1.2B-RAG-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-1-2b-tool-mnn",
+      "name": "LFM2-1.2B-Tool-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 734111998,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-1.2B-Tool-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-1.2B-Tool-MNN",
+        "ModelScope": "MNN/LFM2-1.2B-Tool-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-5-1-2b-base-mnn",
+      "name": "LFM2.5-1.2B-Base-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 734112509,
+      "kind": "mnn_repo",
+      "localPath": "LFM2.5-1.2B-Base-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2.5-1.2B-Base-MNN",
+        "ModelScope": "MNN/LFM2.5-1.2B-Base-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-5-1-2b-instruct-mnn",
+      "name": "LFM2.5-1.2B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 734112941,
+      "kind": "mnn_repo",
+      "localPath": "LFM2.5-1.2B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2.5-1.2B-Instruct-MNN",
+        "ModelScope": "MNN/LFM2.5-1.2B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-5-1-2b-jp-mnn",
+      "name": "LFM2.5-1.2B-JP-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 734112851,
+      "kind": "mnn_repo",
+      "localPath": "LFM2.5-1.2B-JP-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2.5-1.2B-JP-MNN",
+        "ModelScope": "MNN/LFM2.5-1.2B-JP-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-5-1-2b-thinking-mnn",
+      "name": "LFM2.5-1.2B-Thinking-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "Think",
+      "sizeBytes": 734112911,
+      "kind": "mnn_repo",
+      "localPath": "LFM2.5-1.2B-Thinking-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2.5-1.2B-Thinking-MNN",
+        "ModelScope": "MNN/LFM2.5-1.2B-Thinking-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-2-6b-mnn",
+      "name": "LFM2-2.6B-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 1610283276,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-2.6B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-2.6B-MNN",
+        "ModelScope": "MNN/LFM2-2.6B-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-2-6b-exp-mnn",
+      "name": "LFM2-2.6B-Exp-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 1610283391,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-2.6B-Exp-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-2.6B-Exp-MNN",
+        "ModelScope": "MNN/LFM2-2.6B-Exp-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-2-6b-transcript-mnn",
+      "name": "LFM2-2.6B-Transcript-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 1610283859,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-2.6B-Transcript-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-2.6B-Transcript-MNN",
+        "ModelScope": "MNN/LFM2-2.6B-Transcript-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-24b-a2b-mnn",
+      "name": "LFM2-24B-A2B-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 14945491712,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-24B-A2B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-24B-A2B-MNN",
+        "ModelScope": "MNN/LFM2-24B-A2B-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-350m-enjp-mt-mnn",
+      "name": "LFM2-350M-ENJP-MT-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 223529429,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-350M-ENJP-MT-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-350M-ENJP-MT-MNN",
+        "ModelScope": "MNN/LFM2-350M-ENJP-MT-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-350m-extract-mnn",
+      "name": "LFM2-350M-Extract-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 223529638,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-350M-Extract-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-350M-Extract-MNN",
+        "ModelScope": "MNN/LFM2-350M-Extract-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-350m-math-mnn",
+      "name": "LFM2-350M-Math-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "Math",
+      "sizeBytes": 223529380,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-350M-Math-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-350M-Math-MNN",
+        "ModelScope": "MNN/LFM2-350M-Math-MNN"
+      },
+      "tags": [
+        "Math"
+      ],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-350m-pii-extract-jp-mnn",
+      "name": "LFM2-350M-PII-Extract-JP-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 223529947,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-350M-PII-Extract-JP-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-350M-PII-Extract-JP-MNN",
+        "ModelScope": "MNN/LFM2-350M-PII-Extract-JP-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-vl-450m-mnn",
+      "name": "LFM2-VL-450M-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "Vision",
+      "sizeBytes": 327132700,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-VL-450M-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-VL-450M-MNN",
+        "ModelScope": "MNN/LFM2-VL-450M-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-vl-1-6b-mnn",
+      "name": "LFM2-VL-1.6B-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "Vision",
+      "sizeBytes": 1169276117,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-VL-1.6B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-VL-1.6B-MNN",
+        "ModelScope": "MNN/LFM2-VL-1.6B-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-lfm2-audio-1-5b-mnn",
+      "name": "LFM2-Audio-1.5B-MNN",
+      "engine": "MNN",
+      "vendor": "LFM",
+      "description": "Audio",
+      "sizeBytes": 828120793,
+      "kind": "mnn_repo",
+      "localPath": "LFM2-Audio-1.5B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/LFM2-Audio-1.5B-MNN",
+        "ModelScope": "MNN/LFM2-Audio-1.5B-MNN"
+      },
+      "tags": [
+        "Audio"
+      ],
+      "categories": [
+        "chat",
+        "lfm"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-5-0-8b-claude-4-6-opus-reasoning-distilled-mnn",
+      "name": "Qwen3.5-0.8B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think、Vision",
+      "sizeBytes": 544134218,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3.5-0.8B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3.5-0.8B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+        "ModelScope": "MNN/Qwen3.5-0.8B-Claude-4.6-Opus-Reasoning-Distilled-MNN"
+      },
+      "tags": [
+        "Think",
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-5-2b-claude-4-6-opus-reasoning-distilled-mnn",
+      "name": "Qwen3.5-2B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think、Vision",
+      "sizeBytes": 1383239575,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3.5-2B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3.5-2B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+        "ModelScope": "MNN/Qwen3.5-2B-Claude-4.6-Opus-Reasoning-Distilled-MNN"
+      },
+      "tags": [
+        "Think",
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-5-4b-claude-4-6-opus-reasoning-distilled-mnn",
+      "name": "Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think、Vision",
+      "sizeBytes": 2842506997,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+        "ModelScope": "MNN/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN"
+      },
+      "tags": [
+        "Think",
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-5-27b-claude-4-6-opus-reasoning-distilled-mnn",
+      "name": "Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think、Vision",
+      "sizeBytes": 18858231999,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
+        "ModelScope": "MNN/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-MNN"
+      },
+      "tags": [
+        "Think",
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-5-2b-mnn",
+      "name": "Qwen3.5-2B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think、Vision",
+      "sizeBytes": 1386694140,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3.5-2B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3.5-2B-MNN",
+        "ModelScope": "MNN/Qwen3.5-2B-MNN"
+      },
+      "tags": [
+        "Think",
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-5-0-8b-mnn",
+      "name": "Qwen3.5-0.8B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think、Vision",
+      "sizeBytes": 547648308,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3.5-0.8B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3.5-0.8B-MNN",
+        "ModelScope": "MNN/Qwen3.5-0.8B-MNN"
+      },
+      "tags": [
+        "Think",
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-5-4b-mnn",
+      "name": "Qwen3.5-4B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think、Vision",
+      "sizeBytes": 2845946907,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3.5-4B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3.5-4B-MNN",
+        "ModelScope": "MNN/Qwen3.5-4B-MNN"
+      },
+      "tags": [
+        "Think",
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-5-35b-a3b-mnn",
+      "name": "Qwen3.5-35B-A3B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think、Vision",
+      "sizeBytes": 22797088046,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3.5-35B-A3B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3.5-35B-A3B-MNN",
+        "ModelScope": "MNN/Qwen3.5-35B-A3B-MNN"
+      },
+      "tags": [
+        "Think",
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-5-9b-mnn",
+      "name": "Qwen3.5-9B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think、Vision",
+      "sizeBytes": 7274875830,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3.5-9B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3.5-9B-MNN",
+        "ModelScope": "MNN/Qwen3.5-9B-MNN"
+      },
+      "tags": [
+        "Think",
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-mnn-sana-edit-v2",
+      "name": "MNN-Sana-Edit-V2",
+      "engine": "MNN",
+      "vendor": "stability.ai",
+      "description": "ImageGen",
+      "sizeBytes": 1662741606,
+      "kind": "mnn_repo",
+      "localPath": "MNN-Sana-Edit-V2",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MNN-Sana-Edit-V2",
+        "ModelScope": "MNN/MNN-Sana-Edit-V2"
+      },
+      "tags": [
+        "ImageGen"
+      ],
+      "categories": [
+        "recommended",
+        "sana"
+      ]
+    },
+    {
+      "id": "mnn-fun-audio-chat-8b-mnn",
+      "name": "Fun-Audio-Chat-8B-MNN",
+      "engine": "MNN",
+      "vendor": "FunAudio",
+      "description": "Audio",
+      "sizeBytes": 6402555890,
+      "kind": "mnn_repo",
+      "localPath": "Fun-Audio-Chat-8B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Fun-Audio-Chat-8B-MNN",
+        "ModelScope": "MNN/Fun-Audio-Chat-8B-MNN"
+      },
+      "tags": [
+        "Audio"
+      ],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-hunyuan-mt-7b-mnn",
+      "name": "Hunyuan-MT-7B-MNN",
+      "engine": "MNN",
+      "vendor": "Hunyuan",
+      "description": "MNN 量化模型",
+      "sizeBytes": 4958284491,
+      "kind": "mnn_repo",
+      "localPath": "Hunyuan-MT-7B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Hunyuan-MT-7B-MNN",
+        "ModelScope": "MNN/Hunyuan-MT-7B-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-minimind2-mnn",
+      "name": "MiniMind2-MNN",
+      "engine": "MNN",
+      "vendor": "Nanbeige",
+      "description": "MNN 量化模型",
+      "sizeBytes": 68518939,
+      "kind": "mnn_repo",
+      "localPath": "MiniMind2-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MiniMind2-MNN",
+        "ModelScope": "MNN/MiniMind2-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-nanbeige4-3b-thinking-2511-mnn",
+      "name": "Nanbeige4-3B-Thinking-2511-MNN",
+      "engine": "MNN",
+      "vendor": "Nanbeige",
+      "description": "Think",
+      "sizeBytes": 3049996164,
+      "kind": "mnn_repo",
+      "localPath": "Nanbeige4-3B-Thinking-2511-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Nanbeige4-3B-Thinking-2511-MNN",
+        "ModelScope": "MNN/Nanbeige4-3B-Thinking-2511-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-qwq-32b-preview-mnn",
+      "name": "QwQ-32B-Preview-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think",
+      "sizeBytes": 19581135302,
+      "kind": "mnn_repo",
+      "localPath": "QwQ-32B-Preview-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/QwQ-32B-Preview-MNN",
+        "ModelScope": "MNN/QwQ-32B-Preview-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-4b-saferl-mnn",
+      "name": "Qwen3-4B-SafeRL-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 2714986204,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-4B-SafeRL-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-4B-SafeRL-MNN",
+        "ModelScope": "MNN/Qwen3-4B-SafeRL-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-vl-2b-instruct-mnn",
+      "name": "Qwen3-VL-2B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision",
+      "sizeBytes": 1475228382,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-VL-2B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-VL-2B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen3-VL-2B-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-vl-2b-thinking-mnn",
+      "name": "Qwen3-VL-2B-Thinking-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision、Think",
+      "sizeBytes": 1475228296,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-VL-2B-Thinking-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-VL-2B-Thinking-MNN",
+        "ModelScope": "MNN/Qwen3-VL-2B-Thinking-MNN"
+      },
+      "tags": [
+        "Vision",
+        "Think"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-vl-32b-instruct-mnn",
+      "name": "Qwen3-VL-32B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision",
+      "sizeBytes": 20825698858,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-VL-32B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-VL-32B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen3-VL-32B-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-vl-32b-thinking-mnn",
+      "name": "Qwen3-VL-32B-Thinking-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision、Think",
+      "sizeBytes": 20825698772,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-VL-32B-Thinking-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-VL-32B-Thinking-MNN",
+        "ModelScope": "MNN/Qwen3-VL-32B-Thinking-MNN"
+      },
+      "tags": [
+        "Vision",
+        "Think"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3guard-gen-0-6b-mnn",
+      "name": "Qwen3Guard-Gen-0.6B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Safety",
+      "sizeBytes": 455422827,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3Guard-Gen-0.6B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3Guard-Gen-0.6B-MNN",
+        "ModelScope": "MNN/Qwen3Guard-Gen-0.6B-MNN"
+      },
+      "tags": [
+        "Safety"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3guard-gen-4b-mnn",
+      "name": "Qwen3Guard-Gen-4B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Safety",
+      "sizeBytes": 2714985905,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3Guard-Gen-4B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3Guard-Gen-4B-MNN",
+        "ModelScope": "MNN/Qwen3Guard-Gen-4B-MNN"
+      },
+      "tags": [
+        "Safety"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3guard-gen-8b-mnn",
+      "name": "Qwen3Guard-Gen-8B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Safety",
+      "sizeBytes": 5982205320,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3Guard-Gen-8B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3Guard-Gen-8B-MNN",
+        "ModelScope": "MNN/Qwen3Guard-Gen-8B-MNN"
+      },
+      "tags": [
+        "Safety"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3guard-stream-0-6b-mnn",
+      "name": "Qwen3Guard-Stream-0.6B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Safety",
+      "sizeBytes": 455422976,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3Guard-Stream-0.6B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3Guard-Stream-0.6B-MNN",
+        "ModelScope": "MNN/Qwen3Guard-Stream-0.6B-MNN"
+      },
+      "tags": [
+        "Safety"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3guard-stream-4b-mnn",
+      "name": "Qwen3Guard-Stream-4B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Safety",
+      "sizeBytes": 2714986054,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3Guard-Stream-4B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3Guard-Stream-4B-MNN",
+        "ModelScope": "MNN/Qwen3Guard-Stream-4B-MNN"
+      },
+      "tags": [
+        "Safety"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3guard-stream-8b-mnn",
+      "name": "Qwen3Guard-Stream-8B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Safety",
+      "sizeBytes": 5982205469,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3Guard-Stream-8B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3Guard-Stream-8B-MNN",
+        "ModelScope": "MNN/Qwen3Guard-Stream-8B-MNN"
+      },
+      "tags": [
+        "Safety"
+      ],
+      "categories": [
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-smoldocling-256m-preview-mnn",
+      "name": "SmolDocling-256M-preview-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "MNN 量化模型",
+      "sizeBytes": 311430540,
+      "kind": "mnn_repo",
+      "localPath": "SmolDocling-256M-preview-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolDocling-256M-preview-MNN",
+        "ModelScope": "MNN/SmolDocling-256M-preview-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-vibethinker-1-5b-mnn",
+      "name": "VibeThinker-1.5B-MNN",
+      "engine": "MNN",
+      "vendor": "VibeThinker",
+      "description": "MNN 量化模型",
+      "sizeBytes": 1086933122,
+      "kind": "mnn_repo",
+      "localPath": "VibeThinker-1.5B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/VibeThinker-1.5B-MNN",
+        "ModelScope": "MNN/VibeThinker-1.5B-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-yufeng-xguard-reason-0-6b-mnn",
+      "name": "YuFeng-XGuard-Reason-0.6B-MNN",
+      "engine": "MNN",
+      "vendor": "YuFeng",
+      "description": "Safety",
+      "sizeBytes": 377731645,
+      "kind": "mnn_repo",
+      "localPath": "YuFeng-XGuard-Reason-0.6B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/YuFeng-XGuard-Reason-0.6B-MNN",
+        "ModelScope": "MNN/YuFeng-XGuard-Reason-0.6B-MNN"
+      },
+      "tags": [
+        "Safety"
+      ],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-yufeng-xguard-reason-8b-mnn",
+      "name": "YuFeng-XGuard-Reason-8B-MNN",
+      "engine": "MNN",
+      "vendor": "YuFeng",
+      "description": "Safety",
+      "sizeBytes": 5982333183,
+      "kind": "mnn_repo",
+      "localPath": "YuFeng-XGuard-Reason-8B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/YuFeng-XGuard-Reason-8B-MNN",
+        "ModelScope": "MNN/YuFeng-XGuard-Reason-8B-MNN"
+      },
+      "tags": [
+        "Safety"
+      ],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-bge-large-zh-mnn",
+      "name": "bge-large-zh-MNN",
+      "engine": "MNN",
+      "vendor": "BERT",
+      "description": "MNN 量化模型",
+      "sizeBytes": 217048659,
+      "kind": "mnn_repo",
+      "localPath": "bge-large-zh-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/bge-large-zh-MNN",
+        "ModelScope": "MNN/bge-large-zh-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-chatglm-6b-mnn",
+      "name": "chatglm-6b-MNN",
+      "engine": "MNN",
+      "vendor": "THUDM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 4170918607,
+      "kind": "mnn_repo",
+      "localPath": "chatglm-6b-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/chatglm-6b-MNN",
+        "ModelScope": "MNN/chatglm-6b-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-chatglm2-6b-mnn",
+      "name": "chatglm2-6b-MNN",
+      "engine": "MNN",
+      "vendor": "THUDM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 6918504639,
+      "kind": "mnn_repo",
+      "localPath": "chatglm2-6b-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/chatglm2-6b-MNN",
+        "ModelScope": "MNN/chatglm2-6b-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-codegeex2-6b-mnn",
+      "name": "codegeex2-6b-MNN",
+      "engine": "MNN",
+      "vendor": "THUDM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 6916231124,
+      "kind": "mnn_repo",
+      "localPath": "codegeex2-6b-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/codegeex2-6b-MNN",
+        "ModelScope": "MNN/codegeex2-6b-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-gemma-3-270m-it-mnn",
+      "name": "gemma-3-270m-it-MNN",
+      "engine": "MNN",
+      "vendor": "Gemma",
+      "description": "MNN 量化模型",
+      "sizeBytes": 308727585,
+      "kind": "mnn_repo",
+      "localPath": "gemma-3-270m-it-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gemma-3-270m-it-MNN",
+        "ModelScope": "MNN/gemma-3-270m-it-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-gte-sentence-embedding-multilingual-base-mnn",
+      "name": "gte_sentence-embedding_multilingual-base-MNN",
+      "engine": "MNN",
+      "vendor": "Other",
+      "description": "MNN 量化模型",
+      "sizeBytes": 452241196,
+      "kind": "mnn_repo",
+      "localPath": "gte_sentence-embedding_multilingual-base-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gte_sentence-embedding_multilingual-base-MNN",
+        "ModelScope": "MNN/gte_sentence-embedding_multilingual-base-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-vl-4b-thinking-mnn",
+      "name": "Qwen3-VL-4B-Thinking-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision、Think",
+      "sizeBytes": 2958468649,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-VL-4B-Thinking-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-VL-4B-Thinking-MNN",
+        "ModelScope": "MNN/Qwen3-VL-4B-Thinking-MNN"
+      },
+      "tags": [
+        "Vision",
+        "Think"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-vl-4b-instruct-mnn",
+      "name": "Qwen3-VL-4B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision",
+      "sizeBytes": 2958468736,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-VL-4B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-VL-4B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen3-VL-4B-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-vl-8b-thinking-mnn",
+      "name": "Qwen3-VL-8B-Thinking-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision、Think",
+      "sizeBytes": 5453819329,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-VL-8B-Thinking-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-VL-8B-Thinking-MNN",
+        "ModelScope": "MNN/Qwen3-VL-8B-Thinking-MNN"
+      },
+      "tags": [
+        "Vision",
+        "Think"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-vl-8b-instruct-mnn",
+      "name": "Qwen3-VL-8B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision",
+      "sizeBytes": 5453819411,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-VL-8B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-VL-8B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen3-VL-8B-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-vl-30b-a3b-instruct-mnn",
+      "name": "Qwen3-VL-30B-A3B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision",
+      "sizeBytes": 19489921379,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-VL-30B-A3B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-VL-30B-A3B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen3-VL-30B-A3B-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-vl-30b-a3b-thinking-mnn",
+      "name": "Qwen3-VL-30B-A3B-Thinking-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think、Vision",
+      "sizeBytes": 19489921292,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-VL-30B-A3B-Thinking-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-VL-30B-A3B-Thinking-MNN",
+        "ModelScope": "MNN/Qwen3-VL-30B-A3B-Thinking-MNN"
+      },
+      "tags": [
+        "Think",
+        "Vision"
+      ]
+    },
+    {
+      "id": "mnn-websailor-3b-mnn",
+      "name": "WebSailor-3B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 2089778449,
+      "kind": "mnn_repo",
+      "localPath": "WebSailor-3B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/WebSailor-3B-MNN",
+        "ModelScope": "MNN/WebSailor-3B-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-lingshu-7b-mnn",
+      "name": "Lingshu-7B-MNN",
+      "engine": "MNN",
+      "vendor": "Lingshu",
+      "description": "Vision",
+      "sizeBytes": 5890502337,
+      "kind": "mnn_repo",
+      "localPath": "Lingshu-7B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Lingshu-7B-MNN",
+        "ModelScope": "MNN/Lingshu-7B-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-minicpm-v-4-mnn",
+      "name": "MiniCPM-V-4-MNN",
+      "engine": "MNN",
+      "vendor": "MiniCPM",
+      "description": "Vision",
+      "sizeBytes": 2834668967,
+      "kind": "mnn_repo",
+      "localPath": "MiniCPM-V-4-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MiniCPM-V-4-MNN",
+        "ModelScope": "MNN/MiniCPM-V-4-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-minicpm4-0-5b-mnn",
+      "name": "MiniCPM4-0.5B-MNN",
+      "engine": "MNN",
+      "vendor": "MiniCPM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 311061970,
+      "kind": "mnn_repo",
+      "localPath": "MiniCPM4-0.5B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MiniCPM4-0.5B-MNN",
+        "ModelScope": "MNN/MiniCPM4-0.5B-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-minicpm4-8b-mnn",
+      "name": "MiniCPM4-8B-MNN",
+      "engine": "MNN",
+      "vendor": "MiniCPM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 5533462384,
+      "kind": "mnn_repo",
+      "localPath": "MiniCPM4-8B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MiniCPM4-8B-MNN",
+        "ModelScope": "MNN/MiniCPM4-8B-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-gpt-oss-20b-mnn",
+      "name": "gpt-oss-20b-MNN",
+      "engine": "MNN",
+      "vendor": "GPT",
+      "description": "Think",
+      "sizeBytes": 13898033950,
+      "kind": "mnn_repo",
+      "localPath": "gpt-oss-20b-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gpt-oss-20b-MNN",
+        "ModelScope": "MNN/gpt-oss-20b-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-4b-thinking-2507-mnn",
+      "name": "Qwen3-4B-Thinking-2507-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think",
+      "sizeBytes": 2715010257,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-4B-Thinking-2507-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-4B-Thinking-2507-MNN",
+        "ModelScope": "MNN/Qwen3-4B-Thinking-2507-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-4b-instruct-2507-mnn",
+      "name": "Qwen3-4B-Instruct-2507-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 2715010252,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-4B-Instruct-2507-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-4B-Instruct-2507-MNN",
+        "ModelScope": "MNN/Qwen3-4B-Instruct-2507-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-coder-30b-a3b-instruct-mnn",
+      "name": "Qwen3-Coder-30B-A3B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Code",
+      "sizeBytes": 19575785072,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-Coder-30B-A3B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-Coder-30B-A3B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen3-Coder-30B-A3B-Instruct-MNN"
+      },
+      "tags": [
+        "Code"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-30b-a3b-thinking-2507-mnn",
+      "name": "Qwen3-30B-A3B-Thinking-2507-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think",
+      "sizeBytes": 19575782105,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-30B-A3B-Thinking-2507-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-30B-A3B-Thinking-2507-MNN",
+        "ModelScope": "MNN/Qwen3-30B-A3B-Thinking-2507-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-30b-a3b-instruct-2507-mnn",
+      "name": "Qwen3-30B-A3B-Instruct-2507-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 19575782087,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-30B-A3B-Instruct-2507-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-30B-A3B-Instruct-2507-MNN",
+        "ModelScope": "MNN/Qwen3-30B-A3B-Instruct-2507-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-hunyuan-0-5b-instruct-mnn",
+      "name": "Hunyuan-0.5B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Hunyuan",
+      "description": "Think",
+      "sizeBytes": 401753427,
+      "kind": "mnn_repo",
+      "localPath": "Hunyuan-0.5B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Hunyuan-0.5B-Instruct-MNN",
+        "ModelScope": "MNN/Hunyuan-0.5B-Instruct-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-hunyuan-1-8b-instruct-mnn",
+      "name": "Hunyuan-1.8B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Hunyuan",
+      "description": "Think",
+      "sizeBytes": 1247189828,
+      "kind": "mnn_repo",
+      "localPath": "Hunyuan-1.8B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Hunyuan-1.8B-Instruct-MNN",
+        "ModelScope": "MNN/Hunyuan-1.8B-Instruct-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-hunyuan-4b-instruct-mnn",
+      "name": "Hunyuan-4B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Hunyuan",
+      "description": "Think",
+      "sizeBytes": 2829106140,
+      "kind": "mnn_repo",
+      "localPath": "Hunyuan-4B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Hunyuan-4B-Instruct-MNN",
+        "ModelScope": "MNN/Hunyuan-4B-Instruct-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-hunyuan-7b-instruct-mnn",
+      "name": "Hunyuan-7B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Hunyuan",
+      "description": "Think",
+      "sizeBytes": 4957879120,
+      "kind": "mnn_repo",
+      "localPath": "Hunyuan-7B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Hunyuan-7B-Instruct-MNN",
+        "ModelScope": "MNN/Hunyuan-7B-Instruct-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-smollm3-3b-mnn",
+      "name": "SmolLM3-3B-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "Think",
+      "sizeBytes": 2057584038,
+      "kind": "mnn_repo",
+      "localPath": "SmolLM3-3B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolLM3-3B-MNN",
+        "ModelScope": "MNN/SmolLM3-3B-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-ernie-4-5-0-3b-pt-mnn",
+      "name": "ERNIE-4.5-0.3B-PT-MNN",
+      "engine": "MNN",
+      "vendor": "ERNIE",
+      "description": "MNN 量化模型",
+      "sizeBytes": 281543451,
+      "kind": "mnn_repo",
+      "localPath": "ERNIE-4.5-0.3B-PT-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/ERNIE-4.5-0.3B-PT-MNN",
+        "ModelScope": "MNN/ERNIE-4.5-0.3B-PT-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-gemma-3-1b-it-qat-q4-0-gguf-mnn",
+      "name": "gemma-3-1b-it-qat-q4_0-gguf-MNN",
+      "engine": "MNN",
+      "vendor": "Gemma",
+      "description": "Think",
+      "sizeBytes": 1051878337,
+      "kind": "mnn_repo",
+      "localPath": "gemma-3-1b-it-qat-q4_0-gguf-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gemma-3-1b-it-qat-q4_0-gguf-MNN",
+        "ModelScope": "MNN/gemma-3-1b-it-qat-q4_0-gguf-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-4b-mnn",
+      "name": "Qwen3-4B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think",
+      "sizeBytes": 2713766604,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-4B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-4B-MNN",
+        "ModelScope": "MNN/Qwen3-4B-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-0-6b-mnn",
+      "name": "Qwen3-0.6B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think",
+      "sizeBytes": 454473462,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-0.6B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-0.6B-MNN",
+        "ModelScope": "MNN/Qwen3-0.6B-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-omni-3b-mnn",
+      "name": "Qwen2.5-Omni-3B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision、Audio、AudioGen",
+      "sizeBytes": 4015566788,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2.5-Omni-3B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-Omni-3B-MNN",
+        "ModelScope": "MNN/Qwen2.5-Omni-3B-MNN"
+      },
+      "tags": [
+        "Vision",
+        "Audio",
+        "AudioGen"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-1-7b-mnn",
+      "name": "Qwen3-1.7B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think",
+      "sizeBytes": 1235523319,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-1.7B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-1.7B-MNN",
+        "ModelScope": "MNN/Qwen3-1.7B-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-8b-mnn",
+      "name": "Qwen3-8B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think",
+      "sizeBytes": 5510449914,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-8B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-8B-MNN",
+        "ModelScope": "MNN/Qwen3-8B-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-deepseek-r1-0528-qwen3-8b-mnn",
+      "name": "DeepSeek-R1-0528-Qwen3-8B-MNN",
+      "engine": "MNN",
+      "vendor": "DeepSeek",
+      "description": "Think",
+      "sizeBytes": 5507637322,
+      "kind": "mnn_repo",
+      "localPath": "DeepSeek-R1-0528-Qwen3-8B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/DeepSeek-R1-0528-Qwen3-8B-MNN",
+        "ModelScope": "MNN/DeepSeek-R1-0528-Qwen3-8B-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "deepseek"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-30b-a3b-mnn",
+      "name": "Qwen3-30B-A3B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think",
+      "sizeBytes": 17748783268,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-30B-A3B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-30B-A3B-MNN",
+        "ModelScope": "MNN/Qwen3-30B-A3B-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-omni-7b-mnn",
+      "name": "Qwen2.5-Omni-7B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision、Audio、AudioGen",
+      "sizeBytes": 7111667196,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2.5-Omni-7B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-Omni-7B-MNN",
+        "ModelScope": "MNN/Qwen2.5-Omni-7B-MNN"
+      },
+      "tags": [
+        "Vision",
+        "Audio",
+        "AudioGen"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-32b-mnn",
+      "name": "Qwen3-32B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think",
+      "sizeBytes": 19560618334,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-32B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-32B-MNN",
+        "ModelScope": "MNN/Qwen3-32B-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen3-14b-mnn",
+      "name": "Qwen3-14B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Think",
+      "sizeBytes": 9435190853,
+      "kind": "mnn_repo",
+      "localPath": "Qwen3-14B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen3-14B-MNN",
+        "ModelScope": "MNN/Qwen3-14B-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "recommended",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-0-5b-instruct-mnn",
       "name": "Qwen2.5-0.5B-Instruct-MNN",
       "engine": "MNN",
       "vendor": "Qwen",
-      "description": "MNN 量化对话模型，目录含 config.json + llm.mnn 等",
-      "sizeBytes": 400000000,
-      "kind": "repo",
+      "description": "MNN 量化模型",
+      "sizeBytes": 556808791,
+      "kind": "mnn_repo",
       "localPath": "Qwen2.5-0.5B-Instruct-MNN",
       "markerFile": "config.json",
       "sources": {
         "HuggingFace": "taobao-mnn/Qwen2.5-0.5B-Instruct-MNN",
         "ModelScope": "MNN/Qwen2.5-0.5B-Instruct-MNN"
-      }
+      },
+      "tags": [],
+      "categories": [
+        "good",
+        "qwen"
+      ]
     },
     {
-      "id": "qwen2.5-1.5b-instruct-mnn",
+      "id": "mnn-qwen2-5-1-5b-instruct-mnn",
       "name": "Qwen2.5-1.5B-Instruct-MNN",
       "engine": "MNN",
       "vendor": "Qwen",
-      "description": "MNN 1.5B 对话模型，目录含 config.json + llm.mnn 等",
-      "sizeBytes": 900000000,
-      "kind": "repo",
+      "description": "MNN 量化模型",
+      "sizeBytes": 879484183,
+      "kind": "mnn_repo",
       "localPath": "Qwen2.5-1.5B-Instruct-MNN",
       "markerFile": "config.json",
       "sources": {
         "HuggingFace": "taobao-mnn/Qwen2.5-1.5B-Instruct-MNN",
         "ModelScope": "MNN/Qwen2.5-1.5B-Instruct-MNN"
-      }
+      },
+      "tags": [],
+      "categories": [
+        "good",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-deepseek-r1-1-5b-qwen-mnn",
+      "name": "DeepSeek-R1-1.5B-Qwen-MNN",
+      "engine": "MNN",
+      "vendor": "DeepSeek",
+      "description": "Think",
+      "sizeBytes": 1557822247,
+      "kind": "mnn_repo",
+      "localPath": "DeepSeek-R1-1.5B-Qwen-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/DeepSeek-R1-1.5B-Qwen-MNN",
+        "ModelScope": "MNN/DeepSeek-R1-1.5B-Qwen-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "good",
+        "deepseek"
+      ]
+    },
+    {
+      "id": "mnn-gemma-2-2b-it-mnn",
+      "name": "gemma-2-2b-it-MNN",
+      "engine": "MNN",
+      "vendor": "Gemma",
+      "description": "MNN 量化模型",
+      "sizeBytes": 2673390373,
+      "kind": "mnn_repo",
+      "localPath": "gemma-2-2b-it-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gemma-2-2b-it-MNN",
+        "ModelScope": "MNN/gemma-2-2b-it-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "good",
+        "gemma"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-7b-instruct-mnn",
+      "name": "Qwen2.5-7B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 5079845535,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2.5-7B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-7B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2.5-7B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "good",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-3b-instruct-mnn",
+      "name": "Qwen2.5-3B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 2369484250,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2.5-3B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-3B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2.5-3B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "good",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-deepseek-r1-7b-qwen-mnn",
+      "name": "DeepSeek-R1-7B-Qwen-MNN",
+      "engine": "MNN",
+      "vendor": "DeepSeek",
+      "description": "Think",
+      "sizeBytes": 4647473227,
+      "kind": "mnn_repo",
+      "localPath": "DeepSeek-R1-7B-Qwen-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/DeepSeek-R1-7B-Qwen-MNN",
+        "ModelScope": "MNN/DeepSeek-R1-7B-Qwen-MNN"
+      },
+      "tags": [
+        "Think"
+      ],
+      "categories": [
+        "chat",
+        "deepseek"
+      ]
+    },
+    {
+      "id": "mnn-deepseek-vl-7b-chat-mnn",
+      "name": "deepseek-vl-7b-chat-MNN",
+      "engine": "MNN",
+      "vendor": "DeepSeek",
+      "description": "Vision",
+      "sizeBytes": 4949488405,
+      "kind": "mnn_repo",
+      "localPath": "deepseek-vl-7b-chat-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/deepseek-vl-7b-chat-MNN",
+        "ModelScope": "MNN/deepseek-vl-7b-chat-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "deepseek"
+      ]
+    },
+    {
+      "id": "mnn-deepseek-llm-7b-chat-mnn",
+      "name": "deepseek-llm-7b-chat-MNN",
+      "engine": "MNN",
+      "vendor": "DeepSeek",
+      "description": "MNN 量化模型",
+      "sizeBytes": 7771364266,
+      "kind": "mnn_repo",
+      "localPath": "deepseek-llm-7b-chat-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/deepseek-llm-7b-chat-MNN",
+        "ModelScope": "MNN/deepseek-llm-7b-chat-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "deepseek"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-vl-3b-instruct-mnn",
+      "name": "Qwen2.5-VL-3B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision",
+      "sizeBytes": 2736203723,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2.5-VL-3B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-VL-3B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2.5-VL-3B-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-smolvlm2-500m-video-instruct-mnn",
+      "name": "SmolVLM2-500M-Video-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "Video",
+      "sizeBytes": 607101765,
+      "kind": "mnn_repo",
+      "localPath": "SmolVLM2-500M-Video-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolVLM2-500M-Video-Instruct-MNN",
+        "ModelScope": "MNN/SmolVLM2-500M-Video-Instruct-MNN"
+      },
+      "tags": [
+        "Video"
+      ],
+      "categories": [
+        "chat",
+        "smol"
+      ]
+    },
+    {
+      "id": "mnn-internvl2-5-1b-mnn",
+      "name": "InternVL2_5-1B-MNN",
+      "engine": "MNN",
+      "vendor": "InternLM",
+      "description": "Vision",
+      "sizeBytes": 887553126,
+      "kind": "mnn_repo",
+      "localPath": "InternVL2_5-1B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/InternVL2_5-1B-MNN",
+        "ModelScope": "MNN/InternVL2_5-1B-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "internvl"
+      ]
+    },
+    {
+      "id": "mnn-llama-3-2-3b-instruct-mnn",
+      "name": "Llama-3.2-3B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Llama",
+      "description": "MNN 量化模型",
+      "sizeBytes": 2609816917,
+      "kind": "mnn_repo",
+      "localPath": "Llama-3.2-3B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Llama-3.2-3B-Instruct-MNN",
+        "ModelScope": "MNN/Llama-3.2-3B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "llama"
+      ]
+    },
+    {
+      "id": "mnn-smolvlm2-2-2b-instruct-mnn",
+      "name": "SmolVLM2-2.2B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "Vision",
+      "sizeBytes": 2480683993,
+      "kind": "mnn_repo",
+      "localPath": "SmolVLM2-2.2B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolVLM2-2.2B-Instruct-MNN",
+        "ModelScope": "MNN/SmolVLM2-2.2B-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "smol"
+      ]
+    },
+    {
+      "id": "mnn-gemma-2-9b-it-mnn",
+      "name": "gemma-2-9b-it-MNN",
+      "engine": "MNN",
+      "vendor": "Gemma",
+      "description": "MNN 量化模型",
+      "sizeBytes": 7080704779,
+      "kind": "mnn_repo",
+      "localPath": "gemma-2-9b-it-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gemma-2-9b-it-MNN",
+        "ModelScope": "MNN/gemma-2-9b-it-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "gemma"
+      ]
+    },
+    {
+      "id": "mnn-smolvlm2-256m-video-instruct-mnn",
+      "name": "SmolVLM2-256M-Video-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "Video",
+      "sizeBytes": 311431774,
+      "kind": "mnn_repo",
+      "localPath": "SmolVLM2-256M-Video-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolVLM2-256M-Video-Instruct-MNN",
+        "ModelScope": "MNN/SmolVLM2-256M-Video-Instruct-MNN"
+      },
+      "tags": [
+        "Video"
+      ],
+      "categories": [
+        "chat",
+        "smol"
+      ]
+    },
+    {
+      "id": "mnn-fastvlm-1-5b-stage3-mnn",
+      "name": "FastVLM-1.5B-Stage3-MNN",
+      "engine": "MNN",
+      "vendor": "FastVLM",
+      "description": "Vision",
+      "sizeBytes": 1228204915,
+      "kind": "mnn_repo",
+      "localPath": "FastVLM-1.5B-Stage3-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/FastVLM-1.5B-Stage3-MNN",
+        "ModelScope": "MNN/FastVLM-1.5B-Stage3-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "fastvlm"
+      ]
+    },
+    {
+      "id": "mnn-smolvlm-500m-instruct-mnn",
+      "name": "SmolVLM-500M-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "Vision",
+      "sizeBytes": 607101723,
+      "kind": "mnn_repo",
+      "localPath": "SmolVLM-500M-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolVLM-500M-Instruct-MNN",
+        "ModelScope": "MNN/SmolVLM-500M-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "smol"
+      ]
+    },
+    {
+      "id": "mnn-qwen-vl-chat-mnn",
+      "name": "Qwen-VL-Chat-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision",
+      "sizeBytes": 9145507680,
+      "kind": "mnn_repo",
+      "localPath": "Qwen-VL-Chat-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen-VL-Chat-MNN",
+        "ModelScope": "MNN/Qwen-VL-Chat-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-smollm2-360m-instruct-mnn",
+      "name": "SmolLM2-360M-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "MNN 量化模型",
+      "sizeBytes": 326006414,
+      "kind": "mnn_repo",
+      "localPath": "SmolLM2-360M-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolLM2-360M-Instruct-MNN",
+        "ModelScope": "MNN/SmolLM2-360M-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "smol"
+      ]
+    },
+    {
+      "id": "mnn-smolvlm-256m-instruct-mnn",
+      "name": "SmolVLM-256M-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "Vision",
+      "sizeBytes": 311431732,
+      "kind": "mnn_repo",
+      "localPath": "SmolVLM-256M-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolVLM-256M-Instruct-MNN",
+        "ModelScope": "MNN/SmolVLM-256M-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "smol"
+      ]
+    },
+    {
+      "id": "mnn-fastvlm-0-5b-stage3-mnn",
+      "name": "FastVLM-0.5B-Stage3-MNN",
+      "engine": "MNN",
+      "vendor": "FastVLM",
+      "description": "Vision",
+      "sizeBytes": 519168032,
+      "kind": "mnn_repo",
+      "localPath": "FastVLM-0.5B-Stage3-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/FastVLM-0.5B-Stage3-MNN",
+        "ModelScope": "MNN/FastVLM-0.5B-Stage3-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "fastvlm"
+      ]
+    },
+    {
+      "id": "mnn-yi-6b-chat-mnn",
+      "name": "Yi-6B-Chat-MNN",
+      "engine": "MNN",
+      "vendor": "01.AI",
+      "description": "MNN 量化模型",
+      "sizeBytes": 6717595511,
+      "kind": "mnn_repo",
+      "localPath": "Yi-6B-Chat-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Yi-6B-Chat-MNN",
+        "ModelScope": "MNN/Yi-6B-Chat-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "yi"
+      ]
+    },
+    {
+      "id": "mnn-smolvlm-instruct-mnn",
+      "name": "SmolVLM-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "Vision",
+      "sizeBytes": 2479896055,
+      "kind": "mnn_repo",
+      "localPath": "SmolVLM-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolVLM-Instruct-MNN",
+        "ModelScope": "MNN/SmolVLM-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "smol"
+      ]
+    },
+    {
+      "id": "mnn-mimo-7b-rl-mnn",
+      "name": "MiMo-7B-RL-MNN",
+      "engine": "MNN",
+      "vendor": "MiMo",
+      "description": "MNN 量化模型",
+      "sizeBytes": 5189964512,
+      "kind": "mnn_repo",
+      "localPath": "MiMo-7B-RL-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MiMo-7B-RL-MNN",
+        "ModelScope": "MNN/MiMo-7B-RL-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "mimo"
+      ]
+    },
+    {
+      "id": "mnn-tinyllama-1-1b-chat-mnn",
+      "name": "TinyLlama-1.1B-Chat-MNN",
+      "engine": "MNN",
+      "vendor": "Llama",
+      "description": "MNN 量化模型",
+      "sizeBytes": 654513433,
+      "kind": "mnn_repo",
+      "localPath": "TinyLlama-1.1B-Chat-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/TinyLlama-1.1B-Chat-MNN",
+        "ModelScope": "MNN/TinyLlama-1.1B-Chat-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "llama"
+      ]
+    },
+    {
+      "id": "mnn-internlm-chat-7b-mnn",
+      "name": "internlm-chat-7b-MNN",
+      "engine": "MNN",
+      "vendor": "InternLM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 4749260969,
+      "kind": "mnn_repo",
+      "localPath": "internlm-chat-7b-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/internlm-chat-7b-MNN",
+        "ModelScope": "MNN/internlm-chat-7b-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "internlm"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-math-7b-instruct-mnn",
+      "name": "Qwen2.5-Math-7B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Math",
+      "sizeBytes": 5079862221,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2.5-Math-7B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-Math-7B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2.5-Math-7B-Instruct-MNN"
+      },
+      "tags": [
+        "Math"
+      ],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-vl-2b-instruct-mnn",
+      "name": "Qwen2-VL-2B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision",
+      "sizeBytes": 1718109172,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2-VL-2B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2-VL-2B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2-VL-2B-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-fastvlm-0-5b-stage2-mnn",
+      "name": "FastVLM-0.5B-Stage2-MNN",
+      "engine": "MNN",
+      "vendor": "FastVLM",
+      "description": "Vision",
+      "sizeBytes": 519168032,
+      "kind": "mnn_repo",
+      "localPath": "FastVLM-0.5B-Stage2-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/FastVLM-0.5B-Stage2-MNN",
+        "ModelScope": "MNN/FastVLM-0.5B-Stage2-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "fastvlm"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-vl-7b-instruct-mnn",
+      "name": "Qwen2.5-VL-7B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision",
+      "sizeBytes": 5449575998,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2.5-VL-7B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-VL-7B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2.5-VL-7B-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-fastvlm-1-5b-stage2-mnn",
+      "name": "FastVLM-1.5B-Stage2-MNN",
+      "engine": "MNN",
+      "vendor": "FastVLM",
+      "description": "Vision",
+      "sizeBytes": 1228204915,
+      "kind": "mnn_repo",
+      "localPath": "FastVLM-1.5B-Stage2-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/FastVLM-1.5B-Stage2-MNN",
+        "ModelScope": "MNN/FastVLM-1.5B-Stage2-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "fastvlm"
+      ]
+    },
+    {
+      "id": "mnn-deepseek-prover-v2-7b-mnn",
+      "name": "DeepSeek-Prover-V2-7B-MNN",
+      "engine": "MNN",
+      "vendor": "DeepSeek",
+      "description": "Math",
+      "sizeBytes": 5110874172,
+      "kind": "mnn_repo",
+      "localPath": "DeepSeek-Prover-V2-7B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/DeepSeek-Prover-V2-7B-MNN",
+        "ModelScope": "MNN/DeepSeek-Prover-V2-7B-MNN"
+      },
+      "tags": [
+        "Math"
+      ],
+      "categories": [
+        "chat",
+        "deepseek"
+      ]
+    },
+    {
+      "id": "mnn-baichuan2-7b-chat-mnn",
+      "name": "Baichuan2-7B-Chat-MNN",
+      "engine": "MNN",
+      "vendor": "Baichuan",
+      "description": "MNN 量化模型",
+      "sizeBytes": 4547302552,
+      "kind": "mnn_repo",
+      "localPath": "Baichuan2-7B-Chat-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Baichuan2-7B-Chat-MNN",
+        "ModelScope": "MNN/Baichuan2-7B-Chat-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "baichuan"
+      ]
+    },
+    {
+      "id": "mnn-phi-2-mnn",
+      "name": "phi-2-MNN",
+      "engine": "MNN",
+      "vendor": "Phi",
+      "description": "MNN 量化模型",
+      "sizeBytes": 3092773369,
+      "kind": "mnn_repo",
+      "localPath": "phi-2-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/phi-2-MNN",
+        "ModelScope": "MNN/phi-2-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "phi"
+      ]
+    },
+    {
+      "id": "mnn-mobilellm-125m-mnn",
+      "name": "MobileLLM-125M-MNN",
+      "engine": "MNN",
+      "vendor": "MobileLLM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 119783520,
+      "kind": "mnn_repo",
+      "localPath": "MobileLLM-125M-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MobileLLM-125M-MNN",
+        "ModelScope": "MNN/MobileLLM-125M-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "mobilellm"
+      ]
+    },
+    {
+      "id": "mnn-llama-2-7b-chat-ms-mnn",
+      "name": "Llama-2-7b-chat-ms-MNN",
+      "engine": "MNN",
+      "vendor": "Llama",
+      "description": "MNN 量化模型",
+      "sizeBytes": 3998655662,
+      "kind": "mnn_repo",
+      "localPath": "Llama-2-7b-chat-ms-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Llama-2-7b-chat-ms-MNN",
+        "ModelScope": "MNN/Llama-2-7b-chat-ms-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "llama"
+      ]
+    },
+    {
+      "id": "mnn-smollm2-135m-instruct-mnn",
+      "name": "SmolLM2-135M-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "MNN 量化模型",
+      "sizeBytes": 145127368,
+      "kind": "mnn_repo",
+      "localPath": "SmolLM2-135M-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolLM2-135M-Instruct-MNN",
+        "ModelScope": "MNN/SmolLM2-135M-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "smol"
+      ]
+    },
+    {
+      "id": "mnn-qwen-7b-chat-mnn",
+      "name": "Qwen-7B-Chat-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 5259997633,
+      "kind": "mnn_repo",
+      "localPath": "Qwen-7B-Chat-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen-7B-Chat-MNN",
+        "ModelScope": "MNN/Qwen-7B-Chat-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-llama-3-2-1b-instruct-mnn",
+      "name": "Llama-3.2-1B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Llama",
+      "description": "MNN 量化模型",
+      "sizeBytes": 1227442357,
+      "kind": "mnn_repo",
+      "localPath": "Llama-3.2-1B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Llama-3.2-1B-Instruct-MNN",
+        "ModelScope": "MNN/Llama-3.2-1B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "llama"
+      ]
+    },
+    {
+      "id": "mnn-glm-4-9b-chat-mnn",
+      "name": "glm-4-9b-chat-MNN",
+      "engine": "MNN",
+      "vendor": "THUDM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 6209033690,
+      "kind": "mnn_repo",
+      "localPath": "glm-4-9b-chat-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/glm-4-9b-chat-MNN",
+        "ModelScope": "MNN/glm-4-9b-chat-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "glm"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-audio-7b-instruct-mnn",
+      "name": "Qwen2-Audio-7B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Audio",
+      "sizeBytes": 5674467172,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2-Audio-7B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2-Audio-7B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2-Audio-7B-Instruct-MNN"
+      },
+      "tags": [
+        "Audio"
+      ],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-gemma-7b-it-mnn",
+      "name": "gemma-7b-it-MNN",
+      "engine": "MNN",
+      "vendor": "Gemma",
+      "description": "MNN 量化模型",
+      "sizeBytes": 6394220291,
+      "kind": "mnn_repo",
+      "localPath": "gemma-7b-it-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gemma-7b-it-MNN",
+        "ModelScope": "MNN/gemma-7b-it-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "gemma"
+      ]
+    },
+    {
+      "id": "mnn-tinyllama-1-1b-chat-v1-0-mnn",
+      "name": "TinyLlama-1.1B-Chat-v1.0-MNN",
+      "engine": "MNN",
+      "vendor": "TinyLlama",
+      "description": "MNN 量化模型",
+      "sizeBytes": 721208469,
+      "kind": "mnn_repo",
+      "localPath": "TinyLlama-1.1B-Chat-v1.0-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/TinyLlama-1.1B-Chat-v1.0-MNN",
+        "ModelScope": "MNN/TinyLlama-1.1B-Chat-v1.0-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "llama"
+      ]
+    },
+    {
+      "id": "mnn-mobilellm-1b-mnn",
+      "name": "MobileLLM-1B-MNN",
+      "engine": "MNN",
+      "vendor": "MobileLLM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 657167290,
+      "kind": "mnn_repo",
+      "localPath": "MobileLLM-1B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MobileLLM-1B-MNN",
+        "ModelScope": "MNN/MobileLLM-1B-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "mobilellm"
+      ]
+    },
+    {
+      "id": "mnn-meta-llama-3-1-8b-instruct-mnn",
+      "name": "Meta-Llama-3.1-8B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Llama",
+      "description": "MNN 量化模型",
+      "sizeBytes": 5292826319,
+      "kind": "mnn_repo",
+      "localPath": "Meta-Llama-3.1-8B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Meta-Llama-3.1-8B-Instruct-MNN",
+        "ModelScope": "MNN/Meta-Llama-3.1-8B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "llama"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-1-5b-instruct-mnn",
+      "name": "Qwen2-1.5B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 1346227023,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2-1.5B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2-1.5B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2-1.5B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-chatglm3-6b-mnn",
+      "name": "chatglm3-6b-MNN",
+      "engine": "MNN",
+      "vendor": "THUDM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 6918897644,
+      "kind": "mnn_repo",
+      "localPath": "chatglm3-6b-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/chatglm3-6b-MNN",
+        "ModelScope": "MNN/chatglm3-6b-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "glm"
+      ]
+    },
+    {
+      "id": "mnn-mobilellm-350m-mnn",
+      "name": "MobileLLM-350M-MNN",
+      "engine": "MNN",
+      "vendor": "MobileLLM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 282675592,
+      "kind": "mnn_repo",
+      "localPath": "MobileLLM-350M-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MobileLLM-350M-MNN",
+        "ModelScope": "MNN/MobileLLM-350M-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "mobilellm"
+      ]
+    },
+    {
+      "id": "mnn-smollm2-1-7b-instruct-mnn",
+      "name": "SmolLM2-1.7B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Smol",
+      "description": "MNN 量化模型",
+      "sizeBytes": 1170101867,
+      "kind": "mnn_repo",
+      "localPath": "SmolLM2-1.7B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/SmolLM2-1.7B-Instruct-MNN",
+        "ModelScope": "MNN/SmolLM2-1.7B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "smol"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-coder-7b-instruct-mnn",
+      "name": "Qwen2.5-Coder-7B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Code",
+      "sizeBytes": 5079861358,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2.5-Coder-7B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-Coder-7B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2.5-Coder-7B-Instruct-MNN"
+      },
+      "tags": [
+        "Code"
+      ],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-math-1-5b-instruct-mnn",
+      "name": "Qwen2.5-Math-1.5B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Math",
+      "sizeBytes": 1343610154,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2.5-Math-1.5B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-Math-1.5B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2.5-Math-1.5B-Instruct-MNN"
+      },
+      "tags": [
+        "Math"
+      ],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-qwq-32b-mnn",
+      "name": "QwQ-32B-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 19599986931,
+      "kind": "mnn_repo",
+      "localPath": "QwQ-32B-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/QwQ-32B-MNN",
+        "ModelScope": "MNN/QwQ-32B-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "qwq"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-0-5b-instruct-mnn",
+      "name": "Qwen2-0.5B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 558158931,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2-0.5B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2-0.5B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2-0.5B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-meta-llama-3-8b-instruct-mnn",
+      "name": "Meta-Llama-3-8B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Llama",
+      "description": "MNN 量化模型",
+      "sizeBytes": 5292829433,
+      "kind": "mnn_repo",
+      "localPath": "Meta-Llama-3-8B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Meta-Llama-3-8B-Instruct-MNN",
+        "ModelScope": "MNN/Meta-Llama-3-8B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "llama"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-5-coder-1-5b-instruct-mnn",
+      "name": "Qwen2.5-Coder-1.5B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Code",
+      "sizeBytes": 1343595873,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2.5-Coder-1.5B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2.5-Coder-1.5B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2.5-Coder-1.5B-Instruct-MNN"
+      },
+      "tags": [
+        "Code"
+      ],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-mobilellm-600m-mnn",
+      "name": "MobileLLM-600M-MNN",
+      "engine": "MNN",
+      "vendor": "MobileLLM",
+      "description": "MNN 量化模型",
+      "sizeBytes": 420065443,
+      "kind": "mnn_repo",
+      "localPath": "MobileLLM-600M-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MobileLLM-600M-MNN",
+        "ModelScope": "MNN/MobileLLM-600M-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "mobilellm"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-vl-7b-instruct-mnn",
+      "name": "Qwen2-VL-7B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "Vision",
+      "sizeBytes": 5457279512,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2-VL-7B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2-VL-7B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2-VL-7B-Instruct-MNN"
+      },
+      "tags": [
+        "Vision"
+      ],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-mimo-7b-sft-mnn",
+      "name": "MiMo-7B-SFT-MNN",
+      "engine": "MNN",
+      "vendor": "MiMo",
+      "description": "MNN 量化模型",
+      "sizeBytes": 5189964518,
+      "kind": "mnn_repo",
+      "localPath": "MiMo-7B-SFT-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MiMo-7B-SFT-MNN",
+        "ModelScope": "MNN/MiMo-7B-SFT-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "mimo"
+      ]
+    },
+    {
+      "id": "mnn-mimo-7b-rl-zero-mnn",
+      "name": "MiMo-7B-RL-Zero-MNN",
+      "engine": "MNN",
+      "vendor": "MiMo",
+      "description": "MNN 量化模型",
+      "sizeBytes": 5189964542,
+      "kind": "mnn_repo",
+      "localPath": "MiMo-7B-RL-Zero-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MiMo-7B-RL-Zero-MNN",
+        "ModelScope": "MNN/MiMo-7B-RL-Zero-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "mimo"
+      ]
+    },
+    {
+      "id": "mnn-mimo-7b-base-mnn",
+      "name": "MiMo-7B-Base-MNN",
+      "engine": "MNN",
+      "vendor": "MiMo",
+      "description": "MNN 量化模型",
+      "sizeBytes": 5189964401,
+      "kind": "mnn_repo",
+      "localPath": "MiMo-7B-Base-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/MiMo-7B-Base-MNN",
+        "ModelScope": "MNN/MiMo-7B-Base-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "mimo"
+      ]
+    },
+    {
+      "id": "mnn-qwen2-7b-instruct-mnn",
+      "name": "Qwen2-7B-Instruct-MNN",
+      "engine": "MNN",
+      "vendor": "Qwen",
+      "description": "MNN 量化模型",
+      "sizeBytes": 5085851475,
+      "kind": "mnn_repo",
+      "localPath": "Qwen2-7B-Instruct-MNN",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/Qwen2-7B-Instruct-MNN",
+        "ModelScope": "MNN/Qwen2-7B-Instruct-MNN"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "qwen"
+      ]
+    },
+    {
+      "id": "mnn-gemma-3-4b-it-q4-0-mnn",
+      "name": "gemma-3-4b-it-q4_0-mnn",
+      "engine": "MNN",
+      "vendor": "Gemma",
+      "description": "MNN 量化模型",
+      "sizeBytes": 3817306732,
+      "kind": "mnn_repo",
+      "localPath": "gemma-3-4b-it-q4_0-mnn",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/gemma-3-4b-it-q4_0-mnn",
+        "ModelScope": "MNN/gemma-3-4b-it-q4_0-mnn"
+      },
+      "tags": [],
+      "categories": [
+        "chat",
+        "gemma"
+      ]
+    },
+    {
+      "id": "mnn-stable-diffusion-v1-5-mnn-opencl",
+      "name": "stable-diffusion-v1-5-mnn-opencl",
+      "engine": "MNN",
+      "vendor": "stability.ai",
+      "description": "ImageGen",
+      "sizeBytes": 1154249052,
+      "kind": "mnn_repo",
+      "localPath": "stable-diffusion-v1-5-mnn-opencl",
+      "markerFile": "config.json",
+      "sources": {
+        "HuggingFace": "taobao-mnn/stable-diffusion-v1-5-mnn-opencl",
+        "ModelScope": "MNN/stable-diffusion-v1-5-mnn-opencl"
+      },
+      "tags": [
+        "ImageGen"
+      ],
+      "categories": [
+        "other",
+        "stable-diffusion"
+      ]
     },
     {
       "id": "gemma3-1b-it-q4-task",
@@ -43,7 +3339,8 @@
       "fileInRepo": "Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task",
       "sources": {
         "HuggingFace": "litert-community/Gemma3-1B-IT"
-      }
+      },
+      "tags": []
     },
     {
       "id": "qwen2.5-1.5b-instruct-q8-task",
@@ -57,7 +3354,8 @@
       "fileInRepo": "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
       "sources": {
         "HuggingFace": "litert-community/Qwen2.5-1.5B-Instruct"
-      }
+      },
+      "tags": []
     },
     {
       "id": "qwen2.5-1.5b-instruct-q4k-gguf",
@@ -71,7 +3369,8 @@
       "fileInRepo": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
       "sources": {
         "HuggingFace": "Qwen/Qwen2.5-1.5B-Instruct-GGUF"
-      }
+      },
+      "tags": []
     }
   ]
 }
