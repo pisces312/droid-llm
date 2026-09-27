@@ -11,6 +11,11 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
+    <!-- Built-in file browser: direct absolute paths to model files (DESIGN §1.3).
+         Special access — no runtime dialog; Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        android:minSdkVersion="30" />
 
     <!-- Qualcomm HTP / OpenCL optional native libs (when engines ship them). -->
 

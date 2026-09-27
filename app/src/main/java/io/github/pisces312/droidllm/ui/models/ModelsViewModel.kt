@@ -1,6 +1,5 @@
 package io.github.pisces312.droidllm.ui.models
 
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,13 +30,24 @@ class ModelsViewModel @Inject constructor(
     private val _message = MutableStateFlow("")
     val message: StateFlow<String> = _message.asStateFlow()
 
+    private val _pendingPath = MutableStateFlow("")
+    val pendingPath: StateFlow<String> = _pendingPath.asStateFlow()
+
+    fun setPendingPath(path: String) {
+        _pendingPath.value = path
+    }
+
     fun add(engineId: EngineId, displayName: String, path: String) {
         if (displayName.isEmpty() || path.isEmpty()) {
             _message.value = "显示名和路径不能为空"
             return
         }
         val file = File(path)
-        val location = if (file.isDirectory) ModelLocation.FilePath(path) else ModelLocation.FilePath(path)
+        if (!file.exists()) {
+            _message.value = "路径不存在：$path；检查是否已授权存储或路径拼写"
+            return
+        }
+        val location = ModelLocation.FilePath(path)
         val result = FileFormatValidator.validatePath(engineId, file)
         if (result is ValidationResult.Failed) {
             _message.value = "格式校验失败：${result.reason}"
@@ -55,13 +65,8 @@ class ModelsViewModel @Inject constructor(
                 ),
             )
             _message.value = "已添加：$displayName"
+            _pendingPath.value = ""
         }
-    }
-
-    fun pickSaf(engineId: EngineId, displayName: String) {
-        // SAF picker needs an Activity result launcher; wired in P1/P5 polish.
-        // For P0, document the path entry as the primary way.
-        _message.value = "SAF 选择将在后续阶段接入；当前请使用绝对路径"
     }
 
     fun validate(modelId: String) {

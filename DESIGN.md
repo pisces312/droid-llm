@@ -310,6 +310,8 @@ Benchmark 页
 | Genie 指标用 GenieProfile | **MetricsCollector 统一口径**；GenieProfile 未接 |
 | minja chattemplate JNI | **推迟**：Genie 走模型 `metadata.json` 角色标签（chatapp 同款）+ `ChatTemplate.format` fallback |
 | 包体 70–120MB | **≈143MB**（QNN 全 arch） |
+| SAF `content://` 主路径 | **降级为可选**（§1.3）；P5 主路径 = 绝对路径 + 内置文件浏览器 + `MANAGE_EXTERNAL_STORAGE` |
+| Settings 含 OpenAI 兼容 API（P5+ 可选） | **明确不做**，不在当前里程碑 |
 
 ### 3.2 能力探测（DeviceProbe）
 

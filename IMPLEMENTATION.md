@@ -11,7 +11,7 @@
 | P2 | ✅ 完成 | 2026-09-26 | litert，见「P2 交付说明」 |
 | P3 | ✅ 完成 | 2026-09-26 | genie，见「P3 交付说明」 |
 | P4 | ✅ 完成，待审阅 | 2026-09-26 | 核心 + UI 已通；见「P4 交付说明」 |
-| P5 | ⬜ 未开始 | | 打磨 |
+| P5 | ✅ 完成，待审阅 | 2026-09-26 | 打磨；见「P5 交付说明」 |
 
 ### P0 交付摘要（2026-09-26）
 
@@ -42,8 +42,8 @@
 | llama.cpp OpenCL | 未链 GGML OpenCL，Backend 仅 CPU（契约：拒绝而非静默回退） |
 | minja chattemplate | 推迟到 P3 Genie；P1 两引擎用原生模板 |
 | 真机验证 | 构建/装包链路已通；流式聊天 DoD 需真机推模型后手测（见下方） |
-| Settings 采样默认值 DataStore | 仍未绑（P5） |
-| SAF 选择器 | 仍为占位 |
+| Settings 采样默认值 DataStore | P5 已绑（`AppSettingsStore`） |
+| SAF 选择器 | 仍为可选占位（DESIGN §1.3 已降级） |
 
 **P1 真机 DoD 检查单**
 
@@ -191,15 +191,15 @@
 4. **导航**：Tab 文案改为 聊天/模型/评测/设置（UI_DESIGN §4.3）
 5. **验收**：`:app:assembleDebug` BUILD SUCCESSFUL；`:core:benchmark:testDebugUnitTest` 通过
 
-**已知偏差 / 留给 P5**
+**已知偏差 / 留给 P5**（P5 已完成，见「P5 交付说明」）
 
 | 项 | 说明 |
 |----|------|
-| Chat/Models/Settings 视觉 | 仍为 P0 简易布局，未换新 token（UI_DESIGN §9 标注 P5 微调） |
-| Chat「新建会话」溢出菜单 | UI_DESIGN §5.1 要求，P5 补（对应 `reset(handle)`） |
-| 采样参数面板灰显不适用字段 | UI_DESIGN §5.1，P5 随 Chat 统一做 |
-| Settings 外观切换 / 多模型驻留开关 | UI_DESIGN §5.4，P5 接 DataStore |
-| 内置文件浏览器 | UI_DESIGN §5.2 / DESIGN §1.3，P5 |
+| Chat/Models/Settings 视觉 | P5 已换 token |
+| Chat「新建会话」溢出菜单 | P5 已补（`reset(handle)`） |
+| 采样参数面板灰显不适用字段 | P5 已做（`ConfigApplicability`） |
+| Settings 外观切换 / 多模型驻留开关 | P5 已接 DataStore |
+| 内置文件浏览器 | P5 已做 |
 | 进度条 fraction | 近似值（按引擎+样本估算），文案精确 |
 | 真机 DoD | 见下方检查单 |
 
@@ -211,12 +211,7 @@
 4. 导出 JSON 到 `Android/data/.../files/benchmark/`，Snackbar 提示文件名
 5. 历史列表出现本次记录，可清空
 
-**下一步（P5）**
-
-1. Chat/Models/Settings 换 UI_DESIGN token；Chat 新建会话；采样面板字段灰显
-2. 内置文件浏览器 + `MANAGE_EXTERNAL_STORAGE` 授权引导（SAF 仍可选）
-3. Settings：外观切换、多模型驻留开关、默认采样 DataStore
-4. docs/README / DESIGN 偏差回写
+**阶段状态**：P0–P5 均已完成。剩余为真机 DoD 与 README 截图（见「P5 交付说明」）。
 
 ---
 
@@ -388,13 +383,52 @@
 
 ## 8. P5 打磨
 
-- 全部错误路径走 `Availability`/`EngineException` 分类提示，不裸崩
-- Genie 未集成、模型未配置、格式校验失败、存储权限未授予（引导跳 `ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION`）各有一条用户可懂的提示
-- 内置文件浏览器（`java.io.File`，按引擎过滤扩展名/目录特征；未授权降级为仅 App 私有目录 + 授权引导；其他 App 的 `Android/data/` 灰显）
-- `docs/ENGINE_INTEGRATION.md`：每引擎的依赖获取、编译开关、模型导出格式说明
-- `docs/MODEL_PATHS.md`：四种格式的目录组织与获取渠道
-- README：定位一句话（「同一台真机上四引擎实测对比」）+ 截图 + benchmark 示例表
-- 回写 `DESIGN.md`：实际使用的依赖版本、与设计的偏差
+**状态：✅ 完成，待审阅（2026-09-26）**
+
+### P5 交付说明（2026-09-26）
+
+**已完成**
+
+1. **主题统一**：Chat / Models / Settings 全部换用 `ui/theme` token（16dp 边距、12dp 圆角卡片、MetricPill / PrimaryButton / OutlinedToolButton）。Chat 助手气泡下挂 `MetricPill`（TTFT / tok/s）。`PrimaryButton`/`OutlinedToolButton` 不再强制 `fillMaxWidth`，由调用方决定宽度。
+2. **Chat**：
+   - 顶栏溢出菜单「新建会话」→ `engine.reset(handle)` + 清空消息
+   - 可折叠「采样参数」面板（temp/top_k/top_p/threads/maxNewTokens/backend）；默认值取自 Settings；**不适用字段灰显 + 12sp 说明**（`ConfigApplicability`，对齐各适配器 warnings：LiteRT/Genie 的 threads/seed、Genie backend 仅 NPU_HTP 等）
+   - 发送/停止；错误气泡内红字短行；空态引导
+3. **Models 内置文件浏览器**（`ui/models/FileBrowser.kt`）：
+   - `java.io.File` 浏览；按引擎过滤（`.litertlm/.task` / `.gguf` / 目录）
+   - `MANAGE_EXTERNAL_STORAGE` 已入 Manifest；未授权仅 App 私有目录 +「去系统设置授权」（`ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION`）
+   - 其他 App 的 `Android/data/` 灰显不可选；校验失败行内写缺哪个文件
+   - SAF 仍为可选占位（未做）
+4. **Settings**（DataStore `droid_app_settings`）：
+   - 默认采样参数持久化（temp/top_k/top_p/threads/maxNewTokens/backend）
+   - 外观：深色 / 浅色 / 跟随系统（`MainActivity` 收集生效）
+   - 多模型驻留开关（默认关 = 切换即 unload；开启行 12sp「8GB 机型易 OOM」）；Chat 切换按开关联动
+   - 数据：模型根目录 / 评测导出目录展示、清空 benchmark 库
+   - 关于与许可摘要
+5. **错误文案**按 UI_DESIGN §6：`Availability`/加载失败/生成失败均「原因 + 怎么办」短句
+6. **文档**：`docs/ENGINE_INTEGRATION.md`、`docs/MODEL_PATHS.md`、`README.md`；DESIGN 偏差表回写 SAF/API 两项
+
+**验收（构建）**
+
+- `:app:assembleDebug` BUILD SUCCESSFUL
+- `:core:benchmark:testDebugUnitTest`、`:core:engine-api:testDebugUnitTest` 通过
+
+**P5 真机 DoD 检查单**
+
+1. 设置切换深/浅/跟随系统，四页配色一致
+2. 聊天：新建会话清空上下文；采样面板灰显字段与当前引擎一致；助手气泡显示 TTFT/tok/s；生成中可「停止」
+3. 模型页：浏览添加 `.gguf` / `.litertlm` / MNN 目录；未授权时引导可跳系统设置；校验失败红字提示
+4. 设置：改默认采样后聊天面板默认值变；开关多模型驻留后切换模型行为符合描述
+5. 评测：跑 L/P/D，结果表 + 导出 JSON + 清空库
+
+**已知未做 / 可后续**
+
+| 项 | 说明 |
+|----|------|
+| SAF 选择器 | 仍为可选占位（DESIGN §1.3 已降级） |
+| Material You 动态取色 | UI_DESIGN §2.2 可选增强，默认关闭且未做开关 |
+| OpenAI 兼容 API | 明确不做（P5+ 可选，不在范围） |
+| 真机截图入 README | 待用户手测后补 |
 
 ---
 

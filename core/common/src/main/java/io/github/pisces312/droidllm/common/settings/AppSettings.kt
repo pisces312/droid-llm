@@ -1,0 +1,135 @@
+package io.github.pisces312.droidllm.common.settings
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.pisces312.droidllm.engineapi.Backend
+import io.github.pisces312.droidllm.engineapi.InferenceConfig
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+enum class ThemeMode {
+    DARK,
+    LIGHT,
+    SYSTEM,
+    ;
+
+    companion object {
+        fun from(raw: String?): ThemeMode =
+            entries.firstOrNull { it.name == raw } ?: SYSTEM
+    }
+}
+
+/**
+ * User defaults persisted in DataStore. Sampling values seed the Chat
+ * sampling panel and can be overridden per session (UI_DESIGN §5.4).
+ */
+data class AppSettings(
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** false = single-model residency: switch unloads the previous session (DESIGN §3.3). */
+    val multiModelResidency: Boolean = false,
+    val temperature: Float = 0.7f,
+    val topK: Int = 40,
+    val topP: Float = 0.95f,
+    val threads: Int = 4,
+    val maxNewTokens: Int = 128,
+    val backend: Backend = Backend.AUTO,
+) {
+    fun toInferenceConfig(): InferenceConfig = InferenceConfig(
+        maxNewTokens = maxNewTokens,
+        temperature = temperature,
+        topK = topK,
+        topP = topP,
+        threads = threads,
+        backend = backend,
+    )
+}
+
+interface AppSettingsStore {
+    fun observe(): Flow<AppSettings>
+    suspend fun current(): AppSettings
+    suspend fun setThemeMode(mode: ThemeMode)
+    suspend fun setMultiModelResidency(enabled: Boolean)
+    suspend fun setSampling(
+        temperature: Float,
+        topK: Int,
+        topP: Float,
+        threads: Int,
+        maxNewTokens: Int,
+        backend: Backend,
+    )
+}
+
+private val Context.appSettingsDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "droid_app_settings",
+)
+
+@Singleton
+class DataStoreAppSettingsStore @Inject constructor(
+    @param:ApplicationContext private val context: Context,
+) : AppSettingsStore {
+
+    private object Keys {
+        val themeMode = stringPreferencesKey("theme_mode")
+        val multiResidency = booleanPreferencesKey("multi_model_residency")
+        val temperature = floatPreferencesKey("temperature")
+        val topK = intPreferencesKey("top_k")
+        val topP = floatPreferencesKey("top_p")
+        val threads = intPreferencesKey("threads")
+        val maxNewTokens = intPreferencesKey("max_new_tokens")
+        val backend = stringPreferencesKey("backend")
+    }
+
+    override fun observe(): Flow<AppSettings> = context.appSettingsDataStore.data.map { prefs ->
+        AppSettings(
+            themeMode = ThemeMode.from(prefs[Keys.themeMode]),
+            multiModelResidency = prefs[Keys.multiResidency] ?: false,
+            temperature = prefs[Keys.temperature] ?: 0.7f,
+            topK = prefs[Keys.topK] ?: 40,
+            topP = prefs[Keys.topP] ?: 0.95f,
+            threads = prefs[Keys.threads] ?: 4,
+            maxNewTokens = prefs[Keys.maxNewTokens] ?: 128,
+            backend = prefs[Keys.backend]?.let { raw ->
+                Backend.entries.firstOrNull { it.name == raw }
+            } ?: Backend.AUTO,
+        )
+    }
+
+    override suspend fun current(): AppSettings = observe().first()
+
+    override suspend fun setThemeMode(mode: ThemeMode) {
+        context.appSettingsDataStore.edit { it[Keys.themeMode] = mode.name }
+    }
+
+    override suspend fun setMultiModelResidency(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[Keys.multiResidency] = enabled }
+    }
+
+    override suspend fun setSampling(
+        temperature: Float,
+        topK: Int,
+        topP: Float,
+        threads: Int,
+        maxNewTokens: Int,
+        backend: Backend,
+    ) {
+        context.appSettingsDataStore.edit {
+            it[Keys.temperature] = temperature
+            it[Keys.topK] = topK
+            it[Keys.topP] = topP
+            it[Keys.threads] = threads
+            it[Keys.maxNewTokens] = maxNewTokens
+            it[Keys.backend] = backend.name
+        }
+    }
+}

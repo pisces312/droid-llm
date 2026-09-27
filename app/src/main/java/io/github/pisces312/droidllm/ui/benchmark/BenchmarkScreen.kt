@@ -118,7 +118,12 @@ fun BenchmarkScreen(
             ParamsSection(state = state, vm = vm)
 
             if (!state.running) {
-                PrimaryButton("开始评测", onClick = vm::startRun, enabled = state.engineRows.any { it.included })
+                PrimaryButton(
+                    "开始评测",
+                    onClick = vm::startRun,
+                    enabled = state.engineRows.any { it.included },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             if (state.running || state.paused) {
@@ -139,7 +144,11 @@ fun BenchmarkScreen(
             val report = state.report
             if (report != null) {
                 ResultSection(report = report)
-                OutlinedToolButton("导出 JSON", onClick = vm::exportLatest)
+                OutlinedToolButton(
+                    "导出 JSON",
+                    onClick = vm::exportLatest,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             HistorySection(state = state, vm = vm)

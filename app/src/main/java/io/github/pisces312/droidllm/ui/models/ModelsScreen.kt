@@ -10,10 +10,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,91 +26,160 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.pisces312.droidllm.engineapi.EngineId
+import io.github.pisces312.droidllm.engineapi.ModelLocation
+import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
+import io.github.pisces312.droidllm.ui.components.PrimaryButton
 
 @Composable
 fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
     val models by vm.models.collectAsState()
     val message by vm.message.collectAsState()
+    val pendingPath by vm.pendingPath.collectAsState()
 
-    var path by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
     var engineId by remember { mutableStateOf(EngineId.LLAMACPP) }
+    var showBrowser by remember { mutableStateOf(false) }
 
     Column(
         Modifier
             .fillMaxSize()
-            .padding(12.dp),
+            .padding(horizontal = 16.dp),
     ) {
+        Spacer(Modifier.height(8.dp))
         Text("模型管理", style = MaterialTheme.typography.titleLarge)
         Text(
-            "每个引擎独立配置自己的模型文件/目录。格式：LiteRT .litertlm/.task，MNN 目录(config.json+llm.mnn)，Genie 目录(genie_config.json+tokenizer.json+*.bin)，llama.cpp .gguf",
-            style = MaterialTheme.typography.bodySmall,
+            "每个引擎独立配置模型。LiteRT：.litertlm/.task；MNN 目录（config.json+llm.mnn）；" +
+                "Genie 目录（genie_config.json+tokenizer.json+*.bin）；llama.cpp：.gguf",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
-        Text("添加模型", style = MaterialTheme.typography.titleMedium)
-        EngineIdDropdown(selected = engineId, onSelected = { engineId = it })
-        OutlinedTextField(
-            value = displayName,
-            onValueChange = { displayName = it },
-            label = { Text("显示名") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = path,
-            onValueChange = { path = it },
-            label = { Text("文件或目录绝对路径") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { vm.add(engineId, displayName.trim(), path.trim()) }) {
-                Text("校验并添加")
-            }
-            OutlinedButton(onClick = { vm.pickSaf(engineId, displayName.trim()) }) {
-                Text("SAF 选择…")
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        ) {
+            Column(Modifier.padding(12.dp)) {
+                Text("添加模型", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                EngineIdDropdown(selected = engineId, onSelected = { engineId = it })
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = displayName,
+                    onValueChange = { displayName = it },
+                    label = { Text("显示名") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = pendingPath,
+                    onValueChange = { vm.setPendingPath(it) },
+                    label = { Text("文件或目录绝对路径") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PrimaryButton(
+                        text = "浏览…",
+                        onClick = { showBrowser = true },
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedToolButton(
+                        text = "校验并添加",
+                        onClick = { vm.add(engineId, displayName.trim(), pendingPath.trim()) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "主路径：绝对路径 + 内置浏览器（需「所有文件访问」权限）。SAF 可选，暂未接入。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text(message, style = MaterialTheme.typography.labelMedium)
-        Spacer(Modifier.height(8.dp))
+        if (message.isNotEmpty()) {
+            Text(
+                message,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (message.startsWith("校验失败") || message.startsWith("格式") ||
+                    message.startsWith("路径") || message.startsWith("显示名")
+                ) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+        }
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(models) { model ->
                 Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(10.dp)) {
+                    Column(Modifier.padding(12.dp)) {
                         Text(model.displayName, style = MaterialTheme.typography.titleSmall)
-                        Text("${model.engineId} · ${model.formatHint ?: "-"}", style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            "${model.engineId} · ${model.formatHint ?: "-"}" +
+                                (model.quantHint?.let { " · $it" } ?: ""),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         Text(
                             when (val loc = model.location) {
-                                is io.github.pisces312.droidllm.engineapi.ModelLocation.FilePath -> loc.path
-                                is io.github.pisces312.droidllm.engineapi.ModelLocation.SafUri -> loc.uri
-                                is io.github.pisces312.droidllm.engineapi.ModelLocation.AppPrivate -> loc.relativePath
+                                is ModelLocation.FilePath -> loc.path
+                                is ModelLocation.SafUri -> loc.uri
+                                is ModelLocation.AppPrivate -> loc.relativePath
                             },
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { vm.validate(model.id) }) { Text("校验") }
-                            OutlinedButton(onClick = { vm.delete(model.id) }) { Text("删除") }
+                            OutlinedToolButton(
+                                "校验",
+                                onClick = { vm.validate(model.id) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            OutlinedToolButton(
+                                "删除",
+                                onClick = { vm.delete(model.id) },
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
                 }
             }
         }
+        Spacer(Modifier.height(8.dp))
+    }
+
+    if (showBrowser) {
+        FileBrowserDialog(
+            engineId = engineId,
+            onPick = { file ->
+                vm.setPendingPath(file.absolutePath)
+                if (displayName.isBlank()) displayName = file.nameWithoutExtension
+                showBrowser = false
+            },
+            onDismiss = { showBrowser = false },
+        )
     }
 }
 
 @Composable
 private fun EngineIdDropdown(selected: EngineId, onSelected: (EngineId) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        EngineId.entries.forEach { id ->
-            OutlinedButton(
-                onClick = { onSelected(id) },
-                enabled = id != EngineId.FAKE,
-            ) {
-                Text(
-                    id.name,
-                    color = if (id == selected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurface,
+        EngineId.entries.filter { it != EngineId.FAKE }.forEach { id ->
+            val isSelected = id == selected
+            if (isSelected) {
+                PrimaryButton(
+                    text = id.name,
+                    onClick = { onSelected(id) },
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                OutlinedToolButton(
+                    text = id.name,
+                    onClick = { onSelected(id) },
+                    modifier = Modifier.weight(1f),
                 )
             }
         }

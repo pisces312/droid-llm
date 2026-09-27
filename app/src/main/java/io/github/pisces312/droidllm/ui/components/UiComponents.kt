@@ -177,9 +177,7 @@ fun PrimaryButton(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(12.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .height(52.dp),
+        modifier = modifier.height(52.dp),
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge)
     }
@@ -200,9 +198,7 @@ fun OutlinedToolButton(
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = DroidTheme.extra.surfaceHigh,
         ),
-        modifier = modifier
-            .fillMaxWidth()
-            .height(52.dp),
+        modifier = modifier.height(52.dp),
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge)
     }
