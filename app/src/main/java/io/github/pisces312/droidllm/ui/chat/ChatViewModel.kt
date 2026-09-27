@@ -41,6 +41,13 @@ data class ModelChoice(
     val displayName: String,
 )
 
+/**
+ * Lifecycle of the chat session. A model is only resident in memory between
+ * [READY] and the next [IDLE]; picking an engine or model always drops back to
+ * [IDLE] so the previous model is released before the new one is started.
+ */
+enum class SessionState { IDLE, LOADING, READY, FAILED }
+
 /** One chat turn, with optional metrics attached to the assistant bubble. */
 data class ChatUiMessage(
     val role: ChatRole,
@@ -94,6 +101,9 @@ class ChatViewModel @Inject constructor(
 
     private val _generating = MutableStateFlow(false)
     val generating: StateFlow<Boolean> = _generating.asStateFlow()
+
+    private val _sessionState = MutableStateFlow(SessionState.IDLE)
+    val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
 
     private var session: SessionHandle? = null
     private var sessionEngine: LlmEngine? = null
@@ -149,22 +159,60 @@ class ChatViewModel @Inject constructor(
         backend = backend,
     )
 
+    /** Picking an engine releases any running model; the new one waits for [startModel]. */
     fun selectEngine(choice: EngineChoice) {
         viewModelScope.launch {
-            stopGenerate()
-            if (!multiResidency) unloadSession()
+            releaseSession()
             _selectedEngine.value = choice
             _availability.value = describeAvailability(choice)
             loadModelsFor(choice.engine)
         }
     }
 
+    /** Picking a model releases any running model; the new one waits for [startModel]. */
     fun selectModel(choice: ModelChoice) {
-        _selectedModel.value = choice
+        viewModelScope.launch {
+            releaseSession()
+            _selectedModel.value = choice
+            markIdle()
+        }
+    }
+
+    /** Load the selected model. Any previously running model is released first. */
+    fun startModel() {
+        val model = _selectedModel.value
+        if (model == null) {
+            _status.value = "先选择引擎和模型，再点「启动」"
+            return
+        }
+        if (_sessionState.value == SessionState.LOADING) return
         viewModelScope.launch {
             stopGenerate()
-            if (!multiResidency) unloadSession()
-            openSession(choice.model)
+            unloadSession()
+            openSession(model.model)
+        }
+    }
+
+    /** Release the running model and stop generating. */
+    fun stopModel() {
+        viewModelScope.launch {
+            releaseSession()
+            markIdle()
+        }
+    }
+
+    private suspend fun releaseSession() {
+        stopGenerate()
+        unloadSession()
+    }
+
+    private fun markIdle() {
+        _sessionState.value = SessionState.IDLE
+        val name = _selectedModel.value?.displayName
+        _status.value = if (name == null) {
+            "未启动：先选择引擎和模型"
+        } else {
+            "未启动：点击「启动」加载 $name"
         }
     }
 
@@ -177,11 +225,11 @@ class ChatViewModel @Inject constructor(
             stopGenerate()
             val handle = session
             val engine = sessionEngine
-            if (handle != null && engine != null) {
+            if (_sessionState.value == SessionState.READY && handle != null && engine != null) {
                 runCatching { engine.reset(handle) }
                 _status.value = "已新建会话（上下文已清空）"
             } else {
-                _status.value = "当前无会话"
+                _status.value = "模型未启动，已清空聊天记录"
             }
             _messages.value = emptyList()
         }
@@ -226,17 +274,15 @@ class ChatViewModel @Inject constructor(
         _models.value = list
         val current = _selectedModel.value
         if (current == null || list.none { it.model.id == current.model.id }) {
-            val first = list.firstOrNull()
-            _selectedModel.value = first
-            if (first != null) {
-                viewModelScope.launch { openSession(first.model) }
-            }
+            _selectedModel.value = list.firstOrNull()
+            markIdle()
         }
     }
 
     private suspend fun openSession(model: LocalModel) {
         val engine = _selectedEngine.value?.engine ?: return
         if (_selectedEngine.value?.available != true) {
+            _sessionState.value = SessionState.FAILED
             _status.value = "引擎不可用，无法加载模型"
             return
         }
@@ -245,10 +291,12 @@ class ChatViewModel @Inject constructor(
             resident[key]?.let { (eng, handle) ->
                 session = handle
                 sessionEngine = eng
+                _sessionState.value = SessionState.READY
                 _status.value = "已切换到驻留模型 ${model.displayName}"
                 return
             }
         }
+        _sessionState.value = SessionState.LOADING
         _status.value = "加载中…"
         runCatching {
             val handle = engine.load(model, _sampling.value.toConfig())
@@ -256,9 +304,13 @@ class ChatViewModel @Inject constructor(
             sessionEngine = engine
             sessionRegistry.register(engine, handle)
             if (multiResidency) resident[key] = engine to handle
+            _sessionState.value = SessionState.READY
             _status.value = "已加载 ${model.displayName}"
         }.onFailure {
             val err = it.message ?: it.javaClass.simpleName
+            session = null
+            sessionEngine = null
+            _sessionState.value = SessionState.FAILED
             _status.value = "加载失败：$err；检查路径与文件完整性"
         }
     }
@@ -274,9 +326,14 @@ class ChatViewModel @Inject constructor(
     }
 
     fun send(text: String) {
+        if (_sessionState.value != SessionState.READY) {
+            _status.value = "模型未启动，点击「启动」后再发送"
+            return
+        }
         val engine = _selectedEngine.value?.engine ?: return
         val handle = session ?: run {
-            _status.value = "请先选择可用引擎和模型"
+            _sessionState.value = SessionState.IDLE
+            markIdle()
             return
         }
         if (_generating.value) return

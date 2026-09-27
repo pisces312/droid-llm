@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -30,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,6 +70,9 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
     val availability by vm.availability.collectAsState()
     val sampling by vm.sampling.collectAsState()
     val generating by vm.generating.collectAsState()
+    val sessionState by vm.sessionState.collectAsState()
+    val canStart = selectedModel != null && selectedEngine?.available == true
+    val canSend = sessionState == SessionState.READY && !generating
 
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size) {
@@ -87,6 +92,10 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
             models = models,
             selectedModel = selectedModel,
             onModel = vm::selectModel,
+            sessionState = sessionState,
+            canStart = canStart,
+            onStart = vm::startModel,
+            onStop = vm::stopModel,
             onNewSession = vm::newSession,
         )
         Spacer(Modifier.height(4.dp))
@@ -127,6 +136,7 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
         Spacer(Modifier.height(8.dp))
         Composer(
             generating = generating,
+            canSend = canSend,
             onSend = vm::send,
             onStop = vm::stopGenerate,
         )
@@ -143,6 +153,10 @@ private fun TopBar(
     models: List<ModelChoice>,
     selectedModel: ModelChoice?,
     onModel: (ModelChoice) -> Unit,
+    sessionState: SessionState,
+    canStart: Boolean,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
     onNewSession: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -159,6 +173,12 @@ private fun TopBar(
             onModel = onModel,
             modifier = Modifier.weight(1f),
         )
+        SessionToggleButton(
+            state = sessionState,
+            canStart = canStart,
+            onStart = onStart,
+            onStop = onStop,
+        )
         Box {
             IconButton(onClick = { menuOpen = true }) {
                 Icon(Icons.Filled.MoreVert, contentDescription = "更多")
@@ -172,6 +192,45 @@ private fun TopBar(
                     },
                 )
             }
+        }
+    }
+}
+
+/**
+ * Start / stop the chat model. Stopping releases it from memory; only a
+ * [SessionState.READY] session accepts prompts.
+ */
+@Composable
+private fun SessionToggleButton(
+    state: SessionState,
+    canStart: Boolean,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    when (state) {
+        SessionState.READY -> OutlinedButton(
+            onClick = onStop,
+            shape = shape,
+            modifier = Modifier.height(40.dp),
+        ) {
+            Text("停止")
+        }
+        SessionState.LOADING -> Button(
+            onClick = {},
+            enabled = false,
+            shape = shape,
+            modifier = Modifier.height(40.dp),
+        ) {
+            Text("加载中")
+        }
+        SessionState.IDLE, SessionState.FAILED -> Button(
+            onClick = onStart,
+            enabled = canStart,
+            shape = shape,
+            modifier = Modifier.height(40.dp),
+        ) {
+            Text(if (state == SessionState.FAILED) "重试" else "启动")
         }
     }
 }
@@ -451,6 +510,7 @@ private fun BackendField(
 @Composable
 private fun Composer(
     generating: Boolean,
+    canSend: Boolean,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
 ) {
@@ -463,7 +523,7 @@ private fun Composer(
             value = text,
             onValueChange = { text = it },
             modifier = Modifier.weight(1f),
-            placeholder = { Text("输入消息…") },
+            placeholder = { Text(if (canSend || generating) "输入消息…" else "启动模型后可发送消息") },
             maxLines = 4,
         )
         if (generating) {
@@ -482,6 +542,7 @@ private fun Composer(
                         text = ""
                     }
                 },
+                enabled = canSend,
                 modifier = Modifier.widthIn(min = 88.dp),
             )
         }
