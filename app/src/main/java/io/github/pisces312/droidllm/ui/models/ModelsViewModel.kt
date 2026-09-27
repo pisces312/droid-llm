@@ -12,10 +12,12 @@ import io.github.pisces312.droidllm.common.model.ValidationResult
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
 import io.github.pisces312.droidllm.data.catalog.CatalogModel
 import io.github.pisces312.droidllm.data.catalog.DownloadState
+import io.github.pisces312.droidllm.data.catalog.ModelAutoImporter
 import io.github.pisces312.droidllm.data.catalog.ModelCatalog
 import io.github.pisces312.droidllm.data.catalog.ModelCatalogLoader
 import io.github.pisces312.droidllm.data.catalog.ModelDownloader
 import io.github.pisces312.droidllm.data.catalog.ModelSource
+import io.github.pisces312.droidllm.data.catalog.engineFormatTag
 import io.github.pisces312.droidllm.data.catalog.findModelDir
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.LocalModel
@@ -46,6 +48,7 @@ class ModelsViewModel @Inject constructor(
     private val modelStore: ModelPathStore,
     private val settingsStore: AppSettingsStore,
     private val deviceProbe: DeviceProbe,
+    private val autoImporter: ModelAutoImporter,
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -98,7 +101,6 @@ class ModelsViewModel @Inject constructor(
         }
         _catalog.value = runCatching { ModelCatalogLoader.load(context) }
             .getOrElse { ModelCatalog() }
-        refreshDownloaded()
     }
 
     fun setSource(source: ModelSource) {
@@ -107,6 +109,24 @@ class ModelsViewModel @Inject constructor(
 
     fun setDownloadFilter(filter: DownloadFilter) {
         _downloadFilter.value = filter
+    }
+
+    /**
+     * Rescan the current model root, publish what is present, and register any
+     * catalog model found on disk that is missing from the imported list.
+     * Same work the settings page does right after a root switch.
+     */
+    fun syncFoundModels() {
+        val rootDir = File(modelRoot())
+        refreshDownloaded()
+        viewModelScope.launch(Dispatchers.IO) {
+            val added = autoImporter.registerFound(rootDir)
+            _message.value = if (added > 0) {
+                "已自动登记 $added 个模型（来自当前模型根目录）"
+            } else {
+                "扫描完成，没有发现新的模型"
+            }
+        }
     }
 
     fun refreshDownloaded() {
@@ -255,26 +275,30 @@ class ModelsViewModel @Inject constructor(
             _message.value = "路径不存在：$path；检查是否已授权存储或路径拼写"
             return
         }
-        val location = ModelLocation.FilePath(path)
         val result = FileFormatValidator.validatePath(engineId, file)
         if (result is ValidationResult.Failed) {
             _message.value = "格式校验失败：${result.reason}"
             return
         }
         viewModelScope.launch {
-            modelStore.upsert(
-                LocalModel(
-                    id = UUID.randomUUID().toString(),
-                    engineId = engineId,
-                    displayName = displayName,
-                    location = location,
-                    formatHint = formatHint(engineId),
-                    fileSizeBytes = if (file.isFile) file.length() else null,
-                ),
-            )
+            upsertModel(engineId, displayName, path)
             _message.value = "已添加：$displayName"
             _pendingPath.value = ""
         }
+    }
+
+    private suspend fun upsertModel(engineId: EngineId, displayName: String, path: String) {
+        val file = File(path)
+        modelStore.upsert(
+            LocalModel(
+                id = UUID.randomUUID().toString(),
+                engineId = engineId,
+                displayName = displayName,
+                location = ModelLocation.FilePath(path),
+                formatHint = formatHint(engineId),
+                fileSizeBytes = if (file.isFile) file.length() else null,
+            ),
+        )
     }
 
     fun registerDownloaded(model: CatalogModel) {
@@ -353,11 +377,5 @@ class ModelsViewModel @Inject constructor(
         }
     }
 
-    private fun formatHint(engineId: EngineId): String = when (engineId) {
-        EngineId.LITERT -> "litertlm"
-        EngineId.MNN -> "mnn_dir"
-        EngineId.GENIE -> "genie_dir"
-        EngineId.LLAMACPP -> "gguf"
-        EngineId.FAKE -> "fake"
-    }
+    private fun formatHint(engineId: EngineId): String = engineFormatTag(engineId)
 }

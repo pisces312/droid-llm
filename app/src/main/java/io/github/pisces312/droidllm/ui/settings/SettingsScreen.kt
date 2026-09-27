@@ -40,6 +40,7 @@ import io.github.pisces312.droidllm.common.model.ModelRootMigrator
 import io.github.pisces312.droidllm.common.settings.AppSettings
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
 import io.github.pisces312.droidllm.common.settings.ThemeMode
+import io.github.pisces312.droidllm.data.catalog.ModelAutoImporter
 import io.github.pisces312.droidllm.engineapi.Backend
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.ModelLocation
@@ -66,6 +67,7 @@ class SettingsViewModel @Inject constructor(
     private val settingsStore: AppSettingsStore,
     private val benchmarkDao: BenchmarkDao,
     private val modelStore: ModelPathStore,
+    private val autoImporter: ModelAutoImporter,
 ) : ViewModel() {
 
     private val _probe = MutableStateFlow<ProbeContext?>(null)
@@ -165,7 +167,8 @@ class SettingsViewModel @Inject constructor(
                 val skipped = if (result.skippedNames.isEmpty()) ""
                 else "；跳过重名：" + result.skippedNames.joinToString("、")
                 settingsStore.setModelRoot(target.absolutePath)
-                _message.value = "已迁移 ${result.movedPaths.size} 项$skipped"
+                val added = withContext(Dispatchers.IO) { autoImporter.registerFound(target) }
+                _message.value = "已迁移 ${result.movedPaths.size} 项$skipped" + addedSuffix(added)
             } else {
                 // Do not migrate: just point at the new root. Source data stays.
                 if (!target.exists() && !target.mkdirs()) {
@@ -173,10 +176,16 @@ class SettingsViewModel @Inject constructor(
                     return@launch
                 }
                 settingsStore.setModelRoot(target.absolutePath)
-                _message.value = "已改模型根目录（未迁移原数据）"
+                // Files already under the new root must land in the imported list,
+                // otherwise the chat model picker stays empty after the switch.
+                val added = withContext(Dispatchers.IO) { autoImporter.registerFound(target) }
+                _message.value = "已改模型根目录（未迁移原数据）" + addedSuffix(added)
             }
         }
     }
+
+    private fun addedSuffix(added: Int): String =
+        if (added > 0) "；已自动登记 $added 个已下载模型" else ""
 
     private suspend fun rewriteRegisteredPaths(moved: Map<String, String>) {
         if (moved.isEmpty()) return

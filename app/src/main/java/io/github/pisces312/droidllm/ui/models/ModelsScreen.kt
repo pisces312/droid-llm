@@ -102,6 +102,7 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
                     vm.importToModelRoot(engineId, displayName.trim(), pendingPath.trim())
                     displayName = ""
                 },
+                onScanRoot = vm::syncFoundModels,
                 formatHint = vm.engineFormatHint(engineId),
                 modelRoot = modelRoot.ifEmpty { vm.modelRoot() },
                 onValidate = vm::validate,
@@ -141,6 +142,7 @@ private fun LocalModelsTab(
     onBrowse: () -> Unit,
     onAdd: () -> Unit,
     onImport: () -> Unit,
+    onScanRoot: () -> Unit,
     formatHint: String,
     modelRoot: String,
     onValidate: (String) -> Unit,
@@ -193,6 +195,17 @@ private fun LocalModelsTab(
                         text = "导入并复制到模型目录",
                         onClick = onImport,
                         modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedToolButton(
+                        "扫描模型根目录",
+                        onClick = onScanRoot,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "把当前根目录下已存在的 Modelscope/HF 下载登记到下方列表（对话框型模型跳过）。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
