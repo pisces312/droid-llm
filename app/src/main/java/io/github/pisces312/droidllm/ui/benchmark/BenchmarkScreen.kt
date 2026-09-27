@@ -179,7 +179,7 @@ private fun EngineConfigSection(
                         Checkbox(
                             checked = row.included,
                             onCheckedChange = { vm.toggleEngine(row.engineId, it) },
-                            enabled = row.available && (row.models.isNotEmpty() || row.engineId == io.github.pisces312.droidllm.engineapi.EngineId.FAKE),
+                            enabled = row.available && row.models.isNotEmpty(),
                         )
                         EngineStatusCard(
                             name = row.engineName,
@@ -189,7 +189,7 @@ private fun EngineConfigSection(
                         )
                     }
                     if (row.included) {
-                        if (row.models.isEmpty() && row.engineId != io.github.pisces312.droidllm.engineapi.EngineId.FAKE) {
+                        if (row.models.isEmpty()) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween,

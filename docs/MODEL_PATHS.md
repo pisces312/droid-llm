@@ -40,7 +40,7 @@
 | MNN | 目录 | 必须有 `config.json` + `llm.mnn` |
 | Genie | 目录 | 必须有 `genie_config.json` + `tokenizer.json` + 至少一个 `*.bin` |
 | llama.cpp | `.gguf` 文件 | 扩展名 + 文件头魔数 `GGUF` |
-| Fake | 任意 | 始终通过（UI 勾选后才显示） |
+| Fake | 任意 | 始终通过（仅用于「模型根目录选择器」的任意路径模式，UI 不出现该引擎） |
 
 校验失败：行内红字写出**缺哪个文件**（如 `missing config.json in ...`）。
 

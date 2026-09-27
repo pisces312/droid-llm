@@ -23,9 +23,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Reference implementation of [LlmEngine] used for UI wiring and as a living
- * specification of the interface contract. Emits lorem-ipsum tokens with a
- * fixed delay and fabricates plausible TTFT / decode metrics.
+ * Test-only implementation of [LlmEngine]. Serves two purposes:
+ *
+ * - the executable specification behind [FakeEngineTest]: streaming events,
+ *   metrics, and the unload/reset-while-generating contract;
+ * - a readable reference for anyone adding a real engine.
+ *
+ * Deliberately kept out of `src/main` so the shipped app never offers a fake
+ * model. [EngineId.FAKE] still exists for stored records and for the
+ * "accept any path" validation rule the root directory picker borrows.
+ *
+ * Emits lorem-ipsum tokens with a fixed delay and fabricates plausible
+ * TTFT / decode metrics.
  */
 class FakeEngine : LlmEngine {
 

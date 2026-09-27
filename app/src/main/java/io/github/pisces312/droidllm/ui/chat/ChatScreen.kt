@@ -114,7 +114,7 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
         if (messages.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
-                    "先在「模型」页添加模型，或使用 Fake 引擎试用",
+                    "先在「模型」页添加模型，再回到这里启动它",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

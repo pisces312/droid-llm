@@ -286,7 +286,9 @@
   1. Backend 不支持的取值拒绝并提示，不静默回退
   2. `InferenceConfig` 不适用字段忽略并记 warning，指标里如实标注生效值
   3. 同一 `SessionHandle` 上 generate 与 unload/reset 互斥，generate 进行中 unload 阻塞或明确失败
-- `FakeEngine`：固定延迟逐字吐 lorem ipsum，伪造 TTFT/tps 指标——UI 联调用，也是接口行为的可执行样例
+- `FakeEngine`：固定延迟逐字吐 lorem ipsum，伪造 TTFT/tps 指标——P0 起用于 UI 联调，也是接口行为的可执行样例。
+  **2026-09-27 起降为 test-only**：文件迁到 `core/engine-api/src/test`，不再注入 DI、不出现在 UI；仅作为契约单测（`FakeEngineTest`）与写新引擎时的参照。
+  `EngineId.FAKE` 保留给历史存储记录与「模型根目录选择器」的任意路径校验规则
 
 ### 2.3 `:core:common`
 

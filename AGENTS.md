@@ -77,7 +77,7 @@ cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android
 
 ```
 :app                     Compose UI（Chat / Models / Benchmark / Settings）
-:core:engine-api         LlmEngine 统一接口、InferenceConfig、EngineEvent、FakeEngine
+:core:engine-api         LlmEngine 统一接口、InferenceConfig、EngineEvent（FakeEngine 在 src/test，仅测契约）
 :core:common             ModelPathStore / MetricsCollector / DeviceProbe / ResultStore
 :core:benchmark          评测调度（P4）
 :core:chattemplate       ChatTemplate.format（fallback；minja JNI 在 P3）

@@ -17,7 +17,6 @@ import io.github.pisces312.droidllm.engineapi.GenerateRequest
 import io.github.pisces312.droidllm.engineapi.InferenceConfig
 import io.github.pisces312.droidllm.engineapi.LlmEngine
 import io.github.pisces312.droidllm.engineapi.LocalModel
-import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.SessionHandle
 import io.github.pisces312.droidllm.engineapi.labelledName
 import javax.inject.Inject
@@ -255,22 +254,14 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Rebuild the model picker for [engine] from [all] stored models.
-     * Keeps the Fake default entry, and auto-selects (and opens) the first
-     * model when nothing valid is selected — e.g. right after a download.
+     * Rebuild the model picker for [engine] from [all] stored models. Falls
+     * back to the first entry when nothing valid is selected — e.g. right
+     * after a download. An engine without models leaves an empty picker and
+     * an IDLE session; starting then reports "pick a model first".
      */
     private fun reconcileModels(engine: LlmEngine, all: List<LocalModel>) {
-        var list = all.filter { it.engineId == engine.id }
+        val list = all.filter { it.engineId == engine.id }
             .map { ModelChoice(it, it.displayName) }
-        if (list.isEmpty() && engine.id == io.github.pisces312.droidllm.engineapi.EngineId.FAKE) {
-            val fake = LocalModel(
-                id = "fake-default",
-                engineId = io.github.pisces312.droidllm.engineapi.EngineId.FAKE,
-                displayName = "Fake lorem model",
-                location = ModelLocation.AppPrivate("fake"),
-            )
-            list = listOf(ModelChoice(fake, fake.displayName))
-        }
         _models.value = list
         val current = _selectedModel.value
         if (current == null || list.none { it.model.id == current.model.id }) {

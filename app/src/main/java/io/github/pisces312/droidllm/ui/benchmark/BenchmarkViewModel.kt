@@ -22,7 +22,6 @@ import io.github.pisces312.droidllm.engineapi.Availability
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.LlmEngine
 import io.github.pisces312.droidllm.engineapi.LocalModel
-import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.labelledName
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -95,7 +94,7 @@ class BenchmarkViewModel @Inject constructor(
                     availabilityLabel = availabilityLabel(av),
                     models = emptyList(),
                     selectedModelId = null,
-                    included = av is Availability.Available && engine.id != EngineId.FAKE,
+                    included = av is Availability.Available,
                 )
             }.sortedBy { it.engineName }
             _state.value = _state.value.copy(engineRows = rows)
@@ -116,7 +115,7 @@ class BenchmarkViewModel @Inject constructor(
                 models.any { it.id == row.selectedModelId } -> row.selectedModelId
                 else -> models.firstOrNull()?.id
             }
-            val included = row.included && (models.isNotEmpty() || row.engineId == EngineId.FAKE)
+            val included = row.included && models.isNotEmpty()
             row.copy(models = models, selectedModelId = selected, included = included)
         }.ifEmpty {
             // Keep probe rows even before any model exists.
@@ -127,7 +126,7 @@ class BenchmarkViewModel @Inject constructor(
 
     fun toggleEngine(engineId: EngineId, included: Boolean) {
         updateRow(engineId) { row ->
-            row.copy(included = included && (row.models.isNotEmpty() || row.engineId == EngineId.FAKE))
+            row.copy(included = included && row.models.isNotEmpty())
         }
     }
 
@@ -290,15 +289,8 @@ class BenchmarkViewModel @Inject constructor(
     private fun buildTargets(): List<BenchTarget> {
         return _state.value.engineRows.mapNotNull { row ->
             if (!row.included) return@mapNotNull null
-            val model = when {
-                row.engineId == EngineId.FAKE && row.models.isEmpty() -> LocalModel(
-                    id = "fake-default",
-                    engineId = EngineId.FAKE,
-                    displayName = "Fake lorem model",
-                    location = ModelLocation.AppPrivate("fake"),
-                )
-                else -> row.models.firstOrNull { it.id == row.selectedModelId } ?: return@mapNotNull null
-            }
+            val model = row.models.firstOrNull { it.id == row.selectedModelId }
+                ?: return@mapNotNull null
             BenchTarget(row.engineId, model)
         }
     }

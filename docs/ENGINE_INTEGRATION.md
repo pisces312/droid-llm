@@ -10,7 +10,10 @@
 | MNN | `:engine:mnn` | 预编译 `libMNN.so`（`droid.mnnRoot` / `MNN_ROOT`） | jniLibs 拷贝 | 路径不存在则跳过拷贝 |
 | Genie | `:engine:genie` | QAIRT **2.50.0.260828**（`QAIRT_PATH`） | jniLibs 拷贝 | `-Pdroid.skipGenie=true` |
 | llama.cpp | `:engine:llamacpp` | vendored `third_party/llama.cpp` | 静态编入 JNI | 无 |
-| Fake | `:core:engine-api` | 无 | 纯 Kotlin | 始终可用（UI 勾选后才显示） |
+| Fake | `:core:engine-api`（`src/test`） | 无 | 纯 Kotlin | **仅单测**，不随 App 发布 |
+
+Fake 只作 `LlmEngine` 契约的可执行规格（`FakeEngineTest`）与写新引擎时的参照，**不注入 DI、不出现在 UI**。
+保留 `EngineId.FAKE` 是因为存储层的历史记录可能读到它，且「模型根目录选择器」复用了它「任意路径、不做格式校验」的规则。
 
 **工具链硬约束**：Kotlin **2.2.21** + KSP **2.3.6**（litertlm 0.11.0 的 Kotlin metadata 为 2.3.0）。不要降级。
 
