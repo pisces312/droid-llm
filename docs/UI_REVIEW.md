@@ -2,7 +2,7 @@
 
 > 日期：2026-09-27
 > 范围：`app/` 全部 Compose UI + `ui/theme` + `ui/components`，对照 `UI_DESIGN.md` 与**本机 MnnLlmChat 源码实测**
-> 状态：审查与规划文档。§7 的 4 项决策已于 2026-09-27 拍板；**R1 已按本方案落地**（见 `IMPLEMENTATION.md` §8d「R1 交付说明」），R2–R4 待做。
+> 状态：审查与规划文档。§7 的 4 项决策已于 2026-09-27 拍板；**R1、R1.5 已按本方案落地**（见 `IMPLEMENTATION.md` §8d「R1 / R1.5 交付说明」），R2–R4 待做。
 > 关联：界面权威仍是 `UI_DESIGN.md`；引擎/Backend 契约见 `DESIGN.md` §1.2。
 
 ---
@@ -156,6 +156,9 @@ activity_main.xml          DrawerLayout
 **P0-2 Models 引擎按钮文字断行**（截图实证：`LITER T`、`GENI E`）
 `EngineIdDropdown`（`ModelsScreen.kt:375-390`）用 4 个 `weight(1f)` 的 52dp 按钮，每格约 85dp 装不下 `LLAMACPP`。
 **修法**：改 `FlowRow` + `FilterChip`（参照 MnnLlmChat `chip_filter_item.xml`），或横向滚动 chip 行。
+→ **已落地（R1.5，2026-09-27）**：取「横向滚动 chip」方案，`ModelsScreen.ChoiceChipRow`，
+三行（引擎 / 下载源 / 下载过滤）统一。实测三行文字全部单行，且 4 个引擎 chip 总宽 891px
+一屏放得下（无需滚动）。
 
 **P0-3 Settings 的 `backend` 是只读 `OutlinedTextField`**（`SettingsScreen.kt:361-368`，`readOnly=true` 在 364）
 长得像能输入，点了没反应；同一字段在 Chat 是下拉（`ui/chat/ChatScreen.kt` 采样面板）。
@@ -257,7 +260,7 @@ activity_main.xml          DrawerLayout
 
 | 页面 | 改动 | 解决 |
 |---|---|---|
-| Models | 4 个等宽引擎按钮 → 一行**横向 chip** | P0-2 断行 |
+| Models | ~~4 个等宽引擎按钮 → 一行**横向 chip**~~ **已完成（R1.5）**：引擎 / 下载源 / 下载过滤三行都换成 `ChoiceChipRow` | P0-2 断行 |
 | Models | "刷新状态"从每个条目提到顶部工具栏一次 | 重复按钮 |
 | Models | 列表条目加**厂商 logo** avatar（§7.1，命中 74%，未命中文字兜底） | 可识别性 |
 | Models | 空态改「插图 + 说明 + 按钮」 | 空态不统一 |
@@ -275,9 +278,10 @@ activity_main.xml          DrawerLayout
 | 步骤 | 内容 | 覆盖 | 风险 |
 |---|---|---|---|
 | **R1** ✅ | 引擎显示名统一（`EngineId.displayName`，**6 处**展示面改走它） | P0-1 | 极低，纯改名（**已完成 2026-09-27**） |
+| **R1.5** ✅ | Models **三行**等宽按钮 → `ChoiceChipRow`（横向滚动 chip），根治 `LiteRT-LM` / `llama.cpp` / `ModelScope` 断字 | P0-2 | 极低（**已完成 2026-09-27**，从 R4 提前） |
 | **R2** | 五个小改纯收益项：数值输入 buffer（P0-4）、跟随滚动三件套（P0-5）、表格单位（P0-7）、`backend` 假输入框（P0-3）、表格行高联动（P0-6） | P0-3~7 | 低，逐个可验 |
 | **R3** | 三层控件体系 + Chat 顶栏重构（作用域条 + 两级 BottomSheet，引擎 chip 带**状态点 ●**〔决策 2〕）+ 采样参数收成 chip 并**点击开 BottomSheet**〔决策 4〕 | §4.2 首条 / §5.1 | 中，需同步回写 `UI_DESIGN.md` |
-| **R4** | 评测页密度重构 + Models chip 行 + **厂商 logo 资产接入（§7.1，含 `docs/LICENSING.md` 增记商标条目）** + 空态统一 + 其余打磨 | §4.2 / §4.3 | 中 |
+| **R4** | 评测页密度重构（§4.2）+ **厂商 logo 资产接入（§7.1，含 `docs/LICENSING.md` 增记商标条目）** + 空态统一 + 其余打磨。~~Models 引擎 chip 行~~ 已由 **R1.5** 提前完成 | §4.2 / §4.3 | 中 |
 
 **R3 需同步回写 `UI_DESIGN.md`**：它现在是唯一真相，但没有"控件三层职责"这条约束；不写进去会再次漂移。
 **R4 的 logo 资产**是新增资源类别（我方 `res/drawable*` 目前几乎为空），需一并处理压缩与 `LICENSING.md`。

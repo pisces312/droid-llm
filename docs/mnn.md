@@ -123,6 +123,44 @@ decode_tps  = gen_seq_len / (decode_us  / 1e6)
 | `createLLM` 要传 `config.json` 的绝对路径 | 传纯目录会拼出 `<dir>tokenizer.txt`（缺分隔符），tokenizer 加载失败 | Kotlin 侧传 `File(dir, "config.json").absolutePath` |
 | 模型自带 `config.json` 已写死 `backend_type=cpu` / `thread_num=4` / `precision=low` / `memory=low` | — | 我们传 `cpu` + `threads`，与 MnnLlmChat 的缺省一致；**跨 app 比速度时这一项不构成差异** |
 | 模拟器上数值不可信 | `emulator-5554` 是 x86_64，arm64 产物走 `libndk_translation.so` 二进制翻译 | 性能与采样结论一律以真机 arm64 为准 |
+| **模拟器连"跑通评测流程"都做不到** | 实测卡在 `llm->load()`，见 §5.1 | 评测（含结果表/历史卡/失败行）一律真机 arm64；模拟器只用于纯 UI 布局验证 |
+
+### 5.1 模拟器为什么不能用来跑评测
+
+**结论：不要尝试在模拟器上运行评测。** 这不是代码 bug，也不是配置问题，是环境限制，
+在模拟器上排查评测流程只会浪费时间。
+
+2026-09-27 实测（`emulator-5554`，`sdk_gphone64_x86_64`，**2GB RAM**，APK 只含
+`lib/arm64-v8a/` 故走 native bridge 翻译）。点「开始评测」（MNN 引擎 + LFM2-350M-MNN）后：
+
+```
+mnn_chat_jni: createLLM .../LFM2-350M-MNN/.../config.json   ← 请求确实下发到了 native
+（此后不再有任何 native 日志）
+```
+
+进程侧：**CPU 0%、状态 S(sleeping)、无 FATAL / OOM / ANR，RES 592MB 停滞不动，3 分钟无进展**。
+
+→ **卡在 `llm->load()`**（`createLLM` 之后、load 完成日志之前）。
+
+日志里出现的这两条是**正常**的，不要当成失败原因去追：
+
+```
+E MNNJNI: unable to load libcdsprpc.so
+E MNNJNI: [MNN::Hexagon] Open libcdsprpc.so failed
+```
+
+模拟器没有骁龙 HTP，Genie 那条 QNN 路径本来就不通（`MNN_QNN: Loaded HTP backend.`
+是 MNN 的探测日志）。
+
+真正原因是两条叠加：arm64 代码走二进制翻译 + 模拟器只有 2GB RAM（`MemTotal: 2021092 kB`，
+free 仅 200MB、swap 已用 500MB+）。**只能 `adb shell am force-stop` 恢复**。
+
+因此：
+
+- 评测的验收（结果表、历史卡、未注册引擎的失败行）**必须真机 arm64**。历史卡尤其
+  依赖 Room 里有真实记录，模拟器生成不出来。
+- 模拟器仍然可用于**纯 UI 布局验证** —— Compose 渲染不碰 native，界面照常出帧，
+  翻页、截图、`uiautomator dump` 读文字都正常。
 
 ## 6. 调试手法
 

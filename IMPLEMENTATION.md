@@ -12,7 +12,7 @@
 | P3 | ✅ 完成 | 2026-09-26 | genie，见「P3 交付说明」 |
 | P4 | ✅ 完成，待审阅 | 2026-09-26 | 核心 + UI 已通；见「P4 交付说明」 |
 | P5 | ✅ 完成，待审阅 | 2026-09-26 | 打磨；见「P5 交付说明」 |
-| P6 | 🔄 进行中（R1 ✅） | 2026-09-27 | UI/UX 重构；审查与方案见 [`docs/UI_REVIEW.md`](docs/UI_REVIEW.md)，见 §8d |
+| P6 | 🔄 进行中（R1 ✅、R1.5 ✅） | 2026-09-27 | UI/UX 重构；审查与方案见 [`docs/UI_REVIEW.md`](docs/UI_REVIEW.md)，见 §8d |
 
 ### P0 交付摘要（2026-09-26）
 
@@ -212,7 +212,7 @@
 4. 导出 JSON 到 `Android/data/.../files/benchmark/`，Snackbar 提示文件名
 5. 历史列表出现本次记录，可清空
 
-**阶段状态**：P0–P5 均已完成（P5+ / P5++ 增量亦完成）。P6（UI/UX 重构）已规划，见 §8d。剩余为真机 DoD 与 README 截图。
+**阶段状态**：P0–P5 均已完成（P5+ / P5++ 增量亦完成）。**P6（UI/UX 重构）进行中：R1 ✅、R1.5 ✅，下一步 R2**，见 §8d。剩余为真机 DoD 与 README 截图。
 
 ---
 
@@ -257,7 +257,7 @@
 | P3 | `:engine:genie`（可跳过编译） | 骁龙真机四引擎，M2 达成 | 2–4 天 |
 | P4 | Benchmark L/P/D/T + Room + JSON 导出 | 一键出对比表，M3 达成 | 1–2 天 |
 | P5 | 校验/错误提示/文档打磨 | 可交付 | 1 天 |
-| P6 | UI/UX 重构（R1–R4，见 §8d） | 控件语义分层 + 顶栏单入口 + 各页密度合理 | 待估 |
+| P6 | UI/UX 重构（R1–R4，见 §8d）；**R1 ✅ / R1.5 ✅** | 控件语义分层 + 顶栏单入口 + 各页密度合理 | 待估 |
 
 **顺序纪律**：llamacpp 先行（生态最成熟、调试最快），mnn 次之；litert 纯 Kotlin 最快；genie 最后且有跳过开关。每个引擎接入都走同一模板：probe → load → generate 流式 → metrics → smoke test。
 
@@ -580,9 +580,9 @@
 
 ---
 
-## 8d. P6 增量：UI/UX 重构（**进行中**，R1 ✅）
+## 8d. P6 增量：UI/UX 重构（**进行中**，R1 ✅ / R1.5 ✅）
 
-**状态：🔜 计划中（2026-09-27 立项）**
+**状态：🔄 进行中（2026-09-27 立项；R1 ✅、R1.5 ✅，下一步 R2）**
 
 > **权威输入**：[`docs/UI_REVIEW.md`](docs/UI_REVIEW.md) —— 现状盘点 + 问题清单（含文件:行号）+ 布局方案 + 与 MnnLlmChat 的逐条对照。
 > 本节只做落地拆解，不重复论证。**动手前先通读该文档**；契约约束见 `DESIGN.md` §1.2，界面权威见 `UI_DESIGN.md`。
@@ -622,10 +622,10 @@
 
 | 步骤 | 内容 | 覆盖问题 | 风险 |
 |---|---|---|---|
-| **R1** ✅ | **引擎显示名统一**：`engine-api` 加 `val EngineId.displayName`，各引擎 `override val displayName` 改为返回它（**单一来源**）；**6 处展示面**全改走它（`labelledName` 仅留给需版本号的场合）。**已完成**，见上方「R1 交付说明」 | P0-1 | 极低，纯改名零行为变更 |
+| **R1** ✅ | **引擎显示名统一**：`engine-api` 加 `val EngineId.displayName`，各引擎 `override val displayName` 改为返回它（**单一来源**）；**6 处展示面**全改走它（`labelledName` 仅留给需版本号的场合）。**已完成**，见下方「R1 交付说明」；配套补丁 **R1.5**（Models 三行 chip）见「R1.5 交付说明」 | P0-1 | 极低，纯改名零行为变更 |
 | **R2** | 五个小改纯收益项：①数值输入本地 buffer（失焦/IME 完成再解析，参考 MnnLlmChat `NumericInputParser.kt`）②跟随滚动三件套（新内容即滚 / 上滚停跟随 / 悬浮「回到底部」）③结果表补单位 ④`Settings` 的 `backend` 只读框 → 下拉 ⑤`ResultTable` 行高联动 | P0-3~7 | 低，逐个可验 |
 | **R3** | **三层控件体系**（筛选 Chip / 一屏仅一个 Filled 主操作 / 次级 Outlined）+ Chat 顶栏重构（作用域条 + 两级 BottomSheet，引擎 chip 带**状态点 ●**〔决策 2〕）+ 采样参数收成输入卡上方 chip 并**点击开 BottomSheet**〔决策 4〕 | §4.2 首条 + §5.1 | 中，**需同步回写 `UI_DESIGN.md`** |
-| **R4** | 评测页密度重构（置顶"选模型"卡 + 紧凑引擎行，让「开始评测」回首屏）+ Models 引擎 chip 行（根治 `LITER T` 断行）+ **厂商 logo 资产接入**〔决策 3，含压缩与 `docs/LICENSING.md` 增记〕+ 空态统一为「插图 + 说明 + 按钮」+ 其余打磨 | §4.2 / §4.3 | 中 |
+| **R4** | 评测页密度重构（置顶"选模型"卡 + 紧凑引擎行，让「开始评测」回首屏）+ **厂商 logo 资产接入**〔决策 3，含压缩与 `docs/LICENSING.md` 增记〕+ 空态统一为「插图 + 说明 + 按钮」+ 其余打磨。~~Models 引擎 chip 行~~ **已由 R1.5 提前完成** | §4.2 / §4.3 | 中 |
 
 ### R1 交付说明（2026-09-27，✅ 完成）
 
@@ -653,6 +653,32 @@
 - 真机截图比对**未做**（需用户手测：四个界面同一引擎应显示同一串文字）
 
 **踩坑**：Kotlin 对**没有显式 companion** 的枚举，`EngineId.Companion` 作类型引用会 `Unresolved reference 'Companion'` → 反解函数改为顶层函数 `engineIdFromStorage`。
+
+### R1.5 交付说明（2026-09-27，✅ 完成）
+
+**起因**：R1 把展示名改对之后名字变长，**Models 里那排等宽按钮断字反而更明显**——
+`llama.cpp` 断成 `llama .cpp`、`LiteRT-LM` 断成 `LiteR T-LM`、`ModelScope` 断成 `ModelScop` + `e`。
+（属 R4 范围，但改动很小、收益立竿见影，故提前做。）
+
+**改动**（1 个文件：`ui/models/ModelsScreen.kt`）
+
+| 位置 | 原实现 | 现实现 |
+|---|---|---|
+| 引擎选择（LiteRT-LM / MNN / Genie / llama.cpp） | 4 个 `weight(1f)` 按钮，选中 = 主色实心 | `ChoiceChipRow` |
+| 下载源（HF官方 / HF镜像 / ModelScope） | 3 个 `weight(1f)` 按钮 | `ChoiceChipRow` |
+| 下载过滤（全部 / 已下载 / 未下载） | 3 个 `weight(1f)` 按钮 | `ChoiceChipRow` |
+
+新增私有 `ChoiceChipRow<T>(options, selected, label, onSelected)` = `Row` + `horizontalScroll` + `FilterChip`。
+原 `EngineIdDropdown` 是私有函数且**名称与形态不符**（它从来不是 dropdown），随改动删除。
+
+**为什么用横向滚动而不是 `FlowRow`**：`FlowRow` 放不下时折行、高度翻倍；横向滚动保持一行，
+且子项拿到无限宽约束，文字永不折行。实测 4 个引擎 chip 总宽 **891px < 可用 1038px**，
+**一屏就放得下、根本不需要滚动**。选中的 chip 用 Material3 默认选中态（浅色容器），
+不再是主色实心按钮——顺带踩上 R3「筛选走 Chip」的方向。
+
+**验收**：`:app:assembleDebug` BUILD SUCCESSFUL；模拟器实测三行文字**全部单行**
+（`LiteRT-LM` / `llama.cpp` / `ModelScope` 均完整）；截图 `build/uicheck/10_market_chip.png`（市场页三行）、
+`11_engine_chip.png`（引擎行）。
 
 
 
@@ -682,7 +708,9 @@
 ### 决策状态
 
 ✅ **4 条已全部拍板（2026-09-27）**，见上方「已拍板决策」表，明细依据在 `UI_REVIEW.md` §7。
-✅ **R1 已完成**（构建 + 单测全绿）。**当前进度：R1 ✅ → 下一步 R2**（五个小改纯收益项，见上表）。
+✅ **R1 已完成**（构建 + 单测全绿，提交 `1e45553`）。
+✅ **R1.5 已完成**（Models 三行 chip；模拟器实测三行文字全部单行）。
+**当前进度：R1 ✅ → R1.5 ✅ → 下一步 R2**（五个小改纯收益项，见上表）。
 
 ---
 
@@ -696,3 +724,4 @@
 6. **不要扩大范围**：功耗测量、Dynamic Feature、雷达图、质量评测、OpenAI 兼容 API 均明确不做（API 是 P5+ 可选增强，不在本计划内）
 7. **目录改名**：仓库建立后工作目录可从 `LlmChatAndroid` 改为 `droid-llm`，改名时同步 `DESIGN.md` 头部说明
 8. **第三方路径**：一律走环境变量（`MNN_ROOT` / `QAIRT_PATH` 等，见 AGENTS.md「第三方仓库」表），禁止把 `D:\...` 写进仓库
+9. **评测只在真机 arm64 上跑，别在模拟器上试**：模拟器（x86_64 + 2GB RAM + native bridge 翻译）点「开始评测」会卡死在 `llm->load()`——`createLLM` 之后无任何 native 日志、进程 CPU 0%、无崩溃/OOM，只能 `adb shell am force-stop` 恢复。**这是环境限制不是代码 bug**，在模拟器上排查评测流程纯属浪费时间。模拟器仍可用于**纯 UI 布局**验证（Compose 不碰 native）。详见 `docs/mnn.md` §5.1

@@ -1,5 +1,6 @@
 package io.github.pisces312.droidllm.ui.models
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,9 +11,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -159,7 +162,12 @@ private fun LocalModelsTab(
                 Column(Modifier.padding(12.dp)) {
                     Text("添加 / 导入第三方模型", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    EngineIdDropdown(selected = engineId, onSelected = onEngineId)
+                    ChoiceChipRow(
+                        options = EngineId.entries.filter { it != EngineId.FAKE },
+                        selected = engineId,
+                        label = { it.displayName },
+                        onSelected = onEngineId,
+                    )
                     Spacer(Modifier.height(6.dp))
                     Text(
                         "格式：$formatHint",
@@ -266,30 +274,25 @@ private fun MarketTab(vm: ModelsViewModel) {
     }
 
     Column {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ModelSource.entries.forEach { s ->
-                if (s == source) {
-                    PrimaryButton(s.displayName, onClick = { vm.setSource(s) }, modifier = Modifier.weight(1f))
-                } else {
-                    OutlinedToolButton(s.displayName, onClick = { vm.setSource(s) }, modifier = Modifier.weight(1f))
-                }
-            }
-        }
+        ChoiceChipRow(
+            options = ModelSource.entries,
+            selected = source,
+            label = { it.displayName },
+            onSelected = { vm.setSource(it) },
+        )
         Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DownloadFilter.entries.forEach { f ->
-                val label = when (f) {
+        ChoiceChipRow(
+            options = DownloadFilter.entries,
+            selected = downloadFilter,
+            label = { f ->
+                when (f) {
                     DownloadFilter.ALL -> "全部"
                     DownloadFilter.DOWNLOADED -> "已下载"
                     DownloadFilter.NOT_DOWNLOADED -> "未下载"
                 }
-                if (f == downloadFilter) {
-                    PrimaryButton(label, onClick = { vm.setDownloadFilter(f) }, modifier = Modifier.weight(1f))
-                } else {
-                    OutlinedToolButton(label, onClick = { vm.setDownloadFilter(f) }, modifier = Modifier.weight(1f))
-                }
-            }
-        }
+            },
+            onSelected = { vm.setDownloadFilter(it) },
+        )
         Spacer(Modifier.height(4.dp))
         Text(
             "HF官方 = huggingface.co，HF镜像 = hf-mirror.com，ModelScope = modelscope.cn。" +
@@ -375,24 +378,32 @@ private fun formatSize(bytes: Long): String = when {
     else -> "$bytes B"
 }
 
+/**
+ * Single-choice row of filter chips.
+ *
+ * Chips wrap their content, and the row scrolls horizontally, so long labels that are
+ * product names (`LiteRT-LM`, `llama.cpp`, `ModelScope`) stay on one line. An equal-weight
+ * button row instead breaks them mid-word.
+ */
 @Composable
-private fun EngineIdDropdown(selected: EngineId, onSelected: (EngineId) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        EngineId.entries.filter { it != EngineId.FAKE }.forEach { id ->
-            val isSelected = id == selected
-            if (isSelected) {
-                PrimaryButton(
-                    text = id.displayName,
-                    onClick = { onSelected(id) },
-                    modifier = Modifier.weight(1f),
-                )
-            } else {
-                OutlinedToolButton(
-                    text = id.displayName,
-                    onClick = { onSelected(id) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+private fun <T> ChoiceChipRow(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelected: (T) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        options.forEach { option ->
+            FilterChip(
+                selected = option == selected,
+                onClick = { onSelected(option) },
+                label = { Text(label(option)) },
+            )
         }
     }
 }
