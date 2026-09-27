@@ -11,9 +11,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,28 +22,26 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -56,7 +54,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.pisces312.droidllm.engineapi.Backend
@@ -64,9 +64,17 @@ import io.github.pisces312.droidllm.engineapi.ChatRole
 import io.github.pisces312.droidllm.engineapi.ConfigApplicability
 import io.github.pisces312.droidllm.engineapi.ConfigField
 import io.github.pisces312.droidllm.engineapi.EngineId
+import io.github.pisces312.droidllm.engineapi.displayName
+import io.github.pisces312.droidllm.ui.components.ChoiceChipRow
+import io.github.pisces312.droidllm.ui.components.LabeledDropdown
 import io.github.pisces312.droidllm.ui.components.MetricPill
 import io.github.pisces312.droidllm.ui.components.NumericField
+import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
+import io.github.pisces312.droidllm.ui.components.SheetTitle
+import io.github.pisces312.droidllm.ui.components.StatusDot
+import io.github.pisces312.droidllm.ui.components.StatusDotState
+import io.github.pisces312.droidllm.ui.components.formatModelSize
 import io.github.pisces312.droidllm.ui.theme.DroidTheme
 import kotlinx.coroutines.launch
 
@@ -88,6 +96,9 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    var switcherOpen by remember { mutableStateOf(false) }
+    var paramsOpen by remember { mutableStateOf(false) }
     // A streamed reply *replaces* the last bubble instead of appending one, so keying on
     // messages.size never fires mid-reply and the list stops following. Key on the tail's
     // length instead, and only follow while the user is still at the bottom.
@@ -114,25 +125,25 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
                 .padding(horizontal = 16.dp),
         ) {
             Spacer(Modifier.height(8.dp))
-            TopBar(
-                engines = engines,
-                selectedEngine = selectedEngine,
-                onEngine = vm::selectEngine,
-                models = models,
-                selectedModel = selectedModel,
-                onModel = vm::selectModel,
-                statusText = availability + " · " + status,
-                sessionState = sessionState,
+            ScopeBar(
+                engine = selectedEngine,
+                model = selectedModel,
+                busy = loading || generating,
+                inUse = sessionState == SessionState.READY,
+                onClick = {
+                    // The picker sits above the keyboard, so drop the input focus first.
+                    focusManager.clearFocus()
+                    switcherOpen = true
+                },
+            )
+            Spacer(Modifier.height(6.dp))
+            StatusLine(
+                text = availability + " · " + status,
+                state = sessionState,
                 canStart = canStart,
                 onStart = vm::startModel,
                 onStop = vm::stopModel,
                 onNewSession = vm::newSession,
-            )
-            Spacer(Modifier.height(8.dp))
-            SamplingPanel(
-                engineId = selectedEngine?.engine?.id,
-                sampling = sampling,
-                onUpdate = vm::updateSampling,
             )
             Spacer(Modifier.height(8.dp))
             Box(
@@ -174,6 +185,11 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
             }
             Spacer(Modifier.height(8.dp))
             Composer(
+                summary = sampling.summary(),
+                onOpenParams = {
+                    focusManager.clearFocus()
+                    paramsOpen = true
+                },
                 generating = generating,
                 canSend = canSend,
                 onSend = vm::send,
@@ -188,68 +204,262 @@ fun ChatScreen(vm: ChatViewModel = hiltViewModel()) {
             LoadingOverlay(modelName = selectedModel?.displayName)
         }
     }
+
+    if (switcherOpen) {
+        ScopeSheet(
+            engines = engines,
+            selectedEngine = selectedEngine,
+            onEngine = vm::selectEngine,
+            models = models,
+            selectedModel = selectedModel,
+            // Picking a model ends the flow, so close; picking an engine does not, because
+            // the model list under it is what the user came for next.
+            onModel = {
+                vm.selectModel(it)
+                switcherOpen = false
+            },
+            onDismiss = { switcherOpen = false },
+        )
+    }
+    if (paramsOpen) {
+        SamplingSheet(
+            engineId = selectedEngine?.engine?.id,
+            sampling = sampling,
+            onUpdate = vm::updateSampling,
+            onDismiss = { paramsOpen = false },
+        )
+    }
 }
 
+/** The summary shown on the parameter chip: the two values actually worth glancing at. */
+private fun SamplingUiState.summary(): String =
+    "temp $temperature · top_p $topP · tok $maxNewTokens"
+
+/**
+ * The one row that says what the next message will run on: status dot, engine, model.
+ *
+ * Deliberately a single entry point rather than two dropdowns. Engine and model are not
+ * independent choices — a model belongs to exactly one engine (DESIGN §1.2) — and two
+ * parallel pickers hid that hierarchy while truncating every long model name.
+ *
+ * Tapping the row opens [ScopeSheet]; the engine is never switched from here, otherwise
+ * this would be a second engine entry point again.
+ */
+@Composable
+private fun ScopeBar(
+    engine: EngineChoice?,
+    model: ModelChoice?,
+    busy: Boolean,
+    inUse: Boolean,
+    onClick: () -> Unit,
+) {
+    val dot = when {
+        engine?.available != true -> StatusDotState.UNAVAILABLE
+        busy -> StatusDotState.BUSY
+        else -> StatusDotState.OK
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(DroidTheme.extra.surfaceHigh)
+            .clickable(onClickLabel = "选择引擎与模型", onClick = onClick)
+            .padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Filled dot = this model is loaded; ring = usable but idle (UI_DESIGN §7.2).
+        StatusDot(dot, solid = inUse)
+        Text(
+            engine?.displayName ?: "选择引擎",
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            "·",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            model?.displayName ?: "未选择模型",
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (model == null) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            Icons.Filled.ArrowDropDown,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * Engine + model picker. One panel covers both levels: the engine chip row reshapes the
+ * list underneath it, so the hierarchy the data actually has is visible while choosing.
+ *
+ * Selecting here still only *selects* — per DESIGN §1.2 it releases the running session
+ * and returns to IDLE, and loading stays behind the 启动 button.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TopBar(
+private fun ScopeSheet(
     engines: List<EngineChoice>,
     selectedEngine: EngineChoice?,
     onEngine: (EngineChoice) -> Unit,
     models: List<ModelChoice>,
     selectedModel: ModelChoice?,
     onModel: (ModelChoice) -> Unit,
-    statusText: String,
-    sessionState: SessionState,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+        ) {
+            SheetTitle(
+                text = "选择引擎与模型",
+                subtitle = "切换会释放当前已加载的模型；加载仍由「启动」触发。",
+            )
+            Spacer(Modifier.height(12.dp))
+            ChoiceChipRow(
+                options = engines,
+                selected = selectedEngine,
+                label = { it.displayName },
+                dimmed = { !it.available },
+                leading = { choice ->
+                    StatusDot(
+                        if (choice.available) StatusDotState.OK else StatusDotState.UNAVAILABLE,
+                        solid = false,
+                    )
+                },
+                onSelected = onEngine,
+            )
+            selectedEngine?.unavailableReason()?.let { reason ->
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    reason,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DroidTheme.extra.warn,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+            Text(
+                selectedEngine?.let { "${it.displayName} 的已配置模型" } ?: "先选择一个引擎",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            if (models.isEmpty()) {
+                Text(
+                    "该引擎还没有模型，先到「模型」页添加或下载。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 12.dp),
+                )
+            } else {
+                LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                    items(models, key = { it.model.id }) { choice ->
+                        ScopeModelRow(
+                            model = choice,
+                            selected = choice.model.id == selectedModel?.model?.id,
+                            onClick = { onModel(choice) },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/** One pickable model: name, `引擎 · 量化 · 体积` subtitle, check when current. */
+@Composable
+private fun ScopeModelRow(model: ModelChoice, selected: Boolean, onClick: () -> Unit) {
+    val m = model.model
+    val subtitle = listOfNotNull(
+        m.engineId.displayName,
+        m.quantHint,
+        m.fileSizeBytes?.takeIf { it > 0 }?.let { formatModelSize(it) },
+    ).joinToString(" · ")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                model.displayName,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle.isNotEmpty()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (selected) {
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = "当前使用",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+/** Status sentence, start/stop, new session. */
+@Composable
+private fun StatusLine(
+    text: String,
+    state: SessionState,
     canStart: Boolean,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onNewSession: () -> Unit,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
-    // Two rows: the pickers need the full width, so the status line and the
-    // controls get their own row instead of squeezing in beside them.
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        EngineModelPickers(
-            engines = engines,
-            selectedEngine = selectedEngine,
-            onEngine = onEngine,
-            models = models,
-            selectedModel = selectedModel,
-            onModel = onModel,
-            modifier = Modifier.fillMaxWidth(),
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                statusText,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-            )
-            SessionToggleButton(
-                state = sessionState,
-                canStart = canStart,
-                onStart = onStart,
-                onStop = onStop,
-            )
-            Box {
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = "更多")
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text("新建会话") },
-                        onClick = {
-                            menuOpen = false
-                            onNewSession()
-                        },
-                    )
-                }
-            }
+        SessionToggleButton(
+            state = state,
+            canStart = canStart,
+            onStart = onStart,
+            onStop = onStop,
+        )
+        IconButton(onClick = onNewSession) {
+            Icon(Icons.Filled.Add, contentDescription = "新建会话（清空上下文）")
         }
     }
 }
@@ -313,6 +523,10 @@ private fun LoadingOverlay(modelName: String?) {
 /**
  * Start / stop the chat model. Stopping releases it from memory; only a
  * [SessionState.READY] session accepts prompts.
+ *
+ * The filled start button and the filled send button never coexist: while nothing is
+ * loaded, starting is the screen's action and send is greyed; once READY, start degrades
+ * to an outlined stop so send can be the single filled action (UI_DESIGN.md §4.4).
  */
 @Composable
 private fun SessionToggleButton(
@@ -321,129 +535,20 @@ private fun SessionToggleButton(
     onStart: () -> Unit,
     onStop: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(12.dp)
     when (state) {
-        SessionState.READY -> OutlinedButton(
-            onClick = onStop,
-            shape = shape,
-            modifier = Modifier.height(40.dp),
-        ) {
-            Text("停止")
-        }
-        SessionState.LOADING -> Button(
+        SessionState.READY -> OutlinedToolButton("停止", onClick = onStop, height = 40.dp)
+        SessionState.LOADING -> PrimaryButton(
+            text = "加载中",
             onClick = {},
             enabled = false,
-            shape = shape,
-            modifier = Modifier.height(40.dp).widthIn(min = 88.dp),
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                strokeWidth = 2.dp,
-                color = LocalContentColor.current,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text("加载中")
-        }
-        SessionState.IDLE, SessionState.FAILED -> Button(
+            height = 40.dp,
+        )
+        SessionState.IDLE, SessionState.FAILED -> PrimaryButton(
+            text = if (state == SessionState.FAILED) "重试" else "启动",
             onClick = onStart,
             enabled = canStart,
-            shape = shape,
-            modifier = Modifier.height(40.dp),
-        ) {
-            Text(if (state == SessionState.FAILED) "重试" else "启动")
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EngineModelPickers(
-    engines: List<EngineChoice>,
-    selectedEngine: EngineChoice?,
-    onEngine: (EngineChoice) -> Unit,
-    models: List<ModelChoice>,
-    selectedModel: ModelChoice?,
-    onModel: (ModelChoice) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var engineExpanded by remember { mutableStateOf(false) }
-    var modelExpanded by remember { mutableStateOf(false) }
-
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ExposedDropdownMenuBox(
-            expanded = engineExpanded,
-            onExpandedChange = { engineExpanded = it },
-            modifier = Modifier.weight(1f),
-        ) {
-            OutlinedTextField(
-                value = selectedEngine?.label ?: "引擎",
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                label = { Text("引擎") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(engineExpanded) },
-                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable),
-            )
-            ExposedDropdownMenu(
-                expanded = engineExpanded,
-                onDismissRequest = { engineExpanded = false },
-            ) {
-                engines.forEach { e ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                e.label + if (e.available) "" else "（不可用）",
-                                color = if (e.available) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    DroidTheme.extra.textDisabled
-                                },
-                            )
-                        },
-                        onClick = {
-                            onEngine(e)
-                            engineExpanded = false
-                        },
-                    )
-                }
-            }
-        }
-        ExposedDropdownMenuBox(
-            expanded = modelExpanded,
-            onExpandedChange = { modelExpanded = it },
-            modifier = Modifier.weight(1f),
-        ) {
-            OutlinedTextField(
-                value = selectedModel?.displayName ?: "模型",
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                label = { Text("模型") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(modelExpanded) },
-                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable),
-            )
-            ExposedDropdownMenu(
-                expanded = modelExpanded,
-                onDismissRequest = { modelExpanded = false },
-            ) {
-                if (models.isEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text("暂无模型，先到「模型」页添加") },
-                        onClick = { modelExpanded = false },
-                        enabled = false,
-                    )
-                }
-                models.forEach { m ->
-                    DropdownMenuItem(
-                        text = { Text(m.displayName) },
-                        onClick = {
-                            onModel(m)
-                            modelExpanded = false
-                        },
-                    )
-                }
-            }
-        }
+            height = 40.dp,
+        )
     }
 }
 
@@ -514,167 +619,188 @@ private fun MessageBubble(msg: ChatUiMessage) {
     }
 }
 
+/**
+ * Sampling knobs, in a sheet opened from the parameter chip.
+ *
+ * A sheet rather than an inline collapsing card: collapsed, the card still cost a full-width
+ * row above the transcript for something that is opened rarely, and it double-counted the tap
+ * target (card + inner button).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SamplingPanel(
+private fun SamplingSheet(
     engineId: EngineId?,
     sampling: SamplingUiState,
     onUpdate: ((SamplingUiState) -> SamplingUiState) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
-        Column(Modifier.padding(12.dp)) {
-            TextButton(onClick = { expanded = !expanded }) {
-                Text(if (expanded) "收起采样参数" else "展开采样参数")
-            }
-            if (expanded) {
-                val id = engineId
-                Text(
-                    "默认值来自「设置」页；灰显字段当前引擎不生效",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                NumericField(
-                    label = "temperature",
-                    value = sampling.temperature.toString(),
-                    decimal = true,
-                    enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TEMPERATURE),
-                    note = id?.let { ConfigApplicability.note(it, ConfigField.TEMPERATURE) },
-                    onCommit = { v ->
-                        v.toFloatOrNull()?.let { n -> onUpdate { it.copy(temperature = n) } }
-                    },
-                )
-                NumericField(
-                    label = "top_k",
-                    value = sampling.topK.toString(),
-                    enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TOP_K),
-                    note = id?.let { ConfigApplicability.note(it, ConfigField.TOP_K) },
-                    onCommit = { v ->
-                        v.toIntOrNull()?.let { n -> onUpdate { it.copy(topK = n) } }
-                    },
-                )
-                NumericField(
-                    label = "top_p",
-                    value = sampling.topP.toString(),
-                    decimal = true,
-                    enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TOP_P),
-                    note = id?.let { ConfigApplicability.note(it, ConfigField.TOP_P) },
-                    onCommit = { v ->
-                        v.toFloatOrNull()?.let { n -> onUpdate { it.copy(topP = n) } }
-                    },
-                )
-                NumericField(
-                    label = "threads",
-                    value = sampling.threads.toString(),
-                    enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.THREADS),
-                    note = id?.let { ConfigApplicability.note(it, ConfigField.THREADS) },
-                    onCommit = { v ->
-                        v.toIntOrNull()?.let { n -> onUpdate { it.copy(threads = n) } }
-                    },
-                )
-                NumericField(
-                    label = "maxNewTokens",
-                    value = sampling.maxNewTokens.toString(),
-                    enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.MAX_NEW_TOKENS),
-                    note = id?.let { ConfigApplicability.note(it, ConfigField.MAX_NEW_TOKENS) },
-                    onCommit = { v ->
-                        v.toIntOrNull()?.let { n -> onUpdate { it.copy(maxNewTokens = n) } }
-                    },
-                )
-                BackendField(
-                    selected = sampling.backend,
-                    engineId = id,
-                    onSelect = { b -> onUpdate { it.copy(backend = b) } },
-                )
-            }
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+        ) {
+            SheetTitle(
+                text = "采样参数",
+                subtitle = "默认值来自「设置」页；灰显字段当前引擎不生效。",
+            )
+            Spacer(Modifier.height(12.dp))
+            val id = engineId
+            NumericField(
+                label = "temperature",
+                value = sampling.temperature.toString(),
+                decimal = true,
+                enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TEMPERATURE),
+                note = id?.let { ConfigApplicability.note(it, ConfigField.TEMPERATURE) },
+                onCommit = { v ->
+                    v.toFloatOrNull()?.let { n -> onUpdate { it.copy(temperature = n) } }
+                },
+            )
+            NumericField(
+                label = "top_k",
+                value = sampling.topK.toString(),
+                enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TOP_K),
+                note = id?.let { ConfigApplicability.note(it, ConfigField.TOP_K) },
+                onCommit = { v ->
+                    v.toIntOrNull()?.let { n -> onUpdate { it.copy(topK = n) } }
+                },
+            )
+            NumericField(
+                label = "top_p",
+                value = sampling.topP.toString(),
+                decimal = true,
+                enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TOP_P),
+                note = id?.let { ConfigApplicability.note(it, ConfigField.TOP_P) },
+                onCommit = { v ->
+                    v.toFloatOrNull()?.let { n -> onUpdate { it.copy(topP = n) } }
+                },
+            )
+            NumericField(
+                label = "threads",
+                value = sampling.threads.toString(),
+                enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.THREADS),
+                note = id?.let { ConfigApplicability.note(it, ConfigField.THREADS) },
+                onCommit = { v ->
+                    v.toIntOrNull()?.let { n -> onUpdate { it.copy(threads = n) } }
+                },
+            )
+            NumericField(
+                label = "maxNewTokens",
+                value = sampling.maxNewTokens.toString(),
+                enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.MAX_NEW_TOKENS),
+                note = id?.let { ConfigApplicability.note(it, ConfigField.MAX_NEW_TOKENS) },
+                onCommit = { v ->
+                    v.toIntOrNull()?.let { n -> onUpdate { it.copy(maxNewTokens = n) } }
+                },
+            )
+            BackendField(
+                selected = sampling.backend,
+                engineId = id,
+                onSelect = { b -> onUpdate { it.copy(backend = b) } },
+            )
+            Spacer(Modifier.height(16.dp))
+            PrimaryButton(
+                text = "完成",
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BackendField(
     selected: Backend,
     engineId: EngineId?,
     onSelect: (Backend) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
     val supported = engineId?.let { ConfigApplicability.supportedBackends(it) } ?: Backend.entries
     val note = engineId?.let { ConfigApplicability.backendNote(it) }
     Column {
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = it },
-        ) {
-            OutlinedTextField(
-                value = selected.name,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("backend") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                    .fillMaxWidth(),
-            )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                supported.forEach { b ->
-                    DropdownMenuItem(
-                        text = { Text(b.name) },
-                        onClick = {
-                            onSelect(b)
-                            expanded = false
-                        },
-                    )
-                }
-            }
-        }
+        Spacer(Modifier.height(8.dp))
+        LabeledDropdown(
+            label = "backend",
+            options = supported.map { it.name to it.name },
+            selectedKey = selected.name,
+            onSelected = { onSelect(Backend.valueOf(it)) },
+            emptyText = "—",
+        )
         if (note != null) {
-            Text(note, style = MaterialTheme.typography.labelSmall)
+            Text(
+                note,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
+/**
+ * Parameter chip + input + send.
+ *
+ * Only the filled send button lives here; starting the model is handled by the status line
+ * above, and the two never appear filled at the same time.
+ */
 @Composable
 private fun Composer(
+    summary: String,
+    onOpenParams: () -> Unit,
     generating: Boolean,
     canSend: Boolean,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
 ) {
     var text by remember { mutableStateOf("") }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        TextField(
-            value = text,
-            onValueChange = { text = it },
-            modifier = Modifier.weight(1f),
-            placeholder = { Text(if (canSend || generating) "输入消息…" else "启动模型后可发送消息") },
-            maxLines = 4,
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        AssistChip(
+            onClick = onOpenParams,
+            label = {
+                Text(summary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            },
+            leadingIcon = {
+                Icon(
+                    Icons.Filled.Tune,
+                    contentDescription = null,
+                    modifier = Modifier.size(AssistChipDefaults.IconSize),
+                )
+            },
         )
-        if (generating) {
-            PrimaryButton(
-                text = "停止",
-                onClick = onStop,
-                modifier = Modifier.widthIn(min = 88.dp),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text(if (canSend || generating) "输入消息…" else "启动模型后可发送消息") },
+                maxLines = 4,
             )
-        } else {
-            PrimaryButton(
-                text = "发送",
-                onClick = {
-                    val t = text.trim()
-                    if (t.isNotEmpty()) {
-                        onSend(t)
-                        text = ""
-                    }
-                },
-                enabled = canSend,
-                modifier = Modifier.widthIn(min = 88.dp),
-            )
+            if (generating) {
+                PrimaryButton(
+                    text = "停止",
+                    onClick = onStop,
+                    modifier = Modifier.widthIn(min = 88.dp),
+                )
+            } else {
+                PrimaryButton(
+                    text = "发送",
+                    onClick = {
+                        val t = text.trim()
+                        if (t.isNotEmpty()) {
+                            onSend(t)
+                            text = ""
+                        }
+                    },
+                    enabled = canSend,
+                    modifier = Modifier.widthIn(min = 88.dp),
+                )
+            }
         }
     }
 }

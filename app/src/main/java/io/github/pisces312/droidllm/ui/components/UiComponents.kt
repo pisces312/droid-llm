@@ -29,6 +29,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -51,9 +53,119 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.pisces312.droidllm.ui.theme.DroidTheme
 import io.github.pisces312.droidllm.ui.theme.MetricSmallType
+
+/**
+ * Three-state engine indicator (UI_DESIGN.md §4.2).
+ *
+ * [solid] distinguishes "in use" from "installed but idle" without adding a second
+ * colour: a filled dot means the engine currently holds a loaded model, a ring means
+ * it is usable but idle.
+ */
+enum class StatusDotState { OK, BUSY, UNAVAILABLE }
+
+@Composable
+fun StatusDot(
+    state: StatusDotState,
+    modifier: Modifier = Modifier,
+    solid: Boolean = true,
+) {
+    val extra = DroidTheme.extra
+    val color = when (state) {
+        StatusDotState.OK -> extra.ok
+        StatusDotState.BUSY -> extra.warn
+        StatusDotState.UNAVAILABLE -> extra.textDisabled
+    }
+    Box(
+        modifier
+            .size(if (solid) 8.dp else 10.dp)
+            .then(
+                if (solid) {
+                    Modifier.background(color, CircleShape)
+                } else {
+                    Modifier.border(BorderStroke(1.5.dp, color), CircleShape)
+                },
+            ),
+    )
+}
+
+/**
+ * Single-choice row of filter chips.
+ *
+ * Chips wrap their content and the row scrolls horizontally, so long labels that are
+ * product names (`LiteRT-LM`, `llama.cpp`, `ModelScope`) stay on one line. An equal-weight
+ * button row instead breaks them mid-word.
+ *
+ * @param dimmed marks options that are present but unusable. It is presentation only —
+ * the option stays clickable, because an unusable engine still has to open so its reason
+ * can be read.
+ * @param leading drawn before the label inside the chip; used for [StatusDot].
+ */
+@Composable
+fun <T> ChoiceChipRow(
+    options: List<T>,
+    selected: T?,
+    label: (T) -> String,
+    onSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    dimmed: (T) -> Boolean = { false },
+    leading: (@Composable (T) -> Unit)? = null,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        options.forEach { option ->
+            val isDimmed = dimmed(option)
+            FilterChip(
+                selected = option == selected,
+                onClick = { onSelected(option) },
+                label = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        leading?.invoke(option)
+                        Text(label(option))
+                    }
+                },
+                colors = if (isDimmed) {
+                    FilterChipDefaults.filterChipColors(
+                        labelColor = DroidTheme.extra.textDisabled,
+                        selectedLabelColor = DroidTheme.extra.textDisabled,
+                    )
+                } else {
+                    FilterChipDefaults.filterChipColors()
+                },
+            )
+        }
+    }
+}
+
+/** Title block at the top of a bottom sheet: one line of heading, one of context. */
+@Composable
+fun SheetTitle(
+    text: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Text(text, style = MaterialTheme.typography.titleMedium)
+        if (subtitle != null) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
 
 /** One row: status dot + engine name + status sentence. */
 @Composable
@@ -64,7 +176,6 @@ fun EngineStatusCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
 ) {
-    val extra = DroidTheme.extra
     val contentAlpha = if (available) 1f else 0.45f
     Row(
         modifier = modifier
@@ -74,12 +185,7 @@ fun EngineStatusCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(
-            Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(if (available) extra.ok else extra.textDisabled),
-        )
+        StatusDot(if (available) StatusDotState.OK else StatusDotState.UNAVAILABLE)
         Text(
             name,
             style = MaterialTheme.typography.titleMedium,
@@ -173,18 +279,28 @@ fun MetricPill(
     }
 }
 
+/**
+ * The three control tiers of UI_DESIGN.md §4.4.
+ *
+ * `PrimaryButton` is the screen's one filled action, `OutlinedToolButton` is everything
+ * secondary, and selection is expressed with [ChoiceChipRow] — never with a filled
+ * button, which is what used to make every page a row of purple blocks.
+ *
+ * @param height 52dp by default; dense rows (the chat status line) pass 40dp.
+ */
 @Composable
 fun PrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    height: Dp = 52.dp,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(12.dp),
-        modifier = modifier.height(52.dp),
+        modifier = modifier.height(height),
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge)
     }
@@ -196,6 +312,7 @@ fun OutlinedToolButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    height: Dp = 52.dp,
 ) {
     OutlinedButton(
         onClick = onClick,
@@ -205,7 +322,7 @@ fun OutlinedToolButton(
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = DroidTheme.extra.surfaceHigh,
         ),
-        modifier = modifier.height(52.dp),
+        modifier = modifier.height(height),
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge)
     }
@@ -463,4 +580,17 @@ fun WarningBanner(
             }
         }
     }
+}
+
+/**
+ * Model size for display, in decimal units.
+ *
+ * Decimal rather than binary on purpose: model hubs advertise sizes that way, so this
+ * number matches what the download page said. Native library sizes in Settings use binary
+ * units instead.
+ */
+fun formatModelSize(bytes: Long): String = when {
+    bytes >= 1_000_000_000L -> "%.1f GB".format(bytes / 1_000_000_000.0)
+    bytes >= 1_000_000L -> "%.0f MB".format(bytes / 1_000_000.0)
+    else -> "$bytes B"
 }

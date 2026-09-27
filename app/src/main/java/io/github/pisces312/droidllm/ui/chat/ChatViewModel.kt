@@ -44,6 +44,20 @@ data class ModelChoice(
 )
 
 /**
+ * Why [this] engine cannot run right now, or null when it can.
+ *
+ * Shared by the chat status line and the engine chips in the scope sheet, so an
+ * unusable engine reads the same in both places (UI_DESIGN.md §6).
+ */
+fun EngineChoice.unavailableReason(): String? = when (val av = availability) {
+    is Availability.Available -> null
+    is Availability.MissingDependency -> "不可用：${av.detail}；用带该依赖的构建包重装"
+    is Availability.UnsupportedSoc -> "不支持的 SoC：${av.detail}；换骁龙 HTP 机型"
+    is Availability.ModelNotConfigured -> "未配置模型：${av.detail}；到「模型」页添加"
+    is Availability.InvalidModel -> "模型无效：${av.detail}；检查文件是否完整"
+}
+
+/**
  * Lifecycle of the chat session. A model is only resident in memory between
  * [READY] and the next [IDLE]; picking an engine or model always drops back to
  * [IDLE] so the previous model is released before the new one is started.
@@ -249,13 +263,8 @@ class ChatViewModel @Inject constructor(
         _generating.value = false
     }
 
-    private fun describeAvailability(choice: EngineChoice): String = when (val av = choice.availability) {
-        is Availability.Available -> "可用"
-        is Availability.MissingDependency -> "不可用：${av.detail}；用带该依赖的构建包重装"
-        is Availability.UnsupportedSoc -> "不支持的 SoC：${av.detail}；换骁龙 HTP 机型"
-        is Availability.ModelNotConfigured -> "未配置模型：${av.detail}；到「模型」页添加"
-        is Availability.InvalidModel -> "模型无效：${av.detail}；检查文件是否完整"
-    }
+    private fun describeAvailability(choice: EngineChoice): String =
+        choice.unavailableReason() ?: "可用"
 
     private suspend fun loadModelsFor(engine: LlmEngine) {
         val all = modelStore.observeModels().first()

@@ -12,7 +12,7 @@
 | P3 | ✅ 完成 | 2026-09-26 | genie，见「P3 交付说明」 |
 | P4 | ✅ 完成，待审阅 | 2026-09-26 | 核心 + UI 已通；见「P4 交付说明」 |
 | P5 | ✅ 完成，待审阅 | 2026-09-26 | 打磨；见「P5 交付说明」 |
-| P6 | 🔄 进行中（R1 ✅、R1.5 ✅、R2 ✅） | 2026-09-27 | UI/UX 重构；审查与方案见 [`docs/UI_REVIEW.md`](docs/UI_REVIEW.md)，见 §8d |
+| P6 | 🔄 进行中（R1 ✅、R1.5 ✅、R2 ✅、R3 ✅） | 2026-09-27 | UI/UX 重构；审查与方案见 [`docs/UI_REVIEW.md`](docs/UI_REVIEW.md)，见 §8d |
 
 ### P0 交付摘要（2026-09-26）
 
@@ -212,7 +212,7 @@
 4. 导出 JSON 到 `Android/data/.../files/benchmark/`，Snackbar 提示文件名
 5. 历史列表出现本次记录，可清空
 
-**阶段状态**：P0–P5 均已完成（P5+ / P5++ 增量亦完成）。**P6（UI/UX 重构）进行中：R1 ✅、R1.5 ✅、R2 ✅，下一步 R3**，见 §8d。剩余为真机 DoD 与 README 截图。
+**阶段状态**：P0–P5 均已完成（P5+ / P5++ 增量亦完成）。**P6（UI/UX 重构）进行中：R1 ✅、R1.5 ✅、R2 ✅、R3 ✅，下一步 R4**，见 §8d。剩余为真机 DoD 与 README 截图。
 
 ---
 
@@ -257,7 +257,7 @@
 | P3 | `:engine:genie`（可跳过编译） | 骁龙真机四引擎，M2 达成 | 2–4 天 |
 | P4 | Benchmark L/P/D/T + Room + JSON 导出 | 一键出对比表，M3 达成 | 1–2 天 |
 | P5 | 校验/错误提示/文档打磨 | 可交付 | 1 天 |
-| P6 | UI/UX 重构（R1–R4，见 §8d）；**R1 ✅ / R1.5 ✅ / R2 ✅** | 控件语义分层 + 顶栏单入口 + 各页密度合理 | 待估 |
+| P6 | UI/UX 重构（R1–R4，见 §8d）；**R1 ✅ / R1.5 ✅ / R2 ✅ / R3 ✅** | 控件语义分层 + 顶栏单入口 + 各页密度合理 | 待估 |
 
 **顺序纪律**：llamacpp 先行（生态最成熟、调试最快），mnn 次之；litert 纯 Kotlin 最快；genie 最后且有跳过开关。每个引擎接入都走同一模板：probe → load → generate 流式 → metrics → smoke test。
 
@@ -580,9 +580,9 @@
 
 ---
 
-## 8d. P6 增量：UI/UX 重构（**进行中**，R1 ✅ / R1.5 ✅ / R2 ✅）
+## 8d. P6 增量：UI/UX 重构（**进行中**，R1 ✅ / R1.5 ✅ / R2 ✅ / R3 ✅）
 
-**状态：🔄 进行中（2026-09-27 立项；R1 ✅、R1.5 ✅、R2 ✅，下一步 R3）**
+**状态：🔄 进行中（2026-09-27 立项；R1 ✅、R1.5 ✅、R2 ✅、R3 ✅，下一步 R4）**
 
 > **权威输入**：[`docs/UI_REVIEW.md`](docs/UI_REVIEW.md) —— 现状盘点 + 问题清单（含文件:行号）+ 布局方案 + 与 MnnLlmChat 的逐条对照。
 > 本节只做落地拆解，不重复论证。**动手前先通读该文档**；契约约束见 `DESIGN.md` §1.2，界面权威见 `UI_DESIGN.md`。
@@ -624,7 +624,7 @@
 |---|---|---|---|
 | **R1** ✅ | **引擎显示名统一**：`engine-api` 加 `val EngineId.displayName`，各引擎 `override val displayName` 改为返回它（**单一来源**）；**6 处展示面**全改走它（`labelledName` 仅留给需版本号的场合）。**已完成**，见下方「R1 交付说明」；配套补丁 **R1.5**（Models 三行 chip）见「R1.5 交付说明」 | P0-1 | 极低，纯改名零行为变更 |
 | **R2** ✅ | 五个小改纯收益项：①数值输入本地 buffer（`NumericField`，**每次输入即提交**——非"失焦再解析"，见交付说明）②跟随滚动三件套 ③结果表补单位 ④`Settings` 的 `backend` 只读框 → 下拉 ⑤`ResultTable` 固定行高。**已完成**，见下方「R2 交付说明」 | P0-3~7 | 低（**已完成 2026-09-27**；②待真机验） |
-| **R3** | **三层控件体系**（筛选 Chip / 一屏仅一个 Filled 主操作 / 次级 Outlined）+ Chat 顶栏重构（作用域条 + 两级 BottomSheet，引擎 chip 带**状态点 ●**〔决策 2〕）+ 采样参数收成输入卡上方 chip 并**点击开 BottomSheet**〔决策 4〕 | §4.2 首条 + §5.1 | 中，**需同步回写 `UI_DESIGN.md`** |
+| **R3** ✅ | **三层控件体系**（筛选 Chip / 一屏仅一个 Filled 主操作 / 次级 Outlined）+ Chat 顶栏重构（作用域条 + 两级 BottomSheet，引擎 chip 带**状态点 ●**〔决策 2〕）+ 采样参数收成输入框上方 chip 并**点击开 BottomSheet**〔决策 4〕。**已完成并回写 `UI_DESIGN.md`**，见下方「R3 交付说明」 | §4.2 首条 + §5.1 | 中（**已完成 2026-09-27**；UI 效果待设备确认） |
 | **R4** | 评测页密度重构（置顶"选模型"卡 + 紧凑引擎行，让「开始评测」回首屏）+ **厂商 logo 资产接入**〔决策 3，含压缩与 `docs/LICENSING.md` 增记〕+ 空态统一为「插图 + 说明 + 按钮」+ 其余打磨。~~Models 引擎 chip 行~~ **已由 R1.5 提前完成** | §4.2 / §4.3 | 中 |
 
 ### R1 交付说明（2026-09-27，✅ 完成）
@@ -712,6 +712,76 @@
 ③⑤需要跑一次评测才有结果表。**三项均待真机 arm64 手测。**
 
 
+### R3 交付说明（2026-09-27，✅ 完成）
+
+重构 + 分层，共 6 个文件（`ChatScreen` / `ChatViewModel` / `ModelsScreen` / `SettingsScreen` /
+`UiComponents` / 无新增文件）。
+
+**① Chat 顶栏：双下拉 → 作用域条 + 两级 BottomSheet**
+
+| 旧 | 新 |
+|---|---|
+| 第一行：引擎下拉 + 模型下拉各占半宽（`EngineModelPickers`） | 一整行「作用域条」`● 引擎 · 模型 ⌄`，`SurfaceHigh` 底 + 12dp 圆角，整行可点开 `ScopeSheet` |
+| 第二行：状态行 + 启动/停止 + `MoreVert` 溢出菜单（只有一个条目） | 状态行 + 启动/停止（40dp）+「新建会话」图标按钮 |
+
+- `ScopeSheet`（`ModalBottomSheet`）：`SheetTitle` → 引擎 chip 行（复用 `ChoiceChipRow`，带 `StatusDot`）
+  → 选中引擎不可用时的原因行 → `HorizontalDivider` → 模型 `LazyColumn`（名称 + `引擎 · 量化 · 体积` + 选中勾）。
+  选模型后自动收起；只切引擎时保持打开，方便接着选模型。
+- **契约未动**：`selectEngine` / `selectModel` 仍是"释放旧会话 → `IDLE`"，**不自动 load**（`DESIGN §1.2`）。
+- **引擎只有一个入口**：作用域条本身不切引擎，只在 sheet 内部切，否则又变回两个入口。
+
+**② 采样参数：内联折叠卡 → chip + sheet**。输入框上方一颗 `AssistChip`（`temp … · top_p … · tok …`
++ Tune 图标）→ `SamplingSheet`（6 个字段原样搬入 + 底部「完成」）。字段适用性灰显与说明未改。
+`BackendField` 从 `ExposedDropdownMenuBox` 改为复用 `LabeledDropdown`。
+
+**③ 三层控件职责**（`UI_DESIGN.md` §4.4 新增）：
+
+| 层 | 控件 | R3 实际改动 |
+|---|---|---|
+| L1 筛选/选中 | `ChoiceChipRow` | Settings「外观」原来是 Filled/Outlined **按钮对**表达选中 → 改 chip |
+| L2 主操作 | `PrimaryButton` | Models 添加卡原有 **3 颗按钮含 2 颗 Filled** → 路径框尾部图标按钮（浏览）+ 唯一 Filled「导入并复制」+ Outlined「仅引用」；市场「刷新状态」从**每行一颗**提到工具栏一颗 |
+| L3 次级 | `OutlinedToolButton` | 「启动/停止」「加载中」改用共用组件（新增 `height` 参数，状态行用 40dp） |
+
+**「一屏一个 Filled」的判定**写成按**当前可见状态**算：聊天页未加载时 Filled =「启动」而发送钮灰显，
+`READY` 后「启动」降级为 Outlined「停止」、Filled 让给「发送」——两者永不同时为 Filled。
+
+**④ 新增共用组件**（全在 `UiComponents.kt`）：`StatusDot` + `enum StatusDotState`（三态：绿实心=在用 /
+绿空心=可用未加载 / 琥珀=忙 / 灰=不可用）、`ChoiceChipRow<T>`（`dimmed` 只降透明度**不禁用**，
+`leading` 放状态点）、`SheetTitle`、`formatModelSize`（十进制单位，从 `ModelsScreen` 私有函数提升，
+市场列表与模型选择器共用）。`ChoiceChipRow` 由 `ModelsScreen` 私有提升为公共——**ModelsScreen 视觉不变**。
+
+**⑤ 一处小重构**：`EngineChoice.unavailableReason()` 抽成顶层函数，状态行与 sheet 引擎 chip 共用同一份
+原因文案（原来只在 `ChatViewModel.describeAvailability` 里，是 `private`）。
+
+**踩坑**：M3 的 `skipPartiallyExpanded` 是 **`rememberModalBottomSheetState(...)` 的参数**，
+不是 `ModalBottomSheet(...)` 的——按后者写直接编译不过。另外 `selectedModel?.model.id` 会解析成
+`(selectedModel?.model).id`（可空接收者），需写 `selectedModel?.model?.id`。
+
+**验证**：`:app:assembleDebug` BUILD SUCCESSFUL；`:core:engine-api` / `:core:common` 单测全绿。
+
+**模拟器实测**（`emulator-5554`，截图 `build/uicheck/r3_0*.png`）：
+
+| # | 验证项 | 结果 |
+|---|---|---|
+| 1 | 作用域条 | `● LiteRT-LM · 未选择模型 ⌄` → 选完模型变 `● MNN · LFM2-350M-MNN ⌄`，**空心绿点 = 可用未启动**，符合 §7.1 |
+| 2 | `ScopeSheet` | 引擎 chip 行 4 个（`Genie / LiteRT-LM / MNN / llama.cpp`）+ 状态点；`llama.cpp` 超出屏幕 → 横向滚动（预期） |
+| 3 | 引擎 chip 联动模型列表 | 切 `LiteRT-LM`（无模型）→「该引擎还没有模型…」；切 `MNN` → 列出 `LFM2-350M-MNN` |
+| 4 | **★ `DESIGN §1.2` 回归** | 切引擎 / 选模型后状态行仍为「未启动：点击『启动』加载 …」，logcat 无 `load` 调用 → **弹层只选中、不自动 load** ✓ |
+| 5 | 模型条目选中勾 | 唯一模型自动选中，右侧 `Check` 图标节点存在（`[954,2118][1017,2181]`） |
+| 6 | 选模型后自动收起 | 首轮实测**漏接线（弹层不关）**，已修（`onModel` 内一并 `switcherOpen = false`）并复测通过 |
+| 7 | 参数 chip + `SamplingSheet` | chip 显示 `temp 0.7 · top_p 0.95 · tok 128`；点开 6 个字段 + `AUTO` 下拉 + 「完成」，MNN 下无灰显字段 |
+| 8 | Settings 外观 | `深色 / 浅色 / 跟随系统` 已是 FilterChip（选中态紫色填充），不再是 Filled/Outlined 按钮对 |
+| 9 | Settings `backend` | 真下拉（带 `Spinner` 子节点），非只读输入框 |
+| 10 | Models 添加卡三层 | 引擎 chip 行一行放得下 4 个（无断字）；源路径框**尾部文件夹图标**；Filled 只剩「导入并复制到模型目录」 |
+| 11 | Models 市场 | 工具栏一行 = 说明 + **一颗**「刷新状态」；条目 `MNN · Gemma · 3.7 GB`（`formatModelSize` 生效） |
+
+**未验证（模拟器不可及）**：跟随滚动（②R2）与结果表（需 real 流式 / 评测）
+仍待真机 arm64，见 `docs/mnn.md` §5.1。
+
+**一处文案连带修正**：Settings 的 backend 说明原写「见聊天页『展开采样参数』里的灰显说明」，
+面板搬进 sheet 后该指代已失效 → 改为「见聊天页参数 chip 打开的『采样参数』里的灰显说明」。
+
+
 
 ### 参考实现（本机源码，只借交互不借实现）
 
@@ -736,12 +806,16 @@
 - R1 / R2：`gradlew :app:assembleDebug` BUILD SUCCESSFUL；四个界面同一引擎显示一致（**截图比对**）；`Settings` 改 `0.7 → 0.75` 不再吞掉中间态；生成长回复时列表持续跟到底部。
   - R1 的"同一引擎显示一致"**已截图验证**；R2 的数值框**已在模拟器验证**（含半截状态不污染存储）；
   - R2 剩下的**跟随滚动**（需流式回复）与**结果表单位/行高**（需跑一次评测）**必须真机 arm64**——模拟器跑不了评测，见 `docs/mnn.md` §5.1。
-- R3 / R4：顶栏单入口可开两级弹层（引擎 chip 状态点三态正确）；**选引擎/模型不触发自动 load**（`DESIGN §1.2` 回归）；采样 chip 点击开 sheet 且**取消不落盘**；评测页「开始评测」在首屏；模型条目厂商 logo 命中/兜底均正常；`UI_DESIGN.md` 已补"控件三层职责"；`LICENSING.md` 已记 logo 商标条目。
+- R3：顶栏单入口可开两级弹层（引擎 chip 状态点三态正确）；**选引擎/模型不触发自动 load**（`DESIGN §1.2` 回归）；
+  采样 chip 点击开 sheet；每屏最多一个 Filled 主操作；`UI_DESIGN.md` 已补 §4.4 控件三层职责。
+  - **模拟器已验证 1–11 项**（见「R3 交付说明」实测表，含 `DESIGN §1.2` 回归）；真机只需复核视觉与手势
+    手感（sheet 拖动、chip 横滚）；跟随滚动与结果表仍待真机。
+- R4：评测页「开始评测」在首屏；模型条目厂商 logo 命中/兜底均正常；`LICENSING.md` 已记 logo 商标条目。
 
 ### 决策状态
 
 ✅ **4 条已全部拍板（2026-09-27）**，见上方「已拍板决策」表，明细依据在 `UI_REVIEW.md` §7。
-✅ **R1 已完成**（构建 + 单测全绿，提交 `1e45553`）。
+✅ **R1 已完成**（构建 + 单测全绿，提交 `1e45553`）；**R1.5** `bbe77f2`；**R2** `d48daee`；**R3** 见上。
 ✅ **R1.5 已完成**（Models 三行 chip；模拟器实测三行文字全部单行）。
 ✅ **R2 已完成**（5 项 UI 小改；模拟器验证 ①数值框 ④backend 下拉，②③⑤待真机）。
 **当前进度：R1 ✅ → R1.5 ✅ → R2 ✅ → 下一步 R3**（三层控件体系 + Chat 顶栏重构，见上表）。

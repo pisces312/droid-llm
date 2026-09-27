@@ -53,6 +53,7 @@ import io.github.pisces312.droidllm.engineapi.Backend
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.ProbeContext
+import io.github.pisces312.droidllm.ui.components.ChoiceChipRow
 import io.github.pisces312.droidllm.ui.components.LabeledDropdown
 import io.github.pisces312.droidllm.ui.components.NumericField
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
@@ -381,7 +382,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             Spacer(Modifier.height(4.dp))
             Text(
                 "backend 是默认值，AUTO 由引擎自行决定；某个引擎实际支持哪几项、哪项不生效，" +
-                    "见聊天页「展开采样参数」里的灰显说明。",
+                    "见聊天页参数 chip 打开的「采样参数」里的灰显说明。",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -791,20 +792,20 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun ThemeModeRow(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ThemeMode.entries.forEach { mode ->
-            val label = when (mode) {
+    // Selection is a chip, not a filled button: a filled button means "do this",
+    // so using one to show which theme is current made the other two look disabled.
+    ChoiceChipRow(
+        options = ThemeMode.entries,
+        selected = selected,
+        label = {
+            when (it) {
                 ThemeMode.DARK -> "深色"
                 ThemeMode.LIGHT -> "浅色"
                 ThemeMode.SYSTEM -> "跟随系统"
             }
-            if (mode == selected) {
-                PrimaryButton(label, onClick = { onSelect(mode) }, modifier = Modifier.weight(1f))
-            } else {
-                OutlinedToolButton(label, onClick = { onSelect(mode) }, modifier = Modifier.weight(1f))
-            }
-        }
-    }
+        },
+        onSelected = onSelect,
+    )
 }
 
 @Composable
