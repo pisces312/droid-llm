@@ -48,6 +48,31 @@ Fake 只作 `LlmEngine` 契约的可执行规格（`FakeEngineTest`）与写新�
 - **已知偏差**：`seed` 不生效（记 warning）。`threads` → `thread_num` 生效
 - **Backend**：CPU / GPU(→OpenCL) / OPENCL / NPU_HTP(QnnModule 可选) / AUTO
 
+### 2.1 MNN 实测行为与排障（2026-09-27）
+
+排查「模拟器上 MNN 发 `hi` 助手回复为空」时逐项对照 MNN 源码与官方 Android demo
+（`apps/Android/MnnLlmChat`）得出的结论。代码依据位置：
+
+| 结论 | 依据 | 本仓库处理 |
+|------|------|-----------|
+| `set_config` 必须在 `load()` **之前** | `llm.cpp` 的 `Llm::load()` 里 `config.type = backend_type_convert(mConfig->backend_type())`、`config.numThread = mConfig->thread_num()` 在构建 runtime 时读取；`set_config` 只做 `config_.merge()`，load 之后再调只影响采样参数 | `MnnNative.nativeCreate(dir, configJson)` 内 `createLLM → set_config → load`（与 `llm_session.cpp::LlmSession::Load()` 一致） |
+| `response()` 的 `end_with` 传 `nullptr` 会写出 `"\n"` | MNN 对 nullptr 默认 "\n"，命中停止符时把该串原样写进流 | 传空串 `""`，避免只有换行符的假回复 |
+| 每轮生成前需把 `context->status` 复位成 `RUNNING` | 上一轮结束后停在 `NORMAL_FINISHED` / `MAX_TOKENS_FINISHED`，下一轮 `response()` 直接不解码 | `nativeGenerate` 内取 `getContext()`，非 RUNNING 则置 RUNNING（对齐 demo 的 `restoreAndroidSteppingStatusIfNeeded`） |
+| `createLLM` 要传 `config.json` 绝对路径 | 传纯目录会拼出 `<dir>tokenizer.txt`（缺分隔符），tokenizer 加载失败 | Kotlin 侧传 `File(dir, "config.json").absolutePath` |
+
+**首句 `hi` 空回复不是「第一轮特殊处理」**。对照实验（干净会话）：
+
+- 首句 `What is 2+2?` → 正常生成 128 token；
+- 首句 `hi` → `gen_seq_len == 1`，第一个 token 就是 EOS，输出为空；
+- 第二次 `hi` 有内容，是因为 history 里已有一条（空的）assistant turn 提供了上下文。
+
+即：**极短 prompt 下该模型（LFM2-350M）本身倾向立刻出 EOS**，是模型/采样行为，不是 JNI 或轮次 bug。
+MnnLlmChat 之所以看起来更稳，差异在于：默认注入 system prompt、用 `"<eop>"` 哨兵手动 `generate(1)` 循环、
+以及（现在已对齐的）`set_config` 顺序。**注**：模拟器为 x86_64 + `libndk_translation.so` 二进制翻译执行
+arm64 产物，数值/采样结果不可信——上述结论须在真机 arm64 上复核。
+
+待评估（未实施，属产品行为变更）：是否照 demo 注入默认 system prompt。
+
 ## 3. Genie / QNN（Qualcomm）
 
 - **依赖**：QAIRT SDK **2.50.0.260828**（与 local-dream 一致）。路径解析顺序：
