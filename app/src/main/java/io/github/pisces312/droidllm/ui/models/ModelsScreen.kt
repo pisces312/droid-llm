@@ -358,14 +358,17 @@ private fun MarketTab(vm: ModelsViewModel) {
                         }
                         Spacer(Modifier.height(6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Row-level action, not the page's primary one: the market is a
+                            // list of hundreds, so a filled button per row is exactly the
+                            // "wall of purple" UI_DESIGN 4.4 forbids.
                             if (row.downloaded) {
-                                PrimaryButton(
+                                OutlinedToolButton(
                                     "已下载 · 添加到列表",
                                     onClick = { vm.registerDownloaded(row.model) },
                                     modifier = Modifier.weight(1f),
                                 )
                             } else {
-                                PrimaryButton(
+                                OutlinedToolButton(
                                     "下载",
                                     onClick = { vm.download(row.model) },
                                     modifier = Modifier.weight(1f),

@@ -202,7 +202,7 @@ activity_main.xml          DrawerLayout
 
 | 问题 | 建议 |
 |---|---|
-| 主色填充按钮复用于"选中 / 主操作 / 次级"12+ 处 | 分三层：筛选走 Chip，一屏**仅一个** Filled 主操作，次级走 Outlined → **R3 已落地**（`UI_DESIGN.md` §4.4；实际改了三处：Settings 外观从 Filled/Outlined 按钮对改 chip、Models 添加卡的三颗按钮收成一颗 Filled + 路径框尾部图标、市场「刷新状态」从每行一颗提到工具栏一颗） |
+| 主色填充按钮复用于"选中 / 主操作 / 次级"12+ 处 | 分三层：筛选走 Chip，一屏**仅一个** Filled 主操作，次级走 Outlined → **R3 已落地**（`UI_DESIGN.md` §4.4；实际改了四处：Settings 外观从 Filled/Outlined 按钮对改 chip、Models 添加卡的三颗按钮收成一颗 Filled + 路径框尾部图标、市场「刷新状态」从每行一颗提到工具栏一颗、市场条目「下载」从 Filled 降为 Outlined——**前三处属 R3，第四处为 R3 收尾**，市场页因此 Filled 数为 0） |
 | Chat 顶栏模型下拉只占半屏，模型名带版本号必然截断 | 顶栏中央单入口（§5.1），选中项在弹层里看全名 → **R3 已落地**（作用域条 + ScopeSheet） |
 | 空态三种做法：Chat 有文案无按钮、Models 空列表纯空白、Benchmark 有按钮但写成"去 Models 页" | 统一「插图 + 一句说明 + 按钮」（模式 6） |
 | 反馈位置错：Models 提示在 TabRow 上方、Settings 在整页最底部，滚动后看不到 | 统一 Snackbar |
