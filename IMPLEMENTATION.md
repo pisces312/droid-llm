@@ -123,7 +123,9 @@
    - `libGenie.so` + `libQnnHtp.so` + `libQnnHtpPrepare.so` + `libQnnSystem.so` + `libQnnSaver.so`
    - `libQnnHtpV{68..81}Stub.so` + 对应 `hexagon-v*/unsigned/libQnnHtpV*Skel.so`（已 exclude CalculatorStub）
    - 与 chatapp_android `CopyQnnLibs` 同集合；jniLibs 已 gitignore
-5. **HTP config 按 `Build.SOC_MODEL`**（chatapp 表）：SM8850/SM8750→8-elite、SM8650→8-gen3、QCS8550→8-gen2；assets `htp_config/*.json` 复制到 `filesDir/htp_config/` 后注入 `dialog.engine.backend.extensions`
+5. **HTP config 按 `Build.SOC_MODEL`**：SM8850→8-elite-gen5(v81)、SM8750→8-elite(v79)、SM8650→8-gen3(v75)、QCS8550→8-gen2(v73)；assets `htp_config/*.json` 复制到 `filesDir/htp_config/` 后注入 `dialog.engine.backend.extensions`
+   - **SM8850 已从 chatapp 表里拆出**：chatapp 把 SM8850/SM8750 都指向 `8-elite.json`（soc_model 69 / v79），但 QAIRT SDK 支持表给 SM8850 的是 soc_id 87 / **V81**
+   - **APK 侧裁剪**：非 release variant 只打 `libQnnHtpV81{Skel,Stub}.so`（省 ~23 MB 压缩后 / ~63 MB 未压缩），release（GitHub Release 用）保留全部 arch；`-Pdroid.qnnHtpVersions=all|79,81` 可覆盖
 6. **`GenieConfigResolver`**：`genie_config.json` 重写（tokenizer.path / ctx-bins 绝对路径 / extensions / sampler 覆盖 temp/top-k/top-p/seed），对应 chatapp `LoadModelConfig`；目录校验 `genie_config.json`+`tokenizer.json`+`*.bin`
 7. **`GenieEngine`**：
    - Backend 仅 NPU_HTP / AUTO（AUTO→HTP + warning）；CPU/GPU/OPENCL **拒绝**

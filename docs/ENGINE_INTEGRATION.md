@@ -92,6 +92,14 @@ MnnLlmChat 之所以不空，是因为它**无条件注入**了一条 system。�
   ```
   导出工具：Qualcomm AI Hub / `qnn-*` 转换脚本（见 `D:\3rd-party-projects\ai-hub-apps\chatapp_android`）。
 - **SoC 限制**：仅骁龙 HTP。非骁龙 `probe()` → `UnsupportedSoc`，UI 灰显不崩
+- **SoC → dsp_arch**（QAIRT SDK 支持表，非 chatapp 表 —— 两者对 SM8850 不一致）：
+  | SoC | soc_id | HTP arch | htp_config asset |
+  |-----|--------|----------|------------------|
+  | SM8850 (8 Elite Gen 5) | 87 | V81 | `qualcomm-snapdragon-8-elite-gen5.json` |
+  | SM8750 (8 Elite) | 69 | V79 | `qualcomm-snapdragon-8-elite.json` |
+  | SM8650 (8 Gen 3) | 57 | V75 | `qualcomm-snapdragon-8-gen3.json` |
+  | SM8550 (8 Gen 2) | 43 | V73 | `qualcomm-snapdragon-8-gen2.json` |
+- **APK 只打一个 arch**：非 release variant 默认只保留 `libQnnHtpV81{Skel,Stub}.so`（dev 机 SM8850）；release variant 保留 SDK 全部 arch 供 GitHub Release。覆盖：`-Pdroid.qnnHtpVersions=all|79,81`
 - **已知偏差**：`threads` / `seed` 不适用；`backend` 仅 `NPU_HTP` / `AUTO`
 - **Jinja/minja**：未做 JNI。走 `metadata.json` 角色标签 + `ChatTemplate.format` fallback（与 chatapp 一致）
 

@@ -42,6 +42,10 @@ $env:ANDROID_HOME = "D:\dev\android_sdk"
 .\gradlew.bat :app:assembleRelease
 ```
 
+**QNN HTP arch 裁剪**：debug 等非 release 构建默认只打 `libQnnHtpV81{Skel,Stub}.so`
+（开发机 SM8850 → V81，省约 23 MB）；release 保留 QAIRT SDK 全部 arch 供 GitHub Release。
+需要其它组合时用 `-Pdroid.qnnHtpVersions=79,81`，全量用 `-Pdroid.qnnHtpVersions=all`。
+
 **正式版签名**（环境变量，不写进仓库）：
 
 | 变量 | 说明 |

@@ -72,6 +72,9 @@ cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android
 # gradlew.bat :app:assembleDebug -PskipGenie=true   (or -Pdroid.skipGenie=true)
 ```
 
+- **QNN HTP arch 默认裁剪**：非 release variant **只打 v81**（dev 机 SM8850，见
+  `docs/ENGINE_INTEGRATION.md` Genie 小节的 SoC→dsp_arch 表），release variant 保留 SDK 全部
+  arch（GitHub Release 用）。覆盖：`-Pdroid.qnnHtpVersions=all` 或 `-Pdroid.qnnHtpVersions=79,81`。
 - 目标 ABI 仅 `arm64-v8a`，单 APK 全打，不做 Dynamic Feature。
 - debug：`io.github.pisces312.droidllm.debug` / 名称 `droid-llm debug`；release：`io.github.pisces312.droidllm` / 名称 `droid-llm`，可同机安装。
 - 真机 adb：`D:\dev\android_sdk\platform-tools\adb.exe`（不在 PATH）。

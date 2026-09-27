@@ -7,24 +7,38 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-// ---- QNN HTP arch trimming (opt-in) -------------------------------------------------
-// QAIRT ships one HTP Skel/Stub pair per DSP arch; only the pair matching the target SoC
-// is usable at runtime. Trim the rest to shrink the APK by ~70 MB per dropped arch:
-//   -Pdroid.qnnHtpVersions=81        keep only libQnnHtpV81{Skel,Stub}.so
-//   -Pdroid.qnnHtpVersions=79,81     keep both
-//   unset / empty                    keep every version the SDK provides (default)
-// Values accept an optional "v" prefix. See GenieConfigResolver.SOC_TO_HTP for the
-// SoC -> dsp_arch mapping that decides which version a device actually needs.
+// ---- QNN HTP arch trimming ----------------------------------------------------------
+// QAIRT ships one HTP Skel/Stub pair per DSP arch and only the pair matching the target
+// SoC is loadable at runtime (QAIRT SDK support table: SM8850 -> soc_id 87 -> V81,
+// SM8750 -> 69 -> V79, SM8650 -> 57 -> V75, SM8550 -> 43 -> V73). Trimming the other
+// arches drops ~23 MB from the APK (compressed; ~63 MB of raw .so).
+//
+// Default policy (when no -P flag is given):
+//   * non-release variants -> keep v81 only (dev device is SM8850)
+//   * release variant      -> keep every arch the SDK provides (the GitHub Release build)
+// Override for every variant:
+//   -Pdroid.qnnHtpVersions=79,81   keep the listed arches ("v" prefix optional)
+//   -Pdroid.qnnHtpVersions=all     keep every arch, same as the release default
+// See GenieConfigResolver.SOC_TO_HTP for the SoC -> htp_config asset (which carries the
+// dsp_arch) mapping that decides which arch a device actually loads.
 // The candidate range is a deliberate superset: AGP ignores exclude patterns that match
 // nothing, so future SDK arch versions are covered without editing this file.
 val qnnHtpCandidateVersions = 60..89
-val qnnHtpKeepVersions: Set<Int> =
+val qnnHtpDefaultVersion = 81
+val qnnHtpExplicitKeep: Set<Int>? =
     ((findProperty("droid.qnnHtpVersions") as String?) ?: (findProperty("qnnHtpVersions") as String?))
-        ?.split(',', ' ', ';')
-        ?.mapNotNull { it.trim().removePrefix("v").removePrefix("V").toIntOrNull() }
-        ?.filter { it in qnnHtpCandidateVersions }
-        ?.toSet()
-        ?: emptySet()
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { raw ->
+            if (raw.equals("all", ignoreCase = true)) {
+                qnnHtpCandidateVersions.toSet()
+            } else {
+                raw.split(',', ' ', ';')
+                    .mapNotNull { it.trim().removePrefix("v").removePrefix("V").toIntOrNull() }
+                    .filter { it in qnnHtpCandidateVersions }
+                    .toSet()
+            }
+        }
 
 android {
     namespace = "io.github.pisces312.droidllm"
@@ -96,14 +110,7 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
-            if (qnnHtpKeepVersions.isNotEmpty()) {
-                excludes += (qnnHtpCandidateVersions.toSet() - qnnHtpKeepVersions)
-                    .flatMap { v -> listOf("**/libQnnHtpV${v}Skel.so", "**/libQnnHtpV${v}Stub.so") }
-                logger.lifecycle(
-                    "QNN HTP: keeping v${qnnHtpKeepVersions.sorted().joinToString(", v")}; " +
-                        "trimming all other HTP Skel/Stub.",
-                )
-            }
+            // Per-variant HTP arch trimming happens in androidComponents below.
         }
     }
     // noCompress for model extensions is reserved (models stay external).
@@ -144,4 +151,29 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+}
+
+// Per-variant QNN HTP arch trimming: packaging must be narrowed after variants exist,
+// so the DSL-level `packaging {}` block above only sets useLegacyPackaging.
+androidComponents {
+    onVariants { variant ->
+        val keep = qnnHtpExplicitKeep
+            ?: if (variant.buildType == "release") {
+                qnnHtpCandidateVersions.toSet()
+            } else {
+                setOf(qnnHtpDefaultVersion)
+            }
+        val drop = qnnHtpCandidateVersions.toSet() - keep
+        if (drop.isNotEmpty()) {
+            variant.packaging.jniLibs.excludes.addAll(
+                drop.flatMap { v -> listOf("**/libQnnHtpV${v}Skel.so", "**/libQnnHtpV${v}Stub.so") },
+            )
+            logger.lifecycle(
+                "QNN HTP [${variant.name}]: keeping v${keep.sorted().joinToString(", v")}; " +
+                    "trimming the rest.",
+            )
+        } else {
+            logger.lifecycle("QNN HTP [${variant.name}]: keeping every arch the SDK provides.")
+        }
+    }
 }

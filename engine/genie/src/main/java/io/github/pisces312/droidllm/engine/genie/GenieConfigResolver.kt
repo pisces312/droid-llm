@@ -215,11 +215,15 @@ class GenieConfigResolver @Inject constructor(
 
     companion object {
         /**
-         * SOC_MODEL → htp_config asset. From chatapp_android MainActivity.
-         * SM8850/SM8750 = 8 Elite, SM8650 = 8 Gen3, QCS8550 = 8 Gen2.
+         * SOC_MODEL → htp_config asset. Table from chatapp_android, but SM8850 is
+         * deliberately split out: chatapp maps SM8850/SM8750 to the same 8 Elite file
+         * (soc_model 69 / dsp_arch v79), while the QAIRT SDK support table lists
+         * SD 8 Elite Gen 5 (SM8850) as soc_id 87 / V81 and SD 8 Elite (SM8750) as
+         * soc_id 69 / V79. Loading v79 on an SM8850 would need libQnnHtpV79Skel.so,
+         * which trimmed builds no longer ship.
          */
         val SOC_TO_HTP: Map<String, String> = mapOf(
-            "SM8850" to "qualcomm-snapdragon-8-elite.json",
+            "SM8850" to "qualcomm-snapdragon-8-elite-gen5.json",
             "SM8750" to "qualcomm-snapdragon-8-elite.json",
             "SM8650" to "qualcomm-snapdragon-8-gen3.json",
             "QCS8550" to "qualcomm-snapdragon-8-gen2.json",
