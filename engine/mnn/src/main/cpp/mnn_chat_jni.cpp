@@ -87,6 +87,17 @@ JNIEXPORT void JNICALL JNI_METHOD(nativeReset)(JNIEnv* /*env*/, jclass,
 }
 
 /**
+ * Ask an in-flight nativeGenerate to stop at the next token boundary.
+ * Safe to call from any thread while generate is blocked.
+ */
+JNIEXPORT void JNICALL JNI_METHOD(nativeRequestCancel)(JNIEnv* /*env*/, jclass,
+                                                       jlong handle) {
+  auto* session = as_session(handle);
+  if (session == nullptr) return;
+  session->RequestCancel();
+}
+
+/**
  * messages: String[] alternating role, content: [role0, content0, role1, content1, ...]
  * callback: MnnNative.TokenCallback with onToken(String)
  *

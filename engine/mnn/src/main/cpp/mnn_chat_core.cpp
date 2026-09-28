@@ -94,6 +94,17 @@ bool ChatSession::Destroy() {
   return true;
 }
 
+void ChatSession::RequestCancel() {
+  // Intentionally no mutex: Generate() holds impl_->mutex for the whole turn,
+  // and the decode loop reads ctx->status without that lock (see generate.cpp
+  // USER_CANCEL check). A plain store is enough for a single-word stop flag.
+  if (impl_->llm == nullptr) return;
+  auto* ctx = impl_->llm->getContext();
+  if (ctx != nullptr) {
+    const_cast<MNN::Transformer::LlmContext*>(ctx)->status = LlmStatus::USER_CANCEL;
+  }
+}
+
 std::unique_ptr<ChatSession> ChatSession::Create(const std::string& config_path,
                                                  const std::string& config_json) {
   if (config_path.empty()) return nullptr;
@@ -189,6 +200,14 @@ bool ChatSession::Generate(const std::vector<std::string>& flat_messages,
     return false;
   }
   impl_->generating = false;
+
+  {
+    auto* ctx = impl_->llm->getContext();
+    if (ctx != nullptr && ctx->status == LlmStatus::USER_CANCEL) {
+      if (error) *error = "cancelled";
+      return false;
+    }
+  }
 
   if (metrics != nullptr) {
     const auto* ctx = impl_->llm->getContext();

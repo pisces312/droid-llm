@@ -72,9 +72,18 @@ class MnnEngine @Inject constructor() : LlmEngine {
         override val isClosed: Boolean get() = closed.get()
     }
 
-    private class MnnJob(private val job: Job) : GenerateJob {
-        override fun cancel() = job.cancel()
-        override val isActive: Boolean get() = job.isActive
+    private class MnnJob(
+        private val job: Job,
+        private val cancelled: AtomicBoolean,
+        private val onNativeCancel: () -> Unit,
+    ) : GenerateJob {
+        override fun cancel() {
+            if (cancelled.compareAndSet(false, true)) {
+                onNativeCancel()
+            }
+            job.cancel()
+        }
+        override val isActive: Boolean get() = !cancelled.get() && job.isActive
     }
 
     @Volatile
@@ -159,6 +168,7 @@ class MnnEngine @Inject constructor() : LlmEngine {
         }
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val cancelled = AtomicBoolean(false)
         val job = scope.launch {
             val collector = MetricsCollector()
             val rssPeakRef = longArrayOf(RssReader.rssMb() ?: 0L)
@@ -174,6 +184,7 @@ class MnnEngine @Inject constructor() : LlmEngine {
                     flat,
                     request.config.maxNewTokens,
                     MnnNative.TokenCallback { piece ->
+                        if (cancelled.get()) return@TokenCallback
                         if (piece.isNotEmpty()) {
                             collector.onToken()
                             text.append(piece)
@@ -182,6 +193,11 @@ class MnnEngine @Inject constructor() : LlmEngine {
                     },
                     metricsOut,
                 )
+
+                if (cancelled.get()) {
+                    onEvent(EngineEvent.Error(EngineException.Cancelled()))
+                    return@launch
+                }
 
                 val promptTokens = metricsOut[0].toInt().coerceAtLeast(0)
                 val generatedNative = metricsOut[1].toInt().coerceAtLeast(0)
@@ -223,18 +239,24 @@ class MnnEngine @Inject constructor() : LlmEngine {
             } catch (c: kotlinx.coroutines.CancellationException) {
                 onEvent(EngineEvent.Error(EngineException.Cancelled()))
             } catch (t: Throwable) {
-                onEvent(
-                    EngineEvent.Error(
-                        if (t is EngineException) t
-                        else EngineException.GenerateFailed(t.message ?: "MNN generate failed", t),
-                    ),
-                )
+                if (cancelled.get()) {
+                    onEvent(EngineEvent.Error(EngineException.Cancelled()))
+                } else {
+                    onEvent(
+                        EngineEvent.Error(
+                            if (t is EngineException) t
+                            else EngineException.GenerateFailed(t.message ?: "MNN generate failed", t),
+                        ),
+                    )
+                }
             } finally {
                 session.generating.set(false)
                 scope.cancel()
             }
         }
-        return MnnJob(job)
+        return MnnJob(job, cancelled) {
+            runCatching { MnnNative.nativeRequestCancel(session.handle) }
+        }
     }
 
     override suspend fun reset(handle: SessionHandle) {

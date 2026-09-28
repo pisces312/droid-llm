@@ -83,9 +83,15 @@ class GenieEngine @Inject constructor(
         override val isClosed: Boolean get() = closed.get()
     }
 
-    private class GenieJob(private val job: Job) : GenerateJob {
-        override fun cancel() = job.cancel()
-        override val isActive: Boolean get() = job.isActive
+    private class GenieJob(
+        private val job: Job,
+        private val cancelled: AtomicBoolean,
+    ) : GenerateJob {
+        override fun cancel() {
+            cancelled.set(true)
+            job.cancel()
+        }
+        override val isActive: Boolean get() = !cancelled.get() && job.isActive
     }
 
     /** Role tags from model metadata.json (AI Hub) or generic fallback. */
@@ -208,6 +214,7 @@ class GenieEngine @Inject constructor(
         }
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val cancelled = AtomicBoolean(false)
         val job = scope.launch {
             val collector = MetricsCollector()
             val rssPeakRef = longArrayOf(RssReader.rssMb() ?: 0L)
@@ -235,6 +242,7 @@ class GenieEngine @Inject constructor(
                         session.handle,
                         prompt,
                         GenieNative.TokenCallback { piece ->
+                            if (cancelled.get()) return@TokenCallback
                             if (piece.isNotEmpty()) {
                                 collector.onToken()
                                 text.append(piece)
@@ -247,6 +255,11 @@ class GenieEngine @Inject constructor(
                     // would sit on the streaming hot path and inflate latency.
                     RssReader.rssMb()?.let { if (it > rssPeakRef[0]) rssPeakRef[0] = it }
                     produced = ok && text.isNotEmpty()
+                }
+
+                if (cancelled.get()) {
+                    onEvent(EngineEvent.Error(EngineException.Cancelled()))
+                    return@launch
                 }
 
                 if (!produced) {
@@ -287,18 +300,22 @@ class GenieEngine @Inject constructor(
             } catch (c: kotlinx.coroutines.CancellationException) {
                 onEvent(EngineEvent.Error(EngineException.Cancelled()))
             } catch (t: Throwable) {
-                onEvent(
-                    EngineEvent.Error(
-                        if (t is EngineException) t
-                        else EngineException.GenerateFailed(t.message ?: "Genie generate failed", t),
-                    ),
-                )
+                if (cancelled.get()) {
+                    onEvent(EngineEvent.Error(EngineException.Cancelled()))
+                } else {
+                    onEvent(
+                        EngineEvent.Error(
+                            if (t is EngineException) t
+                            else EngineException.GenerateFailed(t.message ?: "Genie generate failed", t),
+                        ),
+                    )
+                }
             } finally {
                 session.generating.set(false)
                 scope.cancel()
             }
         }
-        return GenieJob(job)
+        return GenieJob(job, cancelled)
     }
 
     override suspend fun reset(handle: SessionHandle) {

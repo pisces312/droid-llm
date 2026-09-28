@@ -43,8 +43,16 @@ class ChatSession {
   // in flight so the decode loop cannot race free. Caller still owns `this`.
   bool Destroy();
 
+  // Ask the decode loop to stop at the next token boundary by setting
+  // LlmStatus::USER_CANCEL on the live LlmContext. Safe to call from another
+  // thread while Generate() is blocked in response(); does not take the
+  // generate mutex (that would wait for the whole turn). The next Generate()
+  // resets status to RUNNING as usual.
+  void RequestCancel();
+
   // flat_messages: [role, content, role, content, ...].
   // Blocks until generation finishes. On failure returns false and fills *error.
+  // On RequestCancel() mid-turn, returns false with *error "cancelled".
   bool Generate(const std::vector<std::string>& flat_messages,
                 int max_new_tokens,
                 const TokenCallback& on_token,

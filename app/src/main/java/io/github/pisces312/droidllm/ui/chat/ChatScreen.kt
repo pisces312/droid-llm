@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,15 +29,19 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -980,20 +985,27 @@ private fun Composer(
                 },
             )
             if (thinkingSupported) {
-                FilterChip(
-                    selected = thinkingEnabled,
+                // Same fill language as the send button: primary (蓝紫) = on, gray = off.
+                Button(
                     onClick = { onThinkingChange(!thinkingEnabled) },
-                    label = { Text(if (thinkingEnabled) "Thinking 开" else "Thinking 关") },
-                    leadingIcon = {
-                        if (thinkingEnabled) {
-                            Icon(
-                                Icons.Filled.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(AssistChipDefaults.IconSize),
-                            )
-                        }
-                    },
-                )
+                    shape = RoundedCornerShape(50),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (thinkingEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        },
+                        contentColor = if (thinkingEnabled) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        },
+                    ),
+                    modifier = Modifier.height(32.dp),
+                ) {
+                    Text("Thinking", style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
         Row(
@@ -1008,14 +1020,14 @@ private fun Composer(
                 maxLines = 4,
             )
             if (generating) {
-                PrimaryButton(
-                    text = "停止",
+                FilledIconButton(
                     onClick = onStop,
-                    modifier = Modifier.widthIn(min = 88.dp),
-                )
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Icon(Icons.Filled.Stop, contentDescription = "停止生成")
+                }
             } else {
-                PrimaryButton(
-                    text = "发送",
+                FilledIconButton(
                     onClick = {
                         val t = text.trim()
                         if (t.isNotEmpty()) {
@@ -1024,8 +1036,10 @@ private fun Composer(
                         }
                     },
                     enabled = canSend,
-                    modifier = Modifier.widthIn(min = 88.dp),
-                )
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "发送")
+                }
             }
         }
     }

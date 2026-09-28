@@ -55,9 +55,13 @@ class FakeEngine : LlmEngine {
 
     private class FakeJob(
         private val job: Job,
+        private val cancelled: AtomicBoolean,
     ) : GenerateJob {
-        override fun cancel() = job.cancel()
-        override val isActive: Boolean get() = job.isActive
+        override fun cancel() {
+            cancelled.set(true)
+            job.cancel()
+        }
+        override val isActive: Boolean get() = !cancelled.get() && job.isActive
     }
 
     override suspend fun probe(probeContext: ProbeContext): Availability = Availability.Available
@@ -88,6 +92,7 @@ class FakeEngine : LlmEngine {
         }
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val cancelled = AtomicBoolean(false)
         val job = scope.launch {
             try {
                 val maxTokens = request.config.maxNewTokens.coerceIn(1, 256)
@@ -99,6 +104,7 @@ class FakeEngine : LlmEngine {
                 delay(80) // fake prefill
                 var emitted = 0
                 while (emitted < maxTokens) {
+                    if (cancelled.get()) break
                     val chunk = words[emitted % words.size]
                     val now = System.nanoTime()
                     if (firstTokenMs == null) {
@@ -108,6 +114,11 @@ class FakeEngine : LlmEngine {
                     onEvent(EngineEvent.Token(chunk, emitted))
                     emitted++
                     delay(28)
+                }
+
+                if (cancelled.get()) {
+                    onEvent(EngineEvent.Error(EngineException.Cancelled()))
+                    return@launch
                 }
 
                 val totalMs = (System.nanoTime() - start) / 1_000_000
@@ -138,21 +149,21 @@ class FakeEngine : LlmEngine {
                     ),
                 )
             } catch (t: Throwable) {
-                onEvent(
-                    EngineEvent.Error(
-                        if (t is kotlinx.coroutines.CancellationException) {
-                            EngineException.Cancelled()
-                        } else {
-                            EngineException.GenerateFailed(t.message ?: "fake generate failed", t)
-                        },
-                    ),
-                )
+                if (cancelled.get() || t is kotlinx.coroutines.CancellationException) {
+                    onEvent(EngineEvent.Error(EngineException.Cancelled()))
+                } else {
+                    onEvent(
+                        EngineEvent.Error(
+                            EngineException.GenerateFailed(t.message ?: "fake generate failed", t),
+                        ),
+                    )
+                }
             } finally {
                 session.generating.set(false)
                 scope.cancel()
             }
         }
-        return FakeJob(job)
+        return FakeJob(job, cancelled)
     }
 
     override suspend fun reset(handle: SessionHandle) {

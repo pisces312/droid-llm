@@ -136,6 +136,7 @@ MnnLlmChat `ModelConfig.supportsThinkingSwitch` 同口径）。
 |---|---|---|
 | `set_config` 必须在 `load()` **之前** | `Llm::load()` 构建 runtime 时读 `backend_type()` / `thread_num()`；之后再 set 只影响采样参数 | `nativeCreate` 内 `createLLM → set_config → load`（与 demo 的 `LlmSession::Load()` 一致） |
 | 每轮生成前把 `context->status` 复位成 `RUNNING` | 上一轮结束停在 `NORMAL_FINISHED` / `MAX_TOKENS_FINISHED`，下一轮 `response()` 会直接不解码 | `nativeGenerate` 内检查，非 RUNNING 则 `const_cast` 置回（对齐 demo 的 `restoreAndroidSteppingStatusIfNeeded`） |
+| **停止生成必须写 `context->status = USER_CANCEL`** | `response()` 阻塞在 JNI 里，协程 `job.cancel()` 打不断；decode 循环每 token 查 `LlmStatus::USER_CANCEL`（`generate.cpp` / `CHECK_LLM_RUNNING`） | `ChatSession::RequestCancel()`（`nativeRequestCancel`）从任意线程置位；`Generate` 返回后检测该状态报 `cancelled`。下一轮生成入口会把 status 复位回 `RUNNING`，可继续对话 |
 | `createLLM` 要传 `config.json` 的绝对路径 | 传纯目录会拼出 `<dir>tokenizer.txt`（缺分隔符），tokenizer 加载失败 | Kotlin 侧传 `File(dir, "config.json").absolutePath` |
 | 模型自带 `config.json` 已写死 `backend_type=cpu` / `thread_num=4` / `precision=low` / `memory=low` | — | 我们传 `cpu` + `threads`，与 MnnLlmChat 的缺省一致；**跨 app 比速度时这一项不构成差异** |
 | 模拟器上数值不可信 | `emulator-5554` 是 x86_64，arm64 产物走 `libndk_translation.so` 二进制翻译 | 性能与采样结论一律以真机 arm64 为准 |

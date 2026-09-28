@@ -18,6 +18,9 @@ internal object MnnNative {
     external fun nativeSetConfig(handle: Long, configJson: String)
     external fun nativeReset(handle: Long)
 
+    /** Stop an in-flight [nativeGenerate] at the next token boundary. */
+    external fun nativeRequestCancel(handle: Long)
+
     /**
      * Blocking generate. [messages] is [role, content, role, content, ...].
      * [metricsOut] must be size >= 5: promptTokens, generatedTokens, prefillUs, decodeUs, ttftUs.

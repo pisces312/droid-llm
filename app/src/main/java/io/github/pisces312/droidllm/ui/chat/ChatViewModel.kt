@@ -186,6 +186,13 @@ class ChatViewModel @Inject constructor(
     private var session: SessionHandle? = null
     private var sessionEngine: LlmEngine? = null
     private var activeJob: GenerateJob? = null
+    /**
+     * Monotonic id for the in-flight generate turn. Bumped on every send and
+     * every stop so late engine callbacks (tokens that were already in flight
+     * when Stop was tapped) are dropped instead of appending to the bubble.
+     */
+    @Volatile
+    private var generateSeq = 0
     private var multiResidency = false
     /** Kept sessions when multi-model residency is on (DESIGN §3.3). */
     private val resident = LinkedHashMap<String, Pair<LlmEngine, SessionHandle>>()
@@ -423,9 +430,14 @@ class ChatViewModel @Inject constructor(
     }
 
     fun stopGenerate() {
+        val wasGenerating = _generating.value
+        generateSeq++
         activeJob?.cancel()
         activeJob = null
         _generating.value = false
+        if (wasGenerating) {
+            _status.value = "已停止"
+        }
     }
 
     private fun describeAvailability(choice: EngineChoice): String =
@@ -534,6 +546,7 @@ class ChatViewModel @Inject constructor(
         _messages.value = _messages.value + ChatUiMessage(ChatRole.USER, text)
         _status.value = "生成中…"
         _generating.value = true
+        val seq = ++generateSeq
 
         val sb = StringBuilder()
         val startedAt = System.nanoTime()
@@ -541,6 +554,7 @@ class ChatViewModel @Inject constructor(
         var tokenCount = 0
 
         val job = engine.generate(handle, GenerateRequest(history, config)) { event ->
+            if (seq != generateSeq) return@generate
             when (event) {
                 is EngineEvent.Token -> {
                     if (tokenCount == 0) firstTokenNs = System.nanoTime()

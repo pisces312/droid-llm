@@ -202,13 +202,16 @@ flowchart TD
   点击打开 `SamplingSheet`：temp / top_k / top_p / threads / backend / maxNewTokens + 底部「完成」。
   默认值取自 Settings；不适用当前引擎的字段灰显 + 12sp 说明（`DESIGN §1.2` 字段适用性）。
   此项为 `DESIGN §4` 信息架构要求，P0 已实现，**不可移除**——只是从内联折叠卡搬进 sheet（决策 4）
-- **Thinking 开关**：参数 chip 同一行的 `FilterChip`（`Thinking 开` / `Thinking 关`，选中带勾）。
+- **Thinking 开关**：参数 chip 同一行的胶囊按钮，文案固定 `Thinking`。
   **每条消息级**控制（可逐轮切换），故放在对话框旁而非 Settings（UI_REVIEW §3.2 模式 3）。
+  取色与发送钮同一套语言：**启用 = Primary 蓝紫填充，关闭 = 灰色填充**（仍可点，不是禁用态）。
   仅当模型支持 Thinking 时显示（`ThinkingSupport`：模型名命中 qwen3/thinking/r1 等，
   或 MNN `chat_template` 含 `enable_thinking`）；不支持则整颗隐藏，不做假开关。
   生效路径：MNN 走 `jinja.context.enable_thinking`；其余引擎对 Qwen3 系在用户消息尾附
   `/think` 或 `/no_think`。默认开（对齐上游模板默认）
-- 输入：多行，发送钮 `Primary`；生成中变「停止」。**仅 READY 可发送**，否则灰显 + 占位提示
+- 输入：多行，发送钮为 **44dp 图标钮**（`Icons.Filled.Send`，`FilledIconButton`）；
+  生成中同位置变为 `Icons.Filled.Stop` 停止钮，点击必须真正中断生成（引擎侧取消 +
+  ViewModel 代际守卫丢弃迟到 token）。**仅 READY 可发送**，否则灰显 + 占位提示
   「启动模型后可发送消息」
 - 空态：`EmptyState`——Folder 图标 + 「先在「模型」页添加模型，再回到这里启动它」+ **Filled**
   「去「模型」页」（走 `DroidLlmRoot` 的 `goToModels`，与评测页共用同一个 lambda）

@@ -73,9 +73,15 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
         override val isClosed: Boolean get() = closed.get()
     }
 
-    private class LlamaJob(private val job: Job) : GenerateJob {
-        override fun cancel() = job.cancel()
-        override val isActive: Boolean get() = job.isActive
+    private class LlamaJob(
+        private val job: Job,
+        private val cancelled: AtomicBoolean,
+    ) : GenerateJob {
+        override fun cancel() {
+            cancelled.set(true)
+            job.cancel()
+        }
+        override val isActive: Boolean get() = !cancelled.get() && job.isActive
     }
 
     @Volatile
@@ -159,6 +165,7 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
         mapBackend(request.config.backend)
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val cancelled = AtomicBoolean(false)
         val job = scope.launch {
             val collector = MetricsCollector()
             val rssPeakRef = longArrayOf(RssReader.rssMb() ?: 0L)
@@ -194,6 +201,7 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
                 var generated = 0
                 while (generated < request.config.maxNewTokens) {
                     ensureActive()
+                    if (cancelled.get()) break
                     val piece = LlamaCppNative.nativeNextToken(session.handle) ?: break
                     if (piece.isNotEmpty()) {
                         collector.onToken()
@@ -201,6 +209,10 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
                         onEvent(EngineEvent.Token(piece, generated))
                         generated++
                     }
+                }
+                if (cancelled.get()) {
+                    onEvent(EngineEvent.Error(EngineException.Cancelled()))
+                    return@launch
                 }
                 // Sampled once per turn: a per-token /proc/self/status read sits on
                 // the decode hot path and inflates the reported decode latency.
@@ -228,18 +240,22 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
             } catch (c: kotlinx.coroutines.CancellationException) {
                 onEvent(EngineEvent.Error(EngineException.Cancelled()))
             } catch (t: Throwable) {
-                onEvent(
-                    EngineEvent.Error(
-                        if (t is EngineException) t
-                        else EngineException.GenerateFailed(t.message ?: "llama.cpp generate failed", t),
-                    ),
-                )
+                if (cancelled.get()) {
+                    onEvent(EngineEvent.Error(EngineException.Cancelled()))
+                } else {
+                    onEvent(
+                        EngineEvent.Error(
+                            if (t is EngineException) t
+                            else EngineException.GenerateFailed(t.message ?: "llama.cpp generate failed", t),
+                        ),
+                    )
+                }
             } finally {
                 session.generating.set(false)
                 scope.cancel()
             }
         }
-        return LlamaJob(job)
+        return LlamaJob(job, cancelled)
     }
 
     override suspend fun reset(handle: SessionHandle) {

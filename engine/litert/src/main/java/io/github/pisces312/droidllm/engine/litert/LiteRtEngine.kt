@@ -88,9 +88,18 @@ class LiteRtEngine @Inject constructor(
         override val isClosed: Boolean get() = closed.get()
     }
 
-    private class LiteRtJob(private val job: Job) : GenerateJob {
-        override fun cancel() = job.cancel()
-        override val isActive: Boolean get() = job.isActive
+    private class LiteRtJob(
+        private val job: Job,
+        private val cancelled: AtomicBoolean,
+        private val onNativeCancel: () -> Unit,
+    ) : GenerateJob {
+        override fun cancel() {
+            if (cancelled.compareAndSet(false, true)) {
+                onNativeCancel()
+            }
+            job.cancel()
+        }
+        override val isActive: Boolean get() = !cancelled.get() && job.isActive
     }
 
     override suspend fun probe(probeContext: ProbeContext): Availability {
@@ -170,6 +179,7 @@ class LiteRtEngine @Inject constructor(
         }
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val cancelled = AtomicBoolean(false)
         val job = scope.launch {
             val collector = MetricsCollector()
             val rssPeakRef = longArrayOf(RssReader.rssMb() ?: 0L)
@@ -197,6 +207,7 @@ class LiteRtEngine @Inject constructor(
                     Contents.of(Content.Text(history.lastUser)),
                     object : MessageCallback {
                         override fun onMessage(message: Message) {
+                            if (cancelled.get()) return
                             val piece = message.toString()
                             if (piece.isNotEmpty()) {
                                 collector.onToken()
@@ -263,19 +274,29 @@ class LiteRtEngine @Inject constructor(
                 runCatching { session.conversation?.cancelProcess() }
                 onEvent(EngineEvent.Error(EngineException.Cancelled()))
             } catch (e: EngineException) {
-                onEvent(EngineEvent.Error(e))
+                if (cancelled.get()) {
+                    onEvent(EngineEvent.Error(EngineException.Cancelled()))
+                } else {
+                    onEvent(EngineEvent.Error(e))
+                }
             } catch (t: Throwable) {
-                onEvent(
-                    EngineEvent.Error(
-                        EngineException.GenerateFailed(t.message ?: "LiteRT generate failed", t),
-                    ),
-                )
+                if (cancelled.get()) {
+                    onEvent(EngineEvent.Error(EngineException.Cancelled()))
+                } else {
+                    onEvent(
+                        EngineEvent.Error(
+                            EngineException.GenerateFailed(t.message ?: "LiteRT generate failed", t),
+                        ),
+                    )
+                }
             } finally {
                 session.generating.set(false)
                 scope.cancel()
             }
         }
-        return LiteRtJob(job)
+        return LiteRtJob(job, cancelled) {
+            runCatching { session.conversation?.cancelProcess() }
+        }
     }
 
     override suspend fun reset(handle: SessionHandle) {
