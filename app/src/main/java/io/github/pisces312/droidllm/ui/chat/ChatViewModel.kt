@@ -401,14 +401,15 @@ class ChatViewModel @Inject constructor(
     /**
      * Engines without a native `enable_thinking` flag still honor the Qwen3
      * `/think` / `/no_think` turn suffix. MNN takes the jinja route instead
-     * (see `MnnEngine.buildConfigJson`) so the tag is not doubled.
+     * (see `MnnEngine.buildConfigJson`) so the tag is not doubled. LiteRT
+     * receives `enable_thinking` via `extraContext` (gallery behavior).
      */
     private fun applyThinkingTurn(
         text: String,
         config: InferenceConfig,
         engine: LlmEngine,
     ): String {
-        if (engine.id == EngineId.MNN) return text
+        if (engine.id == EngineId.MNN || engine.id == EngineId.LITERT) return text
         if (!ThinkingSupport.byName(_selectedModel.value?.displayName.orEmpty())) return text
         val tag = if (config.enableThinking) "/think" else "/no_think"
         return if (text.trimEnd().endsWith(tag)) text else text.trimEnd() + "\n" + tag

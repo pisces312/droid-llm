@@ -29,6 +29,12 @@ Fake 只作 `LlmEngine` 契约的可执行规格（`FakeEngineTest`）与写新�
   - 不要求与其它引擎同基座；用户自备文件即可
 - **已知偏差**：`threads` / `seed` 不生效（LiteRT 自管线程池；适配器记 warning）。`OPENCL` backend 不支持
 - **Backend**：CPU / GPU / NPU_HTP / AUTO
+- **多轮会话**（对齐 gallery `LlmChatModelHelper`）：
+  - 一个 `Conversation` 长驻，每轮只 `sendMessageAsync` 新的 USER 文本；历史由 native 累积
+  - 仅当 `GenerateRequest.messages` 与 `liveHistory` 不一致，或上一轮被取消（`liveHistory=null`）时，才用 `initialMessages` 重建
+  - `enable_thinking` 走 `sendMessageAsync` 的 `extraContext`，**不要**再往用户文本拼 `/think`
+  - `onMessage` 可能是 token 增量或累计全文；适配器两者都兼容，避免「您好您好…」刷屏
+  - 达到 `maxNewTokens` 时 `cancelProcess`，按「完成」而不是「已停止」上报
 
 ## 2. MNN（阿里）
 

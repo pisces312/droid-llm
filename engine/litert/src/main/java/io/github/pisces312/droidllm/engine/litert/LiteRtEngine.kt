@@ -82,6 +82,14 @@ class LiteRtEngine @Inject constructor(
         val closed = AtomicBoolean(false)
         val generating = AtomicBoolean(false)
 
+        /**
+         * Chat turns already applied to [conversation] (system excluded).
+         * `null` means the conversation is dirty (cancelled mid-turn) and the
+         * next [generate] must rebuild from [GenerateRequest.messages].
+         */
+        @Volatile
+        var liveHistory: List<ChatMessage>? = emptyList()
+
         @Volatile
         var metrics: EngineMetrics? = null
 
@@ -187,12 +195,23 @@ class LiteRtEngine @Inject constructor(
             val done = CompletableDeferred<Unit>()
             try {
                 val backend = mapBackend(request.config.backend)
-                // Rebuild conversation so the full GenerateRequest history is authoritative.
                 val history = splitHistory(request.messages, request.config)
+
+                // Gallery keeps one Conversation and only sends the new USER turn;
+                // history accumulates natively. Rebuild (initialMessages seed) only when
+                // GenerateRequest.history diverges from what the live conversation has.
                 val conversation = try {
-                    session.conversation?.let { runCatching { it.close() } }
-                    val conv = createConversation(session.engine, request.config, history.seed)
-                    session.conversation = conv
+                    val live = session.liveHistory
+                    val sameHistory = live != null && live == history.seed
+                    val conv = if (sameHistory && session.conversation != null) {
+                        session.conversation!!
+                    } else {
+                        session.conversation?.let { runCatching { it.close() } }
+                        createConversation(session.engine, request.config, history.seed).also {
+                            session.conversation = it
+                            session.liveHistory = history.seed
+                        }
+                    }
                     conv
                 } catch (t: Throwable) {
                     throw EngineException.GenerateFailed(
@@ -202,18 +221,41 @@ class LiteRtEngine @Inject constructor(
 
                 collector.onGenerateStart(promptTokens = 0)
                 val lastIndex = intArrayOf(0)
+                val maxNew = request.config.maxNewTokens.coerceAtLeast(1)
+                val hitTokenCap = AtomicBoolean(false)
+
+                // Match gallery: thinking is a runtime flag, not a text suffix.
+                val extraContext = mapOf<String, Any>(
+                    "enable_thinking" to request.config.enableThinking,
+                )
 
                 conversation.sendMessageAsync(
                     Contents.of(Content.Text(history.lastUser)),
                     object : MessageCallback {
                         override fun onMessage(message: Message) {
-                            if (cancelled.get()) return
+                            if (cancelled.get() || hitTokenCap.get()) return
                             val piece = message.toString()
-                            if (piece.isNotEmpty()) {
-                                collector.onToken()
-                                text.append(piece)
-                                lastIndex[0] += 1
-                                onEvent(EngineEvent.Token(piece, lastIndex[0]))
+                            if (piece.isEmpty()) return
+
+                            // LiteRT may deliver either a token delta or the accumulated
+                            // text so far. Accept both so a cumulative callback cannot
+                            // paint endless "您好您好…".
+                            val current = text.toString()
+                            val delta = when {
+                                current.isEmpty() -> piece
+                                piece == current -> return
+                                piece.startsWith(current) -> piece.substring(current.length)
+                                else -> piece
+                            }
+                            if (delta.isEmpty()) return
+
+                            collector.onToken()
+                            text.append(delta)
+                            lastIndex[0] += 1
+                            onEvent(EngineEvent.Token(delta, lastIndex[0]))
+                            if (lastIndex[0] >= maxNew) {
+                                hitTokenCap.set(true)
+                                runCatching { conversation.cancelProcess() }
                             }
                         }
 
@@ -222,24 +264,32 @@ class LiteRtEngine @Inject constructor(
                         }
 
                         override fun onError(throwable: Throwable) {
-                            done.completeExceptionally(throwable)
+                            if (hitTokenCap.get()) {
+                                done.complete(Unit)
+                            } else {
+                                done.completeExceptionally(throwable)
+                            }
                         }
                     },
-                    emptyMap<String, Any>(),
+                    extraContext,
                 )
 
                 try {
                     done.await()
                 } catch (t: Throwable) {
-                    val cause = t.cause ?: t
-                    if (cause is kotlinx.coroutines.CancellationException ||
-                        cause is java.util.concurrent.CancellationException
-                    ) {
-                        throw EngineException.Cancelled()
+                    if (hitTokenCap.get()) {
+                        // cancelled on purpose after reaching maxNewTokens
+                    } else {
+                        val cause = t.cause ?: t
+                        if (cause is kotlinx.coroutines.CancellationException ||
+                            cause is java.util.concurrent.CancellationException
+                        ) {
+                            throw EngineException.Cancelled()
+                        }
+                        throw EngineException.GenerateFailed(
+                            cause.message ?: "LiteRT generate failed", cause,
+                        )
                     }
-                    throw EngineException.GenerateFailed(
-                        cause.message ?: "LiteRT generate failed", cause,
-                    )
                 }
 
                 // One sample per turn: a per-token /proc/self/status read would
@@ -260,6 +310,10 @@ class LiteRtEngine @Inject constructor(
                         }),
                 )
                 session.metrics = metrics
+                session.liveHistory = history.seed + listOf(
+                    ChatMessage(ChatRole.USER, history.lastUser),
+                    ChatMessage(ChatRole.ASSISTANT, text.toString()),
+                )
                 onEvent(
                     EngineEvent.Done(
                         GenerateResult(
@@ -272,15 +326,18 @@ class LiteRtEngine @Inject constructor(
                 )
             } catch (c: kotlinx.coroutines.CancellationException) {
                 runCatching { session.conversation?.cancelProcess() }
+                session.liveHistory = null
                 onEvent(EngineEvent.Error(EngineException.Cancelled()))
             } catch (e: EngineException) {
                 if (cancelled.get()) {
+                    session.liveHistory = null
                     onEvent(EngineEvent.Error(EngineException.Cancelled()))
                 } else {
                     onEvent(EngineEvent.Error(e))
                 }
             } catch (t: Throwable) {
                 if (cancelled.get()) {
+                    session.liveHistory = null
                     onEvent(EngineEvent.Error(EngineException.Cancelled()))
                 } else {
                     onEvent(
@@ -310,6 +367,7 @@ class LiteRtEngine @Inject constructor(
             // ignore close errors on reset
         }
         session.conversation = createConversation(session.engine, session.config, emptyList())
+        session.liveHistory = emptyList()
     }
 
     override suspend fun unload(handle: SessionHandle) {
@@ -329,7 +387,7 @@ class LiteRtEngine @Inject constructor(
         (handle as? LiteRtSession)?.metrics
 
     private data class SplitHistory(
-        val seed: List<Message>,
+        val seed: List<ChatMessage>,
         val lastUser: String,
     )
 
@@ -344,22 +402,29 @@ class LiteRtEngine @Inject constructor(
         if (lastUserIndex < 0) {
             throw EngineException.GenerateFailed("no USER message in request")
         }
-        val seed = ArrayList<Message>()
+        val seed = ArrayList<ChatMessage>()
         for (i in 0 until lastUserIndex) {
             val m = effective[i]
             when (m.role) {
-                ChatRole.USER -> seed += Message.user(m.content)
-                ChatRole.ASSISTANT -> seed += Message.model(m.content)
+                ChatRole.USER, ChatRole.ASSISTANT -> seed += m
                 ChatRole.SYSTEM -> Unit // handled via systemInstruction
             }
         }
         return SplitHistory(seed = seed, lastUser = effective[lastUserIndex].content)
     }
 
+    private fun List<ChatMessage>.toLitertMessages(): List<Message> = map { m ->
+        when (m.role) {
+            ChatRole.USER -> Message.user(m.content)
+            ChatRole.ASSISTANT -> Message.model(m.content)
+            ChatRole.SYSTEM -> Message.user(m.content) // unused: system goes via systemInstruction
+        }
+    }
+
     private fun createConversation(
         engine: Engine,
         config: InferenceConfig,
-        initialMessages: List<Message>,
+        initialMessages: List<ChatMessage>,
     ): Conversation {
         val system = config.systemPrompt
         val sampler = mapSampler(config)
@@ -367,7 +432,7 @@ class LiteRtEngine @Inject constructor(
             ConversationConfig(
                 samplerConfig = sampler,
                 systemInstruction = system?.let { Contents.of(it) },
-                initialMessages = initialMessages,
+                initialMessages = initialMessages.toLitertMessages(),
             ),
         )
     }
