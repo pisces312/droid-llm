@@ -2,7 +2,9 @@
 #include <jni.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -55,6 +57,30 @@ void log_callback(ggml_log_level level, const char* text, void* /*user_data*/) {
       LOGI("%s", text);
       break;
   }
+}
+
+// ggml_abort defaults to fprintf(stderr) which never reaches logcat.
+void abort_log_callback(const char* message) {
+  LOGE("ggml_abort: %s", message != nullptr ? message : "(null)");
+}
+
+void terminate_log_callback() {
+  try {
+    auto eptr = std::current_exception();
+    if (eptr) {
+      try {
+        std::rethrow_exception(eptr);
+      } catch (const std::exception& ex) {
+        LOGE("std::terminate: %s", ex.what());
+      } catch (...) {
+        LOGE("std::terminate: unknown C++ exception");
+      }
+    } else {
+      LOGE("std::terminate: no current exception (abort/terminate)");
+    }
+  } catch (...) {
+  }
+  std::abort();
 }
 
 bool is_valid_utf8(const char* s) {
@@ -119,6 +145,9 @@ extern "C" {
 JNIEXPORT void JNICALL JNI_METHOD(nativeInit)(JNIEnv* /*env*/, jclass) {
   ensure_backend();
   llama_log_set(log_callback, nullptr);
+  ggml_set_abort_callback(abort_log_callback);
+  std::set_terminate(terminate_log_callback);
+  LOGI("nativeInit: abort/terminate hooks installed");
 }
 
 JNIEXPORT jstring JNICALL JNI_METHOD(nativeSystemInfo)(JNIEnv* env, jclass) {
@@ -239,24 +268,53 @@ JNIEXPORT jint JNICALL JNI_METHOD(nativePrefill)(
   if (prompt == nullptr) return -1;
   const std::string text(prompt);
   env->ReleaseStringUTFChars(jprompt, prompt);
+  LOGI("prefill: text_len=%d max_new=%d", (int)text.size(), max_new_tokens);
+  {
+    std::string hex;
+    const size_t n = std::min<size_t>(text.size(), 160);
+    char tmp[8];
+    for (size_t i = 0; i < n; ++i) {
+      snprintf(tmp, sizeof(tmp), "%02x", (unsigned char)text[i]);
+      hex += tmp;
+    }
+    LOGI("prefill: prompt_hex=%s", hex.c_str());
+  }
 
   const llama_vocab* vocab = llama_model_get_vocab(session->model);
   const bool add_special = true;
   const bool parse_special = true;
-  const int32_t n_tokens_max = llama_tokenize(
+  // Buffer-size probe: llama_tokenize returns a negative required count when
+  // n_tokens_max is too small (including the nullptr/0 probe call).
+  int32_t n_tokens_needed = llama_tokenize(
       vocab, text.c_str(), static_cast<int32_t>(text.size()), nullptr, 0,
       add_special, parse_special);
-  if (n_tokens_max <= 0) {
+  if (n_tokens_needed < 0) {
+    n_tokens_needed = -n_tokens_needed;
+  }
+  if (n_tokens_needed <= 0) {
+    LOGE("tokenize produced 0 tokens (text_len=%d)", (int)text.size());
     throw_java(env, "java/lang/IllegalArgumentException", "tokenize failed");
     return -1;
   }
-  std::vector<llama_token> tokens(static_cast<size_t>(n_tokens_max));
+  std::vector<llama_token> tokens(static_cast<size_t>(n_tokens_needed));
   const int32_t n_tokens = llama_tokenize(
       vocab, text.c_str(), static_cast<int32_t>(text.size()), tokens.data(),
-      n_tokens_max, add_special, parse_special);
+      n_tokens_needed, add_special, parse_special);
   if (n_tokens <= 0) {
+    LOGE("tokenize fill failed (ret=%d, needed=%d, text_len=%d)", n_tokens,
+         n_tokens_needed, (int)text.size());
     throw_java(env, "java/lang/IllegalArgumentException", "tokenize failed");
     return -1;
+  }
+  LOGI("prefill: tokenized n=%d needed=%d", n_tokens, n_tokens_needed);
+  {
+    std::string ids;
+    for (int32_t i = 0; i < n_tokens && i < 32; ++i) {
+      char tmp[16];
+      snprintf(tmp, sizeof(tmp), "%d ", tokens[static_cast<size_t>(i)]);
+      ids += tmp;
+    }
+    LOGI("prefill: token_ids=%s", ids.c_str());
   }
 
   const auto n_ctx = static_cast<int>(llama_n_ctx(session->ctx));
@@ -273,10 +331,25 @@ JNIEXPORT jint JNICALL JNI_METHOD(nativePrefill)(
   }
 
   llama_memory_clear(llama_get_memory(session->ctx), true);
-  if (llama_decode(session->ctx, session->batch) != 0) {
+  LOGI("prefill: llama_decode start n_tokens=%d", n_tokens);
+  int decode_rc = -1;
+  try {
+    decode_rc = llama_decode(session->ctx, session->batch);
+  } catch (const std::exception& ex) {
+    LOGE("prefill: llama_decode threw: %s", ex.what());
+    throw_java(env, "java/lang/IllegalStateException", "llama_decode prefill threw");
+    return -1;
+  } catch (...) {
+    LOGE("prefill: llama_decode threw unknown");
+    throw_java(env, "java/lang/IllegalStateException", "llama_decode prefill threw");
+    return -1;
+  }
+  if (decode_rc != 0) {
+    LOGE("prefill: llama_decode failed rc=%d", decode_rc);
     throw_java(env, "java/lang/IllegalStateException", "llama_decode prefill failed");
     return -1;
   }
+  LOGI("prefill: llama_decode ok");
 
   session->prompt_tokens = n_tokens;
   session->n_cur = n_tokens;
@@ -315,8 +388,16 @@ JNIEXPORT jstring JNICALL JNI_METHOD(nativeNextToken)(JNIEnv* env, jclass,
   batch_clear(session->batch);
   batch_add(session->batch, new_token_id, session->n_cur, true);
   session->n_cur += 1;
-  if (llama_decode(session->ctx, session->batch) != 0) {
-    LOGE("llama_decode step failed");
+  try {
+    if (llama_decode(session->ctx, session->batch) != 0) {
+      LOGE("next: llama_decode failed tok=%d n_cur=%d", new_token_id, session->n_cur);
+      return nullptr;
+    }
+  } catch (const std::exception& ex) {
+    LOGE("next: llama_decode threw: %s", ex.what());
+    return nullptr;
+  } catch (...) {
+    LOGE("next: llama_decode threw unknown");
     return nullptr;
   }
   return result;
@@ -406,6 +487,7 @@ JNIEXPORT jstring JNICALL JNI_METHOD(nativeApplyChatTemplate)(
       fallback += "\n";
     }
     fallback += "assistant:";
+    LOGI("chat_template: fallback len=%d", (int)fallback.size());
     return env->NewStringUTF(fallback.c_str());
   }
   std::string buf(static_cast<size_t>(needed), '\0');
@@ -413,9 +495,11 @@ JNIEXPORT jstring JNICALL JNI_METHOD(nativeApplyChatTemplate)(
       tmpl, msgs.data(), static_cast<int32_t>(msgs.size()), true, &buf[0],
       static_cast<int32_t>(buf.size()));
   if (written <= 0) {
+    LOGE("chat_template: written=%d needed=%d -> empty", written, needed);
     return env->NewStringUTF("");
   }
   buf.resize(static_cast<size_t>(written));
+  LOGI("chat_template: written=%d needed=%d", written, needed);
   return env->NewStringUTF(buf.c_str());
 }
 

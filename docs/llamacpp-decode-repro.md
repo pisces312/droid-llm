@@ -133,13 +133,22 @@ native 重构后跑通 `llama_decode rc=0` 即认为 prefill 路径未回归。
 
 | 环境 | 输入 | 结果 |
 |------|------|------|
-| 模拟器 + 本 CLI（arm64 + ndk_translation） | `prompt_exact.bin`（n=23） | **`llama_decode rc=0`，连续 3 次成功** |
+| **真机 arm64 + APK** | llama + Qwen3-0.6B，正常发消息 | **成功，无崩溃** |
+| 模拟器 x86_64 + 本 CLI（arm64 + ndk_translation） | `prompt_exact.bin`（n=23） | **`llama_decode rc=0`，连续 3 次成功** |
 | 模拟器 + 本 CLI | CHATML `你好`（n=20） | 成功 |
+| 模拟器 + 本 CLI | 1MB 小栈 pthread 上 decode（对齐 DefaultDispatch） | 成功 |
 | 模拟器 + APK（同模型同 prompt） | 同上 23 tokens | **`llama_decode` 内 SIGABRT**（见 llamacpp.md §8） |
 
-结论：同一模型、同一 token 序列下 **进程外 decode 正常**，崩溃依赖 app 运行环境
-（JNI / ART / 其它 so）。本工具因此适合做 **native 路径回归**；它复现不了的
-APK 崩溃不要当成它的失败。
+**结论（已由真机验收钉死）**：
+
+1. **llama.cpp 计算路径本身正确**——真机 arm64 上 APK 同模型可正常推理；
+   模拟器上 standalone 对同一 token 序列也 `rc=0`。
+2. 崩溃 **只发生在 x86 模拟器 + APK 进程**（arm64 so 经 `libndk_translation`
+   执行时）。不是算法 bug，也不是符号冲突（其它引擎 so 不导出 llama/ggml）。
+3. 本工具适合做 **native 路径回归**；它复现不了的「模拟器 APK 崩溃」不要
+   当成它的失败，那是 **ndk_translation × app 进程环境** 的兼容问题。
+4. 模拟器上的 llama 功能结论 **一律以真机为准**；模拟器仅作 UI/流程烟测
+   （且建议 `-gpu swiftshader_indirect`）。
 
 ## 7. 注意事项
 

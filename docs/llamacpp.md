@@ -171,21 +171,17 @@ val prompt = try {
 | 栈 | 仅 3 帧：`libc syscall` → `libndk_translation RunKernelSyscall` → 匿名 JIT 区 |
 | 时间 | guest `11:18:55 UTC` = 宿主 `19:18:55`（app 启动后 19s） |
 
-**关键结论**：
+**关键结论**（后半段有最终结论，以下为当时快照）：
 
 1. **这是 ARM-on-x86 翻译层崩溃**。APK 只带 `arm64-v8a`，x86 模拟器靠
    `libndk_translation` 执行 ARM64 llama.cpp 重 SIMD 代码。native 栈被翻译层
    吃掉，**无法从 tombstone 还原 ggml/llama 帧**。
 2. 崩溃发生在 **model load 成功之后、prefill/decode 期间**。日志停在
    `Model loaded`，用户点发送后约 1s 内 abort；没有 `tokenize failed`，
-   说明 tokenize 这次可能已通过，更像 `llama_decode` / GDN 计算里
-   `GGML_ASSERT`/`GGML_ABORT` 调 `abort()`。
-3. LFM2 走 **fused Gated Delta Net**（load 日志：`fused GDN (autoregressive/chunked)
-   enabled`）。`ggml_compute_forward_gated_delta_net` 有多条 `GGML_ASSERT`
-   （连续性、形状、`K>=1`）和 `GGML_ABORT("fatal error")`。
+   说明 tokenize 这次可能已通过，更像 `llama_decode` 计算路径 `abort()`。
+3. ~~LFM2 走 fused GDN~~（**已否定**：实测模型是 Qwen3-0.6B，GDN 仅为能力探测）。
 4. tombstone 内存附近残留字符串碎片 `...project/issues/` / `...machine configu...`，
-   疑似翻译层或 ggml 的报错正文，未完整落到 logcat（tombstone 日志截止在 abort
-   前 ~240ms）。
+   疑似翻译层报错正文，未完整落到 logcat。
 
 **Host 侧伴随事件**（非根因，但是本次会话副作用）：
 
@@ -220,3 +216,23 @@ ndk_translation 3 帧）。`Model loaded` → 发送 → ~1s abort，中间**零
 FORTIFY/O2/c++_shared/OpenMP，**decode 成功**，无法在进程外复现。差异在 app
 运行环境（JNI/ART/其它 so）。app 已加 `prompt_hex` / `token_ids` dump，
 便于把精确输入喂给该工具做 A/B。
+
+**最终结论（2026-09-28 真机验收后）**：
+
+| 环境 | 结果 |
+|------|------|
+| **真机 arm64 + APK + Qwen3-0.6B** | **正常，无崩溃** |
+| 模拟器 x86_64 + APK + 同模型同 23-token 输入 | `llama_decode` 内 SIGABRT |
+| 模拟器 + `tools/llama_decode_repro`（同输入） | `llama_decode rc=0` |
+
+1. **不是 llama.cpp / JNI 逻辑 bug**。同一 token 序列在真机 APK 与模拟器
+   standalone 都能 decode；先前的 GDN / `GGML_ASSERT` 推测 **已否定**
+   （模型是 Qwen3，GDN 只是能力探测；且 abort 非 `ggml_abort` 路径）。
+2. **崩溃窗口**：x86 模拟器上 arm64 so 经 `libndk_translation` 执行 ×
+   **APK 进程环境**（JNI/ART/其它 so 同进程）。standalone 同为 arm64+翻译层
+   却不崩，说明还要叠加上 app 进程因素。
+3. **工程约定**：llama 功能与 DoD **以真机为准**；模拟器仅做 UI/流程烟测。
+   模拟器上再看到该 SIGABRT（DefaultDispatch + ndk_translation 3 帧），
+   按本条归类为环境问题，不要回滚 native。
+4. 仍可选的收尾隔离（未做）：最小 APK（只 load llamacpp so）、模拟器上把
+   decode 挪到大栈 pthread、对比是否加载 QNN/MNN so 后才崩。

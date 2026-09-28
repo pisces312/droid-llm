@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <pthread.h>
 
 #include "llama.h"
 
@@ -147,7 +148,32 @@ int main(int argc, char** argv) {
 
   fprintf(stderr, "repro: llama_decode start n=%d\n", n_tokens);
   llama_memory_clear(llama_get_memory(ctx), true);
-  int rc = llama_decode(ctx, batch);
+  // Optional: run decode on a small-stack pthread like Kotlin Dispatchers.Default (~1MB).
+  int rc = -1;
+  struct DecodeArg { llama_context* c; llama_batch* b; int out; };
+  auto decode_fn = [](void* p) -> void* {
+    auto* a = static_cast<DecodeArg*>(p);
+    a->out = llama_decode(a->c, *a->b);
+    return nullptr;
+  };
+  const char* stack_kb = getenv("REPRO_STACK_KB");
+  if (stack_kb != nullptr && stack_kb[0] != 0) {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, (size_t)atol(stack_kb) * 1024);
+    DecodeArg arg{ctx, &batch, -1};
+    pthread_t th;
+    fprintf(stderr, "repro: decode on pthread stack=%sKB\n", stack_kb);
+    if (pthread_create(&th, &attr, decode_fn, &arg) != 0) {
+      fprintf(stderr, "repro: pthread_create failed\n");
+      return 1;
+    }
+    pthread_join(th, nullptr);
+    rc = arg.out;
+    pthread_attr_destroy(&attr);
+  } else {
+    rc = llama_decode(ctx, batch);
+  }
   fprintf(stderr, "repro: llama_decode rc=%d\n", rc);
 
   llama_sampler_free(smpl);

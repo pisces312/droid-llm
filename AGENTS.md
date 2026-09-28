@@ -138,3 +138,6 @@ third_party/llama.cpp    vendored 源码树
 - `when` 表达式里禁止自引用同一 `val`（用 `config.backend` 等）。
 - MNN `Llm::createLLM(dir)` 需要目录内有 `config.json`；流式用 `response(ChatMessages, ostream)`。
 - llama.cpp 用纯 `llama.h`（不链 `common`），batch 工具函数本地内联。
+- **llama 在 x86 模拟器上可能 SIGABRT**（DefaultDispatch + ndk_translation 栈）：
+  真机 arm64 正常、`tools/llama_decode_repro` 也正常 → 按环境问题处理，
+  **不要回滚 native**。llama 功能 DoD 以真机为准（详见 `docs/llamacpp.md` §8）。
