@@ -1,8 +1,14 @@
 """Convert MnnLlmChat model_market.json into droid-llm model_catalog.json.
 
-Also appends hand-curated LiteRT / llama.cpp GGUF entries (single-file Q4_K_M
-where possible; params ≤ 10B). GGUF rows were verified against the HF tree API
-(hf-mirror.com) — keep fileInRepo / sizeBytes in sync when editing.
+Also appends hand-curated LiteRT (.litertlm / .task) and llama.cpp GGUF entries
+(single-file Q4_K_M where possible; params ≤ 10B). GGUF rows were verified
+against the HF tree API (hf-mirror.com); LiteRT rows follow Google AI Edge
+Gallery `model_allowlists` and were checked on HF Content-Length + ModelScope
+tree — keep fileInRepo / sizeBytes in sync when editing.
+
+Gemma weights are gated on HF (403 without license acceptance) but the same
+`litert-community/*` / `google/*` repos download freely from ModelScope, so
+Gemma rows always carry both sources.
 """
 
 import json
@@ -266,6 +272,156 @@ def gguf_entry(row) -> dict:
     }
 
 
+# (id, name, vendor, description, size_bytes, file_in_repo, hf_repo, ms_repo, tags)
+# Prefer single-file .litertlm (LiteRT-LM). Gallery allowlist is the source of
+# truth for recommended models; sizes cross-checked on MS tree / HF headers.
+LITERT_MODELS = [
+    (
+        "gemma3-1b-it-int4-litertlm",
+        "Gemma3-1B-IT int4 (.litertlm)",
+        "Google",
+        "1B 指令模型，QAT int4，Gallery 推荐",
+        584417280,
+        "gemma3-1b-it-int4.litertlm",
+        "litert-community/Gemma3-1B-IT",
+        "litert-community/Gemma3-1B-IT",
+        ["chat"],
+    ),
+    (
+        "qwen2.5-1.5b-instruct-q8-litertlm",
+        "Qwen2.5-1.5B-Instruct q8 (.litertlm)",
+        "Qwen",
+        "1.5B 指令模型，q8 ekv4096，Gallery 推荐",
+        1597931520,
+        "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+        "litert-community/Qwen2.5-1.5B-Instruct",
+        "litert-community/Qwen2.5-1.5B-Instruct",
+        ["chat"],
+    ),
+    (
+        "deepseek-r1-distill-qwen-1.5b-q8-litertlm",
+        "DeepSeek-R1-Distill-Qwen-1.5B q8 (.litertlm)",
+        "DeepSeek",
+        "1.5B 推理蒸馏，q8 ekv4096，Gallery 推荐",
+        1833451520,
+        "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
+        "litert-community/DeepSeek-R1-Distill-Qwen-1.5B",
+        "litert-community/DeepSeek-R1-Distill-Qwen-1.5B",
+        ["reasoning"],
+    ),
+    (
+        "phi-4-mini-instruct-q8-litertlm",
+        "Phi-4-mini-instruct q8 (.litertlm)",
+        "Microsoft",
+        "3.8B 指令模型，q8 ekv4096",
+        3910090752,
+        "Phi-4-mini-instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+        "litert-community/Phi-4-mini-instruct",
+        "litert-community/Phi-4-mini-instruct",
+        ["chat"],
+    ),
+    (
+        "qwen3-0.6b-litertlm",
+        "Qwen3-0.6B (.litertlm)",
+        "Qwen",
+        "0.6B 混合思考，单文件",
+        614236160,
+        "Qwen3-0.6B.litertlm",
+        "litert-community/Qwen3-0.6B",
+        "litert-community/Qwen3-0.6B",
+        ["chat", "thinking"],
+    ),
+    (
+        "gemma3-270m-it-q8-litertlm",
+        "Gemma3-270M-it q8 (.litertlm)",
+        "Google",
+        "270M 超轻量指令模型",
+        304005120,
+        "gemma3-270m-it-q8.litertlm",
+        "litert-community/gemma-3-270m-it",
+        "litert-community/gemma-3-270m-it",
+        ["chat"],
+    ),
+    (
+        "minicpm5-2b-int4-litertlm",
+        "MiniCPM5-2B int4 (.litertlm)",
+        "OpenBMB",
+        "2B 指令模型，int4",
+        1553670064,
+        "MiniCPM5-2B_int4.litertlm",
+        "litert-community/MiniCPM5-2B",
+        "litert-community/MiniCPM5-2B",
+        ["chat"],
+    ),
+    (
+        "qwen3.5-2b-int8-litertlm",
+        "Qwen3.5-2B int8 (.litertlm)",
+        "Qwen",
+        "2B 指令模型，int8",
+        2116592816,
+        "Qwen3.5-2B_int8.litertlm",
+        "litert-community/Qwen3.5-2B",
+        "litert-community/Qwen3.5-2B",
+        ["chat"],
+    ),
+    (
+        "qwen2.5-coder-3b-it-litertlm",
+        "Qwen2.5-Coder-3B-Instruct (.litertlm)",
+        "Qwen",
+        "3B 代码模型，单文件",
+        3433083824,
+        "Qwen2.5_Coder_3B_It.litertlm",
+        "litert-community/Qwen2.5-Coder-3B-Instruct",
+        "litert-community/Qwen2.5-Coder-3B-Instruct",
+        ["coding"],
+    ),
+    (
+        "gemma-3n-e2b-it-int4-litertlm",
+        "Gemma-3n-E2B-it int4 (.litertlm)",
+        "Google",
+        "E2B 多模态（文/图/音），Gallery 推荐",
+        3655827456,
+        "gemma-3n-E2B-it-int4.litertlm",
+        "google/gemma-3n-E2B-it-litert-lm",
+        "google/gemma-3n-E2B-it-litert-lm",
+        ["chat", "multimodal"],
+    ),
+    (
+        "gemma-3n-e4b-it-int4-litertlm",
+        "Gemma-3n-E4B-it int4 (.litertlm)",
+        "Google",
+        "E4B 多模态（文/图/音），Gallery 推荐",
+        4919541760,
+        "gemma-3n-E4B-it-int4.litertlm",
+        "google/gemma-3n-E4B-it-litert-lm",
+        "google/gemma-3n-E4B-it-litert-lm",
+        ["chat", "multimodal"],
+    ),
+]
+
+
+def litert_entry(row) -> dict:
+    model_id, name, vendor, desc, size, file_name, hf_repo, ms_repo, tags = row
+    sources = {}
+    if hf_repo:
+        sources["HuggingFace"] = hf_repo
+    if ms_repo:
+        sources["ModelScope"] = ms_repo
+    return {
+        "id": model_id,
+        "name": name,
+        "engine": "LITERT",
+        "vendor": vendor,
+        "description": desc,
+        "sizeBytes": size,
+        "kind": "file",
+        "localPath": file_name,
+        "fileInRepo": file_name,
+        "sources": sources,
+        "tags": tags,
+    }
+
+
 def main() -> None:
     src = json.loads(SRC.read_text(encoding="utf-8"))
     models = []
@@ -298,6 +454,7 @@ def main() -> None:
             entry["categories"] = cats
         models.append(entry)
 
+    # Legacy .task MediaPipe packs (kept for devices that prefer that format).
     extra = [
         {
             "id": "gemma3-1b-it-q4-task",
@@ -309,7 +466,10 @@ def main() -> None:
             "kind": "file",
             "localPath": "Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task",
             "fileInRepo": "Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task",
-            "sources": {"HuggingFace": "litert-community/Gemma3-1B-IT"},
+            "sources": {
+                "HuggingFace": "litert-community/Gemma3-1B-IT",
+                "ModelScope": "litert-community/Gemma3-1B-IT",
+            },
             "tags": [],
         },
         {
@@ -318,14 +478,18 @@ def main() -> None:
             "engine": "LITERT",
             "vendor": "Qwen",
             "description": "LiteRT-LM 量化模型包",
-            "sizeBytes": 1625493432,
+            "sizeBytes": 1597913616,
             "kind": "file",
             "localPath": "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
             "fileInRepo": "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
-            "sources": {"HuggingFace": "litert-community/Qwen2.5-1.5B-Instruct"},
+            "sources": {
+                "HuggingFace": "litert-community/Qwen2.5-1.5B-Instruct",
+                "ModelScope": "litert-community/Qwen2.5-1.5B-Instruct",
+            },
             "tags": [],
         },
     ]
+    extra.extend(litert_entry(row) for row in LITERT_MODELS)
     extra.extend(gguf_entry(row) for row in GGUF_MODELS)
 
     out = {"version": 2, "models": models + extra}
@@ -333,8 +497,9 @@ def main() -> None:
     both = sum(1 for m in models if m["sources"]["HuggingFace"] and m["sources"]["ModelScope"])
     hf_only = sum(1 for m in models if m["sources"]["HuggingFace"] and not m["sources"]["ModelScope"])
     ms_only = sum(1 for m in models if m["sources"]["ModelScope"] and not m["sources"]["HuggingFace"])
+    litert = sum(1 for m in extra if m["engine"] == "LITERT")
     print(
-        f"mnn={len(models)} litert=2 gguf={len(GGUF_MODELS)} total={len(out['models'])} "
+        f"mnn={len(models)} litert={litert} gguf={len(GGUF_MODELS)} total={len(out['models'])} "
         f"both={both} hf_only={hf_only} ms_only={ms_only}"
     )
     print(f"wrote {DST}")

@@ -3338,7 +3338,8 @@
       "localPath": "Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task",
       "fileInRepo": "Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task",
       "sources": {
-        "HuggingFace": "litert-community/Gemma3-1B-IT"
+        "HuggingFace": "litert-community/Gemma3-1B-IT",
+        "ModelScope": "litert-community/Gemma3-1B-IT"
       },
       "tags": []
     },
@@ -3348,14 +3349,216 @@
       "engine": "LITERT",
       "vendor": "Qwen",
       "description": "LiteRT-LM 量化模型包",
-      "sizeBytes": 1625493432,
+      "sizeBytes": 1597913616,
       "kind": "file",
       "localPath": "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
       "fileInRepo": "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
       "sources": {
-        "HuggingFace": "litert-community/Qwen2.5-1.5B-Instruct"
+        "HuggingFace": "litert-community/Qwen2.5-1.5B-Instruct",
+        "ModelScope": "litert-community/Qwen2.5-1.5B-Instruct"
       },
       "tags": []
+    },
+    {
+      "id": "gemma3-1b-it-int4-litertlm",
+      "name": "Gemma3-1B-IT int4 (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "Google",
+      "description": "1B 指令模型，QAT int4，Gallery 推荐",
+      "sizeBytes": 584417280,
+      "kind": "file",
+      "localPath": "gemma3-1b-it-int4.litertlm",
+      "fileInRepo": "gemma3-1b-it-int4.litertlm",
+      "sources": {
+        "HuggingFace": "litert-community/Gemma3-1B-IT",
+        "ModelScope": "litert-community/Gemma3-1B-IT"
+      },
+      "tags": [
+        "chat"
+      ]
+    },
+    {
+      "id": "qwen2.5-1.5b-instruct-q8-litertlm",
+      "name": "Qwen2.5-1.5B-Instruct q8 (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "Qwen",
+      "description": "1.5B 指令模型，q8 ekv4096，Gallery 推荐",
+      "sizeBytes": 1597931520,
+      "kind": "file",
+      "localPath": "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+      "fileInRepo": "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+      "sources": {
+        "HuggingFace": "litert-community/Qwen2.5-1.5B-Instruct",
+        "ModelScope": "litert-community/Qwen2.5-1.5B-Instruct"
+      },
+      "tags": [
+        "chat"
+      ]
+    },
+    {
+      "id": "deepseek-r1-distill-qwen-1.5b-q8-litertlm",
+      "name": "DeepSeek-R1-Distill-Qwen-1.5B q8 (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "DeepSeek",
+      "description": "1.5B 推理蒸馏，q8 ekv4096，Gallery 推荐",
+      "sizeBytes": 1833451520,
+      "kind": "file",
+      "localPath": "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
+      "fileInRepo": "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
+      "sources": {
+        "HuggingFace": "litert-community/DeepSeek-R1-Distill-Qwen-1.5B",
+        "ModelScope": "litert-community/DeepSeek-R1-Distill-Qwen-1.5B"
+      },
+      "tags": [
+        "reasoning"
+      ]
+    },
+    {
+      "id": "phi-4-mini-instruct-q8-litertlm",
+      "name": "Phi-4-mini-instruct q8 (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "Microsoft",
+      "description": "3.8B 指令模型，q8 ekv4096",
+      "sizeBytes": 3910090752,
+      "kind": "file",
+      "localPath": "Phi-4-mini-instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+      "fileInRepo": "Phi-4-mini-instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+      "sources": {
+        "HuggingFace": "litert-community/Phi-4-mini-instruct",
+        "ModelScope": "litert-community/Phi-4-mini-instruct"
+      },
+      "tags": [
+        "chat"
+      ]
+    },
+    {
+      "id": "qwen3-0.6b-litertlm",
+      "name": "Qwen3-0.6B (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "Qwen",
+      "description": "0.6B 混合思考，单文件",
+      "sizeBytes": 614236160,
+      "kind": "file",
+      "localPath": "Qwen3-0.6B.litertlm",
+      "fileInRepo": "Qwen3-0.6B.litertlm",
+      "sources": {
+        "HuggingFace": "litert-community/Qwen3-0.6B",
+        "ModelScope": "litert-community/Qwen3-0.6B"
+      },
+      "tags": [
+        "chat",
+        "thinking"
+      ]
+    },
+    {
+      "id": "gemma3-270m-it-q8-litertlm",
+      "name": "Gemma3-270M-it q8 (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "Google",
+      "description": "270M 超轻量指令模型",
+      "sizeBytes": 304005120,
+      "kind": "file",
+      "localPath": "gemma3-270m-it-q8.litertlm",
+      "fileInRepo": "gemma3-270m-it-q8.litertlm",
+      "sources": {
+        "HuggingFace": "litert-community/gemma-3-270m-it",
+        "ModelScope": "litert-community/gemma-3-270m-it"
+      },
+      "tags": [
+        "chat"
+      ]
+    },
+    {
+      "id": "minicpm5-2b-int4-litertlm",
+      "name": "MiniCPM5-2B int4 (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "OpenBMB",
+      "description": "2B 指令模型，int4",
+      "sizeBytes": 1553670064,
+      "kind": "file",
+      "localPath": "MiniCPM5-2B_int4.litertlm",
+      "fileInRepo": "MiniCPM5-2B_int4.litertlm",
+      "sources": {
+        "HuggingFace": "litert-community/MiniCPM5-2B",
+        "ModelScope": "litert-community/MiniCPM5-2B"
+      },
+      "tags": [
+        "chat"
+      ]
+    },
+    {
+      "id": "qwen3.5-2b-int8-litertlm",
+      "name": "Qwen3.5-2B int8 (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "Qwen",
+      "description": "2B 指令模型，int8",
+      "sizeBytes": 2116592816,
+      "kind": "file",
+      "localPath": "Qwen3.5-2B_int8.litertlm",
+      "fileInRepo": "Qwen3.5-2B_int8.litertlm",
+      "sources": {
+        "HuggingFace": "litert-community/Qwen3.5-2B",
+        "ModelScope": "litert-community/Qwen3.5-2B"
+      },
+      "tags": [
+        "chat"
+      ]
+    },
+    {
+      "id": "qwen2.5-coder-3b-it-litertlm",
+      "name": "Qwen2.5-Coder-3B-Instruct (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "Qwen",
+      "description": "3B 代码模型，单文件",
+      "sizeBytes": 3433083824,
+      "kind": "file",
+      "localPath": "Qwen2.5_Coder_3B_It.litertlm",
+      "fileInRepo": "Qwen2.5_Coder_3B_It.litertlm",
+      "sources": {
+        "HuggingFace": "litert-community/Qwen2.5-Coder-3B-Instruct",
+        "ModelScope": "litert-community/Qwen2.5-Coder-3B-Instruct"
+      },
+      "tags": [
+        "coding"
+      ]
+    },
+    {
+      "id": "gemma-3n-e2b-it-int4-litertlm",
+      "name": "Gemma-3n-E2B-it int4 (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "Google",
+      "description": "E2B 多模态（文/图/音），Gallery 推荐",
+      "sizeBytes": 3655827456,
+      "kind": "file",
+      "localPath": "gemma-3n-E2B-it-int4.litertlm",
+      "fileInRepo": "gemma-3n-E2B-it-int4.litertlm",
+      "sources": {
+        "HuggingFace": "google/gemma-3n-E2B-it-litert-lm",
+        "ModelScope": "google/gemma-3n-E2B-it-litert-lm"
+      },
+      "tags": [
+        "chat",
+        "multimodal"
+      ]
+    },
+    {
+      "id": "gemma-3n-e4b-it-int4-litertlm",
+      "name": "Gemma-3n-E4B-it int4 (.litertlm)",
+      "engine": "LITERT",
+      "vendor": "Google",
+      "description": "E4B 多模态（文/图/音），Gallery 推荐",
+      "sizeBytes": 4919541760,
+      "kind": "file",
+      "localPath": "gemma-3n-E4B-it-int4.litertlm",
+      "fileInRepo": "gemma-3n-E4B-it-int4.litertlm",
+      "sources": {
+        "HuggingFace": "google/gemma-3n-E4B-it-litert-lm",
+        "ModelScope": "google/gemma-3n-E4B-it-litert-lm"
+      },
+      "tags": [
+        "chat",
+        "multimodal"
+      ]
     },
     {
       "id": "qwen2.5-0.5b-instruct-q4k-gguf",
