@@ -3,6 +3,8 @@ package io.github.pisces312.droidllm.ui.settings
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +30,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,11 +46,20 @@ import io.github.pisces312.droidllm.common.bench.BenchmarkDao
 import io.github.pisces312.droidllm.common.device.DeviceProbe
 import io.github.pisces312.droidllm.api.ApiServerPreferences
 import io.github.pisces312.droidllm.apiserver.ApiServerConfig
+import io.github.pisces312.droidllm.common.model.ModelParamsStore
 import io.github.pisces312.droidllm.common.model.ModelPathStore
 import io.github.pisces312.droidllm.common.model.ModelRootMigrator
+import io.github.pisces312.droidllm.common.model.StoredModel
 import io.github.pisces312.droidllm.common.settings.AppSettings
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
+import io.github.pisces312.droidllm.common.settings.BundledApiServer
+import io.github.pisces312.droidllm.common.settings.BundledSettings
+import io.github.pisces312.droidllm.common.settings.BundleParseResult
 import io.github.pisces312.droidllm.common.settings.DEFAULT_SYSTEM_PROMPT
+import io.github.pisces312.droidllm.common.settings.ImportPlan
+import io.github.pisces312.droidllm.common.settings.SettingsBundle
+import io.github.pisces312.droidllm.common.settings.SettingsBundleCodec
+import io.github.pisces312.droidllm.common.settings.SettingsBundleMerger
 import io.github.pisces312.droidllm.common.settings.ThemeMode
 import io.github.pisces312.droidllm.data.catalog.ModelAutoImporter
 import io.github.pisces312.droidllm.service.ApiForegroundService
@@ -97,6 +109,7 @@ class SettingsViewModel @Inject constructor(
     private val settingsStore: AppSettingsStore,
     private val benchmarkDao: BenchmarkDao,
     private val modelStore: ModelPathStore,
+    private val modelParamsStore: ModelParamsStore,
     private val autoImporter: ModelAutoImporter,
     private val apiPrefs: ApiServerPreferences,
 ) : ViewModel() {
@@ -186,6 +199,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setMultiModelResidency(enabled) }
     }
 
+    fun setHfUseMirror(useMirror: Boolean) {
+        viewModelScope.launch { settingsStore.setHfUseMirror(useMirror) }
+    }
+
     fun setSampling(
         temperature: Float?,
         topK: Int?,
@@ -220,6 +237,124 @@ class SettingsViewModel @Inject constructor(
 
     fun setSystemPrompt(prompt: String) {
         viewModelScope.launch { settingsStore.setSystemPrompt(prompt) }
+    }
+
+    // ---- Settings export / import (SAF) ------------------------------------
+
+    /** Non-null while an import awaits the user's confirmation. */
+    private val _pendingImport = MutableStateFlow<ImportPlan?>(null)
+    val pendingImport: StateFlow<ImportPlan?> = _pendingImport.asStateFlow()
+
+    /** Set after a successful export so the UI can show the destination URI. */
+    private val _lastExport = MutableStateFlow<String?>(null)
+    val lastExport: StateFlow<String?> = _lastExport.asStateFlow()
+
+    /**
+     * Build the bundle from the live stores and serialize it.
+     * Returns the JSON text; the caller writes it to the SAF handle it owns.
+     */
+    suspend fun buildExportJson(includeApiServer: Boolean): String {
+        val s = settingsStore.current()
+        val models = modelStore.listModels().map { StoredModel.from(it) }
+        val params = modelParamsStore.all()
+        val api = if (includeApiServer) {
+            val cur = apiPrefs.current()
+            BundledApiServer(
+                port = cur.port,
+                bindAddress = cur.bindAddress,
+                authEnabled = cur.authEnabled,
+                corsEnabled = cur.corsEnabled,
+                corsOrigins = cur.corsOrigins,
+            )
+        } else {
+            null
+        }
+        return SettingsBundleCodec.encode(
+            SettingsBundle(
+                version = SettingsBundle.CURRENT_VERSION,
+                appVersion = appVersionName(),
+                exportedAt = java.time.LocalDateTime.now().toString().substringBefore('.').replace('T', ' '),
+                settings = BundledSettings.from(s),
+                models = models,
+                modelParams = params,
+                apiServer = api,
+            ),
+        )
+    }
+
+    fun noteExported(uriDisplay: String) {
+        _lastExport.value = uriDisplay
+        _message.value = "已导出设置：$uriDisplay"
+    }
+
+    fun noteImportError(detail: String) {
+        _message.value = "导入失败：$detail"
+    }
+
+    private fun appVersionName(): String = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+    }.getOrDefault("")
+
+    /**
+     * Parse the picked file and stage an import plan. Nothing is written until
+     * the user confirms in the dialog — a wrong file must not silently rewrite
+     * the settings.
+     */
+    fun stageImport(text: String) {
+        when (val parsed = SettingsBundleCodec.decode(text)) {
+            is BundleParseResult.Ok -> {
+                viewModelScope.launch {
+                    val existingModels = runCatching { modelStore.listModels() }
+                        .getOrDefault(emptyList())
+                        .map { StoredModel.from(it) }
+                    val plan = SettingsBundleMerger.plan(
+                        bundle = parsed.bundle,
+                        existingModels = existingModels,
+                        existingParams = modelParamsStore.all(),
+                        includeApiServer = parsed.bundle.apiServer != null,
+                    )
+                    _pendingImport.value = plan
+                }
+            }
+            BundleParseResult.Empty -> _message.value = "导入失败：文件为空"
+            is BundleParseResult.Malformed -> _message.value = "导入失败：不是有效的设置文件（${parsed.detail}）"
+            is BundleParseResult.VersionMismatch ->
+                _message.value = "导入失败：文件版本 ${parsed.found} 高于本应用支持的 ${parsed.expected}"
+        }
+    }
+
+    fun cancelImport() {
+        _pendingImport.value = null
+    }
+
+    /** Apply the staged plan. Additive: local-only models and params survive. */
+    fun confirmImport() {
+        val plan = _pendingImport.value ?: return
+        viewModelScope.launch {
+            settingsStore.applyImported(plan.settings.toAppSettings())
+            modelStore.applyImported(plan.modelsToAdd + plan.modelsToUpdate)
+            modelParamsStore.replaceAll(plan.modelParamsToWrite)
+            plan.apiServer?.let { a ->
+                val cur = apiPrefs.current()
+                apiPrefs.update(
+                    cur.copy(
+                        port = a.port,
+                        bindAddress = a.bindAddress,
+                        authEnabled = a.authEnabled,
+                        corsEnabled = a.corsEnabled,
+                        corsOrigins = a.corsOrigins,
+                    ),
+                )
+                _apiConfig.value = apiPrefs.current()
+                if (_apiConfig.value.enabled) {
+                    ApiForegroundService.stop(context)
+                    ApiForegroundService.start(context)
+                }
+            }
+            _pendingImport.value = null
+            _message.value = "已导入：${plan.modelsToAdd.size} 新增 / ${plan.modelsToUpdate.size} 覆盖模型，" +
+                "${plan.modelParamsToWrite.size} 组参数"
+        }
     }
 
     /**
@@ -339,6 +474,50 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     var storagePrompt by remember { mutableStateOf(false) }
     var metricsHelp by remember { mutableStateOf(false) }
     var aboutExpanded by remember { mutableStateOf(false) }
+    var exportIncludeApi by remember { mutableStateOf(false) }
+    var exportSheet by remember { mutableStateOf(false) }
+    val importPlan by vm.pendingImport.collectAsState()
+    val lastExport by vm.lastExport.collectAsState()
+
+    val scope = rememberCoroutineScope()
+
+    // System picker (DocumentsUI): the only route that also exposes the gallery,
+    // cloud drives and recents, which a hand-rolled File browser cannot reach.
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(SettingsBundle.MIME),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val json = vm.buildExportJson(exportIncludeApi)
+            val ok = runCatching {
+                context.contentResolver.openOutputStream(uri, "wt")?.use { out ->
+                    out.write(json.toByteArray(Charsets.UTF_8))
+                } ?: error("无法写入所选位置")
+            }
+            if (ok.isSuccess) {
+                vm.noteExported(uri.toString())
+            } else {
+                vm.noteExported("失败：" + (ok.exceptionOrNull()?.message ?: "未知"))
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val text = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    input.bufferedReader(Charsets.UTF_8).readText()
+                } ?: error("无法读取所选文件")
+            }.getOrElse { e ->
+                vm.noteImportError(e.message ?: "无法读取所选文件")
+                return@launch
+            }
+            vm.stageImport(text)
+        }
+    }
 
     Column(
         Modifier
@@ -597,6 +776,37 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             )
         }
 
+        SectionCard("模型下载") {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("HF 使用镜像站", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (settings.hfUseMirror) {
+                            "当前：hf-mirror.com（国内可直连，默认）"
+                        } else {
+                            "当前：huggingface.co（官方）"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = settings.hfUseMirror,
+                    onCheckedChange = vm::setHfUseMirror,
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "只切换下载域名；HF 官方与镜像共用同一份模型仓库 id 和 `hf/` 磁盘布局，" +
+                    "来回切换无需迁移或重新校验已下载的模型。ModelScope 固定 modelscope.cn。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         SectionCard("数据") {
             val root = vm.modelRoot()
             val def = vm.defaultModelRootPath()
@@ -646,6 +856,37 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                 onClick = vm::clearBenchDb,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(12.dp))
+            Text("设置备份", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "导出设置参数、已注册模型和每个模型的参数覆盖为一份 JSON，" +
+                    "换机或重装后导入即可恢复。不含模型文件本身、模型根目录和 API Key。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedToolButton(
+                    "导出…",
+                    onClick = { exportSheet = true },
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedToolButton(
+                    "导入…",
+                    onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            lastExport?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "上次导出：$it",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         SectionCard("设备信息") {
@@ -826,6 +1067,76 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                 }
             },
             onDismiss = { showBrowser = false },
+        )
+    }
+
+    if (exportSheet) {
+        AlertDialog(
+            onDismissRequest = { exportSheet = false },
+            shape = RoundedCornerShape(12.dp),
+            title = { Text("导出设置") },
+            text = {
+                Column {
+                    Text(
+                        "将写入一份 JSON：设置参数、已注册模型、单模型参数覆盖。",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("包含 API 服务器配置", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "端口 / 绑定地址 / 鉴权开关；API Key 永不导出",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(checked = exportIncludeApi, onCheckedChange = { exportIncludeApi = it })
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { exportSheet = false }) { Text("取消") }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    exportSheet = false
+                    val stamp = java.time.LocalDate.now().toString().replace("-", "")
+                    exportLauncher.launch("${SettingsBundle.FILE_PREFIX}$stamp.json")
+                }) { Text("选择保存位置") }
+            },
+        )
+    }
+
+    val plan = importPlan
+    if (plan != null) {
+        AlertDialog(
+            onDismissRequest = vm::cancelImport,
+            shape = RoundedCornerShape(12.dp),
+            title = { Text("导入设置") },
+            text = {
+                Column {
+                    Text("将应用以下内容：", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(6.dp))
+                    Text("· 设置参数：覆盖当前值")
+                    Text("· 注册模型：新增 ${plan.modelsToAdd.size} 个，覆盖 ${plan.modelsToUpdate.size} 个")
+                    Text("· 单模型参数：写入 ${plan.modelParamsToWrite.size} 组")
+                    if (plan.apiServer != null) Text("· API 服务器配置：覆盖端口与绑定")
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "本机独有、文件中没有的模型与参数会保留；模型文件本身不会被改动，" +
+                            "若文件不在本机会显示为路径无效。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = vm::cancelImport) { Text("取消") }
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.confirmImport() }) { Text("导入") }
+            },
         )
     }
 

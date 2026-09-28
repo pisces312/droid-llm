@@ -3,6 +3,8 @@ package io.github.pisces312.droidllm.ui.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.pisces312.droidllm.common.model.ModelParamsOverride
+import io.github.pisces312.droidllm.common.model.ModelParamsStore
 import io.github.pisces312.droidllm.common.model.ModelPathStore
 import io.github.pisces312.droidllm.common.settings.AppSettings
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
@@ -72,6 +74,8 @@ enum class SessionState { IDLE, LOADING, READY, FAILED }
 data class ChatUiMessage(
     val role: ChatRole,
     val content: String,
+    /** Snapshot of the per-turn Thinking knob; display uses it to drop empty/off thinking blocks. */
+    val thinkingEnabled: Boolean = true,
     val ttftMs: Long? = null,
     val prefillTps: Double? = null,
     val decodeTps: Double? = null,
@@ -91,12 +95,52 @@ data class SamplingUiState(
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
     /** Reasoning on/off for the next turn (UI_REVIEW §3.2 模式 3). */
     val enableThinking: Boolean = true,
-)
+    /**
+     * Per-model overlay for the currently selected model. Null = every field
+     * falls back to the global Settings defaults. Non-null fields are marked
+     * "仅本模型" in the sampling sheet.
+     */
+    val override: ModelParamsOverride = ModelParamsOverride(),
+) {
+    /** Fields currently pinned to this model rather than the global default. */
+    val overriddenFields: Set<ParamsField>
+        get() = buildSet {
+            if (override.temperature != null) add(ParamsField.TEMPERATURE)
+            if (override.topK != null) add(ParamsField.TOP_K)
+            if (override.topP != null) add(ParamsField.TOP_P)
+            if (override.threads != null) add(ParamsField.THREADS)
+            if (override.maxNewTokens != null) add(ParamsField.MAX_NEW_TOKENS)
+            if (override.backend != null) add(ParamsField.BACKEND)
+            if (override.systemPrompt != null) add(ParamsField.SYSTEM_PROMPT)
+        }
+
+    val hasOverrides: Boolean get() = overriddenFields.isNotEmpty()
+}
+
+/** Sampling fields a per-model override can pin (drives the "仅本模型" markers). */
+enum class ParamsField {
+    TEMPERATURE,
+    TOP_K,
+    TOP_P,
+    THREADS,
+    MAX_NEW_TOKENS,
+    BACKEND,
+    SYSTEM_PROMPT,
+}
+
+/** Typed value for one overlay write; `null` value = unpin that field. */
+sealed interface FieldValue {
+    data class Num(val v: Int) : FieldValue
+    data class Dec(val v: Float) : FieldValue
+    data class BackendValue(val v: Backend) : FieldValue
+    data class Text(val v: String) : FieldValue
+}
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val engineSet: Set<@JvmSuppressWildcards LlmEngine>,
     private val modelStore: ModelPathStore,
+    private val modelParamsStore: ModelParamsStore,
     private val probe: io.github.pisces312.droidllm.common.device.DeviceProbe,
     private val sessionRegistry: io.github.pisces312.droidllm.common.bench.SessionRegistry,
     private val settingsStore: AppSettingsStore,
@@ -146,16 +190,25 @@ class ChatViewModel @Inject constructor(
     /** Kept sessions when multi-model residency is on (DESIGN §3.3). */
     private val resident = LinkedHashMap<String, Pair<LlmEngine, SessionHandle>>()
 
+    /** Latest global defaults; the per-model overlay is applied on top of these. */
+    private var globalSettings = AppSettings()
+
     init {
         viewModelScope.launch {
-            val settings = settingsStore.current()
-            multiResidency = settings.multiModelResidency
-            _sampling.value = settings.toSamplingUi()
+            globalSettings = settingsStore.current()
+            multiResidency = globalSettings.multiModelResidency
+            _sampling.value = effectiveSampling()
             settingsStore.observe().collect { s ->
+                globalSettings = s
                 multiResidency = s.multiModelResidency
-                if (!_generating.value) {
-                    _sampling.value = s.toSamplingUi()
-                }
+                if (!_generating.value) refreshSampling()
+            }
+        }
+        // A settings import rewrites the overlay for the selected model too.
+        viewModelScope.launch {
+            modelParamsStore.observe().collect { map ->
+                overridesByModel = map
+                if (!_generating.value) refreshSampling()
             }
         }
         viewModelScope.launch {
@@ -184,18 +237,37 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun AppSettings.toSamplingUi() = SamplingUiState(
-        temperature = temperature,
-        topK = topK,
-        topP = topP,
-        threads = threads,
-        maxNewTokens = maxNewTokens,
-        backend = backend,
-        systemPrompt = systemPrompt,
-        // Thinking is a per-turn knob, not a Settings default; keep the current
-        // session value when Settings pushes a new sampling snapshot.
-        enableThinking = _sampling.value.enableThinking,
-    )
+    /**
+     * Global defaults with the selected model's overlay applied on top.
+     * Reading the overlay from the in-memory [ModelParamsStore] snapshot is not
+     * possible synchronously, so callers that need the *stored* value must go
+     * through [loadOverrideForSelected]; this uses the last observed snapshot.
+     */
+    private fun effectiveSampling(): SamplingUiState {
+        val s = globalSettings
+        val o = overridesByModel[_selectedModel.value?.model?.id] ?: ModelParamsOverride()
+        return SamplingUiState(
+            temperature = o.temperature ?: s.temperature,
+            topK = o.topK ?: s.topK,
+            topP = o.topP ?: s.topP,
+            threads = o.threads ?: s.threads,
+            maxNewTokens = o.maxNewTokens ?: s.maxNewTokens,
+            backend = ModelParamsOverride.backendOf(o.backend) ?: s.backend,
+            systemPrompt = o.systemPrompt ?: s.systemPrompt,
+            // Thinking is a per-turn knob, not a Settings default; keep the current
+            // session value when Settings pushes a new sampling snapshot.
+            enableThinking = _sampling.value.enableThinking,
+            override = o,
+        )
+    }
+
+    /** Latest overlay snapshot, refreshed by the `modelParamsStore.observe()` collector. */
+    private var overridesByModel: Map<String, ModelParamsOverride> = emptyMap()
+
+    private fun refreshSampling() {
+        val next = effectiveSampling()
+        _sampling.value = if (next == _sampling.value) _sampling.value else next
+    }
 
     /** Picking an engine releases any running model; the new one waits for [startModel]. */
     fun selectEngine(choice: EngineChoice) {
@@ -214,6 +286,8 @@ class ChatViewModel @Inject constructor(
             _selectedModel.value = choice
             markIdle()
             refreshThinkingSupport(choice)
+            // Swap in this model's overlay (or drop back to global defaults).
+            refreshSampling()
         }
     }
 
@@ -289,6 +363,35 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Pin one sampling field to the selected model (overlay write), or unpin it
+     * with `value = null` so the field falls back to the global Settings default.
+     *
+     * Callers edit the *effective* value they see on screen: pinning with a value
+     * persists that value, editing a pinned field overwrites it, and unpinning
+     * always falls back to the global default.
+     */
+    fun setModelOverride(field: ParamsField, value: FieldValue?) {
+        val modelId = _selectedModel.value?.model?.id ?: return
+        val cur = _sampling.value.override
+        val next = when (field) {
+            ParamsField.TEMPERATURE -> cur.copy(temperature = (value as? FieldValue.Dec)?.v)
+            ParamsField.TOP_K -> cur.copy(topK = (value as? FieldValue.Num)?.v)
+            ParamsField.TOP_P -> cur.copy(topP = (value as? FieldValue.Dec)?.v)
+            ParamsField.THREADS -> cur.copy(threads = (value as? FieldValue.Num)?.v)
+            ParamsField.MAX_NEW_TOKENS -> cur.copy(maxNewTokens = (value as? FieldValue.Num)?.v)
+            ParamsField.BACKEND -> cur.copy(backend = (value as? FieldValue.BackendValue)?.v?.name)
+            ParamsField.SYSTEM_PROMPT -> cur.copy(systemPrompt = (value as? FieldValue.Text)?.v)
+        }
+        viewModelScope.launch { modelParamsStore.set(modelId, next) }
+    }
+
+    /** Drop every per-model override; the model reverts to global defaults. */
+    fun clearModelOverride() {
+        val modelId = _selectedModel.value?.model?.id ?: return
+        viewModelScope.launch { modelParamsStore.set(modelId, null) }
+    }
+
+    /**
      * Engines without a native `enable_thinking` flag still honor the Qwen3
      * `/think` / `/no_think` turn suffix. MNN takes the jinja route instead
      * (see `MnnEngine.buildConfigJson`) so the tag is not doubled.
@@ -349,6 +452,7 @@ class ChatViewModel @Inject constructor(
             _selectedModel.value = next
             markIdle()
             refreshThinkingSupport(next)
+            refreshSampling()
         } else {
             refreshThinkingSupport(current)
         }
@@ -445,10 +549,10 @@ class ChatViewModel @Inject constructor(
                     val last = _messages.value.lastOrNull()
                     if (last?.role == ChatRole.ASSISTANT && last.error == null) {
                         _messages.value = _messages.value.dropLast(1) +
-                            ChatUiMessage(ChatRole.ASSISTANT, sb.toString())
+                            ChatUiMessage(ChatRole.ASSISTANT, sb.toString(), config.enableThinking)
                     } else {
                         _messages.value = _messages.value +
-                            ChatUiMessage(ChatRole.ASSISTANT, sb.toString())
+                            ChatUiMessage(ChatRole.ASSISTANT, sb.toString(), config.enableThinking)
                     }
                 }
                 is EngineEvent.Done -> {
@@ -456,10 +560,12 @@ class ChatViewModel @Inject constructor(
                     val ttft = m.ttftMs ?: if (firstTokenNs > 0) {
                         (firstTokenNs - startedAt) / 1_000_000
                     } else null
-                    val emptyReply = sb.isBlank()
+                    // Empty thinking blocks still count as "no output" for the bubble.
+                    val emptyReply =
+                        ThinkingDisplay.forDisplay(sb.toString(), config.enableThinking).isBlank()
                     val hitTokenCap = m.generatedTokens >= config.maxNewTokens && !emptyReply
                     val content = buildString {
-                        append(sb.toString().ifBlank { "（空回复，可重试）" })
+                        append(if (emptyReply) "（空回复，可重试）" else sb.toString())
                         if (hitTokenCap) {
                             append("\n\n· 已达 maxNewTokens=${config.maxNewTokens} 上限，回答可能不完整；可在参数里调大")
                         }
@@ -467,6 +573,7 @@ class ChatViewModel @Inject constructor(
                     val bubble = ChatUiMessage(
                         role = ChatRole.ASSISTANT,
                         content = content,
+                        thinkingEnabled = config.enableThinking,
                         ttftMs = ttft,
                         prefillTps = m.prefillTps,
                         decodeTps = m.decodeTps,
@@ -508,10 +615,10 @@ class ChatViewModel @Inject constructor(
                     val last = _messages.value.lastOrNull()
                     if (last?.role == ChatRole.ASSISTANT) {
                         _messages.value = _messages.value.dropLast(1) +
-                            ChatUiMessage(ChatRole.ASSISTANT, content, error = msg)
+                            ChatUiMessage(ChatRole.ASSISTANT, content, config.enableThinking, error = msg)
                     } else {
                         _messages.value = _messages.value +
-                            ChatUiMessage(ChatRole.ASSISTANT, content, error = msg)
+                            ChatUiMessage(ChatRole.ASSISTANT, content, config.enableThinking, error = msg)
                     }
                     _status.value = msg
                     _generating.value = false

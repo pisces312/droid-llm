@@ -141,3 +141,9 @@ third_party/llama.cpp    vendored 源码树
 - **llama 在 x86 模拟器上可能 SIGABRT**（DefaultDispatch + ndk_translation 栈）：
   真机 arm64 正常、`tools/llama_decode_repro` 也正常 → 按环境问题处理，
   **不要回滚 native**。llama 功能 DoD 以真机为准（详见 `docs/llamacpp.md` §8）。
+- **模拟器截图是缩放的，`input tap` 要用物理坐标**：`adb exec-out screencap` 出图 480×1078，
+  但 `adb shell wm size` 是 **1080×2400**（density 420）。按截图像素比例点会全部落空
+  （表现为"点了没反应"）。**先 `wm size` 取真实分辨率再换算坐标**；本模拟器底部 4 个 tab
+  中心约为 x = 135 / 405 / 675 / 945、y ≈ 2093。
+- UI 断言用 `uiautomator dump` + `adb shell cat //sdcard/x.xml`（**不要 `adb pull`**，
+  Git Bash 会把路径解析成 `D:/dev/git/sdcard/...`）。

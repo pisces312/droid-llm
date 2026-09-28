@@ -191,6 +191,9 @@ flowchart TD
 - 消息：用户右/助手左气泡；助手气泡下挂 `MetricPill`（TTFT、本次 tok/s）。
   **引擎未产出任何 token 时补一条「（空回复，可重试）」气泡**，状态行记为「完成（无输出）」，
   避免出现无反馈的空轮次
+- **Thinking 标签不入气泡**（`ThinkingDisplay`）：空 thinking 块整段丢弃；
+  Thinking 关时 thinking 块整段丢弃；Thinking 开且非空时原样保留。仅影响展示，
+  发给引擎的 history 仍用原始文本；空块导致的「无可见输出」同样走「（空回复，可重试）」
 - **自动滚动三件套**：新内容即滚（按**尾条内容长度**触发，因为流式 token 是替换最后一条气泡、
   `messages.size` 全程不变）／用户上滚即停跟随／非底部时右下角悬浮「回到底部」按钮
 - **采样参数**：输入框上方一颗参数 chip（`AssistChip`，显示 `temp … · top_p … · tok …`），

@@ -128,23 +128,39 @@ data class ModelCatalog(
 )
 
 /**
- * Download server. HuggingFace official and mirror share the same catalog repo
- * id (`sources.HuggingFace`) and only differ by host; both write under `hf/`.
+ * Download server family. One entry per family; the HuggingFace host
+ * (official vs mirror) is a user setting (`AppSettings.hfBaseUrl`), not a
+ * separate source — official and mirror share the catalog repo id
+ * (`sources.HuggingFace`) and both write under `hf/`.
  */
-enum class ModelSource(val displayName: String, val host: String, val cacheDir: String) {
-    HuggingFace("HF官方", "https://huggingface.co", "hf"),
-    HuggingFaceMirror("HF镜像", "https://hf-mirror.com", "hf"),
-    ModelScope("ModelScope", "https://modelscope.cn", "modelscope"),
+enum class ModelSource(val displayName: String, val cacheDir: String) {
+    HuggingFace("HF", "hf"),
+    ModelScope("ModelScope", "modelscope"),
     ;
 
     val isHuggingFace: Boolean
-        get() = this == HuggingFace || this == HuggingFaceMirror
+        get() = this == HuggingFace
 
     companion object {
-        fun from(raw: String?): ModelSource =
-            entries.firstOrNull { it.name == raw } ?: HuggingFace
+        /** HF official and legacy mirror values both resolve to [HuggingFace]. */
+        fun from(raw: String?): ModelSource = when (raw) {
+            "HuggingFaceMirror", "HuggingFace" -> HuggingFace
+            "ModelScope" -> ModelScope
+            else -> HuggingFace
+        }
     }
 }
+
+/** Hosts for the HuggingFace family, selected in Settings (default = mirror). */
+object HfHost {
+    const val OFFICIAL = "https://huggingface.co"
+    const val MIRROR = "https://hf-mirror.com"
+
+    fun resolve(useMirror: Boolean): String = if (useMirror) MIRROR else OFFICIAL
+}
+
+/** ModelScope has a single fixed host. */
+const val ModelScopeHost: String = "https://modelscope.cn"
 
 object ModelCatalogLoader {
     private val json = Json { ignoreUnknownKeys = true }

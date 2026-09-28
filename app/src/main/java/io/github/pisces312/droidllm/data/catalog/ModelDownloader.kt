@@ -44,11 +44,15 @@ class ModelDownloader {
     /**
      * Download [model] from [source] under [root] (the shared model root).
      * Files land at [CatalogModel.downloadRelPath] so MNN repos match MnnLlmChat layout.
+     *
+     * @param hfHost host used when [source] is [ModelSource.HuggingFace]
+     *   ([HfHost.resolve]); ignored for ModelScope.
      */
     suspend fun download(
         model: CatalogModel,
         source: ModelSource,
         root: File,
+        hfHost: String = HfHost.MIRROR,
     ): Result<File> = withContext(Dispatchers.IO) {
         val key = model.id
         if (activeId != null) {
@@ -60,8 +64,8 @@ class ModelDownloader {
             val repo = model.repoPath(source)
                 ?: return@withContext fail(key, "当前源无此模型").let { Result.failure(it) }
             val out = when (model.kind) {
-                "repo", "mnn_repo" -> downloadRepo(model, source, repo, root)
-                else -> downloadSingle(model, source, repo, root)
+                "repo", "mnn_repo" -> downloadRepo(model, source, repo, root, hfHost)
+                else -> downloadSingle(model, source, repo, root, hfHost)
             }
             update(key, DownloadStatus.SUCCESS, 1f, "完成")
             Result.success(out)
@@ -83,11 +87,12 @@ class ModelDownloader {
         source: ModelSource,
         repo: String,
         root: File,
+        hfHost: String,
     ): File {
         val remote = model.fileInRepo ?: model.localPath
         val out = File(root, model.downloadRelPath(source))
         out.parentFile?.mkdirs()
-        val url = resolveFileUrl(source, repo, remote)
+        val url = resolveFileUrl(source, repo, remote, hfHost)
         fetchToFile(url, out, model.id)
         return out
     }
@@ -97,33 +102,42 @@ class ModelDownloader {
         source: ModelSource,
         repo: String,
         root: File,
+        hfHost: String,
     ): File {
         val dir = File(root, model.downloadRelPath(source))
         dir.mkdirs()
-        val files = listRepoFiles(source, repo)
+        val files = listRepoFiles(source, repo, hfHost)
         if (files.isEmpty()) throw IllegalStateException("仓库文件列表为空")
         files.forEachIndexed { index, path ->
             val out = File(dir, path)
             out.parentFile?.mkdirs()
-            fetchToFile(resolveFileUrl(source, repo, path), out, model.id)
+            fetchToFile(resolveFileUrl(source, repo, path, hfHost), out, model.id)
             val progress = (index + 1).toFloat() / files.size
             update(model.id, DownloadStatus.DOWNLOADING, progress, "下载 ${index + 1}/${files.size}")
         }
         return dir
     }
 
-    private fun resolveFileUrl(source: ModelSource, repo: String, path: String): String =
-        if (source.isHuggingFace) {
-            "${source.host}/$repo/resolve/main/$path"
-        } else {
-            "${source.host}/api/v1/models/$repo/repo?FilePath=$path"
-        }
+    private fun resolveFileUrl(
+        source: ModelSource,
+        repo: String,
+        path: String,
+        hfHost: String,
+    ): String = if (source.isHuggingFace) {
+        "$hfHost/$repo/resolve/main/$path"
+    } else {
+        "${ModelScopeHost}/api/v1/models/$repo/repo?FilePath=$path"
+    }
 
-    private fun listRepoFiles(source: ModelSource, repo: String): List<String> {
+    private fun listRepoFiles(
+        source: ModelSource,
+        repo: String,
+        hfHost: String,
+    ): List<String> {
         val body = if (source.isHuggingFace) {
-            readText("${source.host}/api/models/$repo/tree/main?recursive=true")
+            readText("$hfHost/api/models/$repo/tree/main?recursive=true")
         } else {
-            readText("${source.host}/api/v1/models/$repo/repo/files?Recursive=1")
+            readText("${ModelScopeHost}/api/v1/models/$repo/repo/files?Recursive=1")
         }
         return parseFileList(source, body)
     }

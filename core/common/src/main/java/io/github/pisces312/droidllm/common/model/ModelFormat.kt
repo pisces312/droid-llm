@@ -15,8 +15,15 @@ interface ModelPathStore {
     suspend fun delete(modelId: String)
     suspend fun listModels(): List<LocalModel>
     suspend fun listModels(engineId: EngineId): List<LocalModel>
-}
 
+    /**
+     * Add or overwrite registry entries from an imported bundle, keyed by id.
+     *
+     * Entries already on this device but absent from [models] are **kept** —
+     * import is additive and must never silently drop a local registration.
+     */
+    suspend fun applyImported(models: List<StoredModel>)
+}
 /**
  * Fast format detection before load. Returns null when the location cannot be
  * inspected (e.g. SAF without permission); the adapter then does a full load

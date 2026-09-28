@@ -32,7 +32,47 @@ data class StoredModel(
     val formatHint: String? = null,
     val fileSizeBytes: Long? = null,
     val quantHint: String? = null,
-)
+) {
+    /** Rebuild the runtime model. */
+    fun toLocal(): LocalModel = LocalModel(
+        id = id,
+        engineId = EngineId.valueOf(engineId),
+        displayName = displayName,
+        location = when (locationType) {
+            "saf" -> ModelLocation.SafUri(locationValue)
+            "app_private" -> ModelLocation.AppPrivate(locationValue)
+            else -> ModelLocation.FilePath(locationValue)
+        },
+        formatHint = formatHint,
+        fileSizeBytes = fileSizeBytes,
+        quantHint = quantHint,
+    )
+
+    companion object {
+        /** Persist a runtime model. */
+        fun from(model: LocalModel): StoredModel {
+            val loc = model.location
+            return StoredModel(
+                id = model.id,
+                engineId = model.engineId.name,
+                displayName = model.displayName,
+                locationType = when (loc) {
+                    is ModelLocation.FilePath -> "file"
+                    is ModelLocation.SafUri -> "saf"
+                    is ModelLocation.AppPrivate -> "app_private"
+                },
+                locationValue = when (loc) {
+                    is ModelLocation.FilePath -> loc.path
+                    is ModelLocation.SafUri -> loc.uri
+                    is ModelLocation.AppPrivate -> loc.relativePath
+                },
+                formatHint = model.formatHint,
+                fileSizeBytes = model.fileSizeBytes,
+                quantHint = model.quantHint,
+            )
+        }
+    }
+}
 
 @Singleton
 class DataStoreModelPathStore @Inject constructor(
@@ -49,7 +89,7 @@ class DataStoreModelPathStore @Inject constructor(
         context.modelDataStore.edit { prefs ->
             val current = decode(prefs[key]).toMutableList()
             current.removeAll { it.id == model.id }
-            current += model.toStored()
+            current += StoredModel.from(model)
             prefs[key] = json.encodeToString(current)
         }
     }
@@ -70,44 +110,21 @@ class DataStoreModelPathStore @Inject constructor(
     override suspend fun listModels(engineId: EngineId): List<LocalModel> =
         listModels().filter { it.engineId == engineId }
 
+    override suspend fun applyImported(models: List<StoredModel>) {
+        if (models.isEmpty()) return
+        context.modelDataStore.edit { prefs ->
+            val merged = decode(prefs[key]).toMutableList()
+            val incoming = models.associateBy { it.id }
+            // Overwrite by id, keep everything else.
+            merged.replaceAll { existing -> incoming[existing.id] ?: existing }
+            val known = merged.mapTo(HashSet()) { it.id }
+            merged += models.filter { it.id !in known }
+            prefs[key] = json.encodeToString(merged)
+        }
+    }
+
     private fun decode(raw: String?): List<StoredModel> {
         if (raw.isNullOrBlank()) return emptyList()
         return runCatching { json.decodeFromString<List<StoredModel>>(raw) }.getOrDefault(emptyList())
     }
-
-    private fun LocalModel.toStored(): StoredModel {
-        val loc = location
-        return StoredModel(
-            id = id,
-            engineId = engineId.name,
-            displayName = displayName,
-            locationType = when (loc) {
-                is ModelLocation.FilePath -> "file"
-                is ModelLocation.SafUri -> "saf"
-                is ModelLocation.AppPrivate -> "app_private"
-            },
-            locationValue = when (loc) {
-                is ModelLocation.FilePath -> loc.path
-                is ModelLocation.SafUri -> loc.uri
-                is ModelLocation.AppPrivate -> loc.relativePath
-            },
-            formatHint = formatHint,
-            fileSizeBytes = fileSizeBytes,
-            quantHint = quantHint,
-        )
-    }
-
-    private fun StoredModel.toLocal() = LocalModel(
-        id = id,
-        engineId = EngineId.valueOf(engineId),
-        displayName = displayName,
-        location = when (locationType) {
-            "saf" -> ModelLocation.SafUri(locationValue)
-            "app_private" -> ModelLocation.AppPrivate(locationValue)
-            else -> ModelLocation.FilePath(locationValue)
-        },
-        formatHint = formatHint,
-        fileSizeBytes = fileSizeBytes,
-        quantHint = quantHint,
-    )
 }

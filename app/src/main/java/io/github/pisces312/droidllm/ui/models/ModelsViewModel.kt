@@ -13,6 +13,7 @@ import io.github.pisces312.droidllm.common.model.ValidationResult
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
 import io.github.pisces312.droidllm.data.catalog.CatalogModel
 import io.github.pisces312.droidllm.data.catalog.DownloadState
+import io.github.pisces312.droidllm.data.catalog.HfHost
 import io.github.pisces312.droidllm.data.catalog.ModelAutoImporter
 import io.github.pisces312.droidllm.data.catalog.ModelCatalog
 import io.github.pisces312.droidllm.data.catalog.ModelCatalogLoader
@@ -106,6 +107,10 @@ class ModelsViewModel @Inject constructor(
     /** Shared model root for every engine (configured or default). */
     val root: StateFlow<String> = _root.asStateFlow()
 
+    /** HF host resolved from Settings (`hfUseMirror`), default = mirror. */
+    private val _hfHost = MutableStateFlow(HfHost.MIRROR)
+    val hfHost: StateFlow<String> = _hfHost.asStateFlow()
+
     fun modelRoot(): String =
         _root.value.ifEmpty { deviceProbe.defaultModelRoot().absolutePath }
 
@@ -116,6 +121,7 @@ class ModelsViewModel @Inject constructor(
         viewModelScope.launch {
             settingsStore.observe().collect { s ->
                 _root.value = s.modelRootPath ?: deviceProbe.defaultModelRoot().absolutePath
+                _hfHost.value = HfHost.resolve(s.hfUseMirror)
                 refreshDownloaded()
             }
         }
@@ -206,10 +212,11 @@ class ModelsViewModel @Inject constructor(
             _message.value = "「${model.name}」暂无 $family 源，请切换服务器"
             return
         }
+        val hfHost = _hfHost.value
         val root = File(modelRoot())
         root.mkdirs()
         viewModelScope.launch {
-            val result = downloader.download(model, source, root)
+            val result = downloader.download(model, source, root, hfHost)
             result.onSuccess { out ->
                 refreshDownloaded()
                 val chatable = model.tags.none { it == "ImageGen" || it == "AudioGen" }

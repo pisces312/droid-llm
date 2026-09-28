@@ -471,6 +471,7 @@ private fun MarketTab(vm: ModelsViewModel) {
     val downloadFilter by vm.downloadFilter.collectAsState()
     val engineFilter by vm.marketEngineFilter.collectAsState()
     val catalog by vm.catalog.collectAsState()
+    val hfHost by vm.hfHost.collectAsState()
     val rows = remember(source, downloaded, downloadStates, downloadFilter, engineFilter, catalog) {
         vm.catalogRows(downloadFilter, engineFilter)
     }
@@ -518,7 +519,7 @@ private fun MarketTab(vm: ModelsViewModel) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "HF官方 = huggingface.co，HF镜像 = hf-mirror.com，ModelScope = modelscope.cn。" +
+            "HF 下载地址取自设置（当前 $hfHost，默认镜像 hf-mirror.com），ModelScope = modelscope.cn。" +
                 "下载统一存 `{hf|modelscope}/models--org--repo/snapshots/`（MnnLlmChat 同款）。" +
                 "刷新下载状态见右上角。",
             style = MaterialTheme.typography.labelSmall,

@@ -55,6 +55,12 @@ data class AppSettings(
     val modelRootPath: String? = null,
     /** true = the all-files-access guide was already shown (shown on first model-root change). */
     val storageGuideSeen: Boolean = false,
+    /**
+     * HuggingFace download host: true = hf-mirror.com (default, reachable in CN),
+     * false = huggingface.co. Only the host changes; the catalog repo id and the
+     * on-disk `hf/` layout are identical, so switching needs no migration.
+     */
+    val hfUseMirror: Boolean = true,
     val temperature: Float = 0.7f,
     val topK: Int = 40,
     val topP: Float = 0.95f,
@@ -82,6 +88,7 @@ interface AppSettingsStore {
     suspend fun setMultiModelResidency(enabled: Boolean)
     suspend fun setModelRoot(path: String?)
     suspend fun setStorageGuideSeen(seen: Boolean)
+    suspend fun setHfUseMirror(useMirror: Boolean)
     suspend fun setSystemPrompt(prompt: String)
     suspend fun setSampling(
         temperature: Float,
@@ -91,6 +98,15 @@ interface AppSettingsStore {
         maxNewTokens: Int,
         backend: Backend,
     )
+
+    /**
+     * Overwrite every user-authored setting at once (settings import).
+     *
+     * [modelRootPath] and [storageGuideSeen] are deliberately not written —
+     * they are device-local, and an import must never move the model root or
+     * re-trigger onboarding.
+     */
+    suspend fun applyImported(imported: AppSettings)
 }
 
 private val Context.appSettingsDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -107,6 +123,7 @@ class DataStoreAppSettingsStore @Inject constructor(
         val multiResidency = booleanPreferencesKey("multi_model_residency")
         val modelRoot = stringPreferencesKey("model_root_path")
         val storageGuideSeen = booleanPreferencesKey("storage_guide_seen")
+        val hfUseMirror = booleanPreferencesKey("hf_use_mirror")
         val temperature = floatPreferencesKey("temperature")
         val topK = intPreferencesKey("top_k")
         val topP = floatPreferencesKey("top_p")
@@ -122,6 +139,7 @@ class DataStoreAppSettingsStore @Inject constructor(
             multiModelResidency = prefs[Keys.multiResidency] ?: false,
             modelRootPath = prefs[Keys.modelRoot]?.takeIf { it.isNotBlank() },
             storageGuideSeen = prefs[Keys.storageGuideSeen] ?: false,
+            hfUseMirror = prefs[Keys.hfUseMirror] ?: true,
             temperature = prefs[Keys.temperature] ?: 0.7f,
             topK = prefs[Keys.topK] ?: 40,
             topP = prefs[Keys.topP] ?: 0.95f,
@@ -155,6 +173,10 @@ class DataStoreAppSettingsStore @Inject constructor(
         context.appSettingsDataStore.edit { it[Keys.storageGuideSeen] = seen }
     }
 
+    override suspend fun setHfUseMirror(useMirror: Boolean) {
+        context.appSettingsDataStore.edit { it[Keys.hfUseMirror] = useMirror }
+    }
+
     override suspend fun setSystemPrompt(prompt: String) {
         context.appSettingsDataStore.edit { it[Keys.systemPrompt] = prompt }
     }
@@ -174,6 +196,21 @@ class DataStoreAppSettingsStore @Inject constructor(
             it[Keys.threads] = threads
             it[Keys.maxNewTokens] = maxNewTokens
             it[Keys.backend] = backend.name
+        }
+    }
+
+    override suspend fun applyImported(imported: AppSettings) {
+        context.appSettingsDataStore.edit {
+            it[Keys.themeMode] = imported.themeMode.name
+            it[Keys.multiResidency] = imported.multiModelResidency
+            it[Keys.hfUseMirror] = imported.hfUseMirror
+            it[Keys.temperature] = imported.temperature
+            it[Keys.topK] = imported.topK
+            it[Keys.topP] = imported.topP
+            it[Keys.threads] = imported.threads
+            it[Keys.maxNewTokens] = imported.maxNewTokens
+            it[Keys.backend] = imported.backend.name
+            it[Keys.systemPrompt] = imported.systemPrompt
         }
     }
 }

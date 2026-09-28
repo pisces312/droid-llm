@@ -232,8 +232,11 @@ fun ChatScreen(
     if (paramsOpen) {
         SamplingSheet(
             engineId = selectedEngine?.engine?.id,
+            modelName = selectedModel?.displayName,
             sampling = sampling,
             onUpdate = vm::updateSampling,
+            onOverride = vm::setModelOverride,
+            onClearOverrides = vm::clearModelOverride,
             onDismiss = { paramsOpen = false },
         )
     }
@@ -584,7 +587,11 @@ private fun MessageBubble(msg: ChatUiMessage) {
                 color = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.height(4.dp))
-            Text(msg.content, style = MaterialTheme.typography.bodyMedium)
+            // Drop empty / off-mode thinking blocks so raw tags never appear in the bubble.
+            Text(
+                ThinkingDisplay.forDisplay(msg.content, msg.thinkingEnabled),
+                style = MaterialTheme.typography.bodyMedium,
+            )
             if (msg.error != null) {
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -633,13 +640,20 @@ private fun MessageBubble(msg: ChatUiMessage) {
  * A sheet rather than an inline collapsing card: collapsed, the card still cost a full-width
  * row above the transcript for something that is opened rarely, and it double-counted the tap
  * target (card + inner button).
+ *
+ * Every field has a "仅本模型" pin. Unpinned edits write the global default in
+ * Settings; pinned edits write only the selected model's overlay, so one model
+ * can diverge without moving every other model's baseline.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SamplingSheet(
     engineId: EngineId?,
+    modelName: String?,
     sampling: SamplingUiState,
     onUpdate: ((SamplingUiState) -> SamplingUiState) -> Unit,
+    onOverride: (ParamsField, FieldValue?) -> Unit,
+    onClearOverrides: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(
@@ -654,62 +668,161 @@ private fun SamplingSheet(
         ) {
             SheetTitle(
                 text = "采样参数",
-                subtitle = "默认值来自「设置」页；灰显字段当前引擎不生效。",
+                subtitle = if (modelName == null) {
+                    "默认值来自「设置」页；灰显字段当前引擎不生效。"
+                } else {
+                    "默认值来自「设置」页。点「仅本模型」可让 $modelName 单独覆盖该项。"
+                },
             )
             Spacer(Modifier.height(12.dp))
             val id = engineId
-            NumericField(
+            val pinned = sampling.overriddenFields
+            val pinEnabled = modelName != null
+
+            OverrideField(
                 label = "temp",
                 value = sampling.temperature.toString(),
                 decimal = true,
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TEMPERATURE),
                 note = id?.let { ConfigApplicability.note(it, ConfigField.TEMPERATURE) },
+                pinned = ParamsField.TEMPERATURE in pinned,
+                pinEnabled = pinEnabled,
+                onTogglePin = { on ->
+                    onOverride(
+                        ParamsField.TEMPERATURE,
+                        if (on) FieldValue.Dec(sampling.temperature) else null,
+                    )
+                },
                 onCommit = { v ->
-                    v.toFloatOrNull()?.let { n -> onUpdate { it.copy(temperature = n) } }
+                    v.toFloatOrNull()?.let { n ->
+                        if (ParamsField.TEMPERATURE in pinned) {
+                            onOverride(ParamsField.TEMPERATURE, FieldValue.Dec(n))
+                        } else {
+                            onUpdate { it.copy(temperature = n) }
+                        }
+                    }
                 },
             )
-            NumericField(
+            OverrideField(
                 label = "top_k",
                 value = sampling.topK.toString(),
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TOP_K),
                 note = id?.let { ConfigApplicability.note(it, ConfigField.TOP_K) },
+                pinned = ParamsField.TOP_K in pinned,
+                pinEnabled = pinEnabled,
+                onTogglePin = { on ->
+                    onOverride(
+                        ParamsField.TOP_K,
+                        if (on) FieldValue.Num(sampling.topK) else null,
+                    )
+                },
                 onCommit = { v ->
-                    v.toIntOrNull()?.let { n -> onUpdate { it.copy(topK = n) } }
+                    v.toIntOrNull()?.let { n ->
+                        if (ParamsField.TOP_K in pinned) {
+                            onOverride(ParamsField.TOP_K, FieldValue.Num(n))
+                        } else {
+                            onUpdate { it.copy(topK = n) }
+                        }
+                    }
                 },
             )
-            NumericField(
+            OverrideField(
                 label = "top_p",
                 value = sampling.topP.toString(),
                 decimal = true,
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TOP_P),
                 note = id?.let { ConfigApplicability.note(it, ConfigField.TOP_P) },
+                pinned = ParamsField.TOP_P in pinned,
+                pinEnabled = pinEnabled,
+                onTogglePin = { on ->
+                    onOverride(
+                        ParamsField.TOP_P,
+                        if (on) FieldValue.Dec(sampling.topP) else null,
+                    )
+                },
                 onCommit = { v ->
-                    v.toFloatOrNull()?.let { n -> onUpdate { it.copy(topP = n) } }
+                    v.toFloatOrNull()?.let { n ->
+                        if (ParamsField.TOP_P in pinned) {
+                            onOverride(ParamsField.TOP_P, FieldValue.Dec(n))
+                        } else {
+                            onUpdate { it.copy(topP = n) }
+                        }
+                    }
                 },
             )
-            NumericField(
+            OverrideField(
                 label = "threads",
                 value = sampling.threads.toString(),
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.THREADS),
                 note = id?.let { ConfigApplicability.note(it, ConfigField.THREADS) },
+                pinned = ParamsField.THREADS in pinned,
+                pinEnabled = pinEnabled,
+                onTogglePin = { on ->
+                    onOverride(
+                        ParamsField.THREADS,
+                        if (on) FieldValue.Num(sampling.threads) else null,
+                    )
+                },
                 onCommit = { v ->
-                    v.toIntOrNull()?.let { n -> onUpdate { it.copy(threads = n) } }
+                    v.toIntOrNull()?.let { n ->
+                        if (ParamsField.THREADS in pinned) {
+                            onOverride(ParamsField.THREADS, FieldValue.Num(n))
+                        } else {
+                            onUpdate { it.copy(threads = n) }
+                        }
+                    }
                 },
             )
-            NumericField(
+            OverrideField(
                 label = "maxNewTokens",
                 value = sampling.maxNewTokens.toString(),
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.MAX_NEW_TOKENS),
                 note = id?.let { ConfigApplicability.note(it, ConfigField.MAX_NEW_TOKENS) },
+                pinned = ParamsField.MAX_NEW_TOKENS in pinned,
+                pinEnabled = pinEnabled,
+                onTogglePin = { on ->
+                    onOverride(
+                        ParamsField.MAX_NEW_TOKENS,
+                        if (on) FieldValue.Num(sampling.maxNewTokens) else null,
+                    )
+                },
                 onCommit = { v ->
-                    v.toIntOrNull()?.let { n -> onUpdate { it.copy(maxNewTokens = n) } }
+                    v.toIntOrNull()?.let { n ->
+                        if (ParamsField.MAX_NEW_TOKENS in pinned) {
+                            onOverride(ParamsField.MAX_NEW_TOKENS, FieldValue.Num(n))
+                        } else {
+                            onUpdate { it.copy(maxNewTokens = n) }
+                        }
+                    }
                 },
             )
             BackendField(
                 selected = sampling.backend,
                 engineId = id,
-                onSelect = { b -> onUpdate { it.copy(backend = b) } },
+                pinned = ParamsField.BACKEND in pinned,
+                pinEnabled = pinEnabled,
+                onTogglePin = { on ->
+                    onOverride(
+                        ParamsField.BACKEND,
+                        if (on) FieldValue.BackendValue(sampling.backend) else null,
+                    )
+                },
+                onSelect = { b ->
+                    if (ParamsField.BACKEND in pinned) {
+                        onOverride(ParamsField.BACKEND, FieldValue.BackendValue(b))
+                    } else {
+                        onUpdate { it.copy(backend = b) }
+                    }
+                },
             )
+            if (sampling.hasOverrides && modelName != null) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedToolButton(
+                    "清除 $modelName 的全部单项覆盖",
+                    onClick = onClearOverrides,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             Spacer(Modifier.height(16.dp))
             PrimaryButton(
                 text = "完成",
@@ -721,10 +834,61 @@ private fun SamplingSheet(
     }
 }
 
+/** A [NumericField] with a trailing "仅本模型" pin toggle. */
+@Composable
+private fun OverrideField(
+    label: String,
+    value: String,
+    onCommit: (String) -> Unit,
+    decimal: Boolean = false,
+    enabled: Boolean = true,
+    note: String? = null,
+    pinned: Boolean = false,
+    pinEnabled: Boolean = true,
+    onTogglePin: (Boolean) -> Unit,
+) {
+    Column {
+        NumericField(
+            label = label,
+            value = value,
+            decimal = decimal,
+            enabled = enabled,
+            note = note,
+            onCommit = onCommit,
+        )
+        PinRow(pinned = pinned, enabled = pinEnabled, onToggle = onTogglePin)
+    }
+}
+
+@Composable
+private fun PinRow(pinned: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
+    if (!enabled) return
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (pinned) {
+            Text(
+                "已覆盖全局默认",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        OutlinedToolButton(
+            text = if (pinned) "取消覆盖" else "仅本模型",
+            onClick = { onToggle(!pinned) },
+        )
+    }
+}
+
 @Composable
 private fun BackendField(
     selected: Backend,
     engineId: EngineId?,
+    pinned: Boolean = false,
+    pinEnabled: Boolean = true,
+    onTogglePin: (Boolean) -> Unit = {},
     onSelect: (Backend) -> Unit,
 ) {
     val supported = engineId?.let { ConfigApplicability.supportedBackends(it) } ?: Backend.entries
@@ -745,6 +909,7 @@ private fun BackendField(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        PinRow(pinned = pinned, enabled = pinEnabled, onToggle = onTogglePin)
     }
 }
 
