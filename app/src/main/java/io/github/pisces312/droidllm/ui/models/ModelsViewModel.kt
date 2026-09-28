@@ -20,6 +20,7 @@ import io.github.pisces312.droidllm.data.catalog.ModelSource
 import io.github.pisces312.droidllm.data.catalog.engineFormatTag
 import io.github.pisces312.droidllm.data.catalog.findModelDir
 import io.github.pisces312.droidllm.engineapi.EngineId
+import io.github.pisces312.droidllm.engineapi.engineIdFromStorage
 import io.github.pisces312.droidllm.engineapi.LocalModel
 import io.github.pisces312.droidllm.engineapi.ModelLocation
 import java.io.File
@@ -81,6 +82,10 @@ class ModelsViewModel @Inject constructor(
     private val _downloadFilter = MutableStateFlow(DownloadFilter.ALL)
     val downloadFilter: StateFlow<DownloadFilter> = _downloadFilter.asStateFlow()
 
+    /** `null` = all engines; narrows the market catalog rows. */
+    private val _marketEngineFilter = MutableStateFlow<EngineId?>(null)
+    val marketEngineFilter: StateFlow<EngineId?> = _marketEngineFilter.asStateFlow()
+
     private val _catalog = MutableStateFlow(ModelCatalog())
     val catalog: StateFlow<ModelCatalog> = _catalog.asStateFlow()
 
@@ -121,6 +126,10 @@ class ModelsViewModel @Inject constructor(
 
     fun setDownloadFilter(filter: DownloadFilter) {
         _downloadFilter.value = filter
+    }
+
+    fun setMarketEngineFilter(engine: EngineId?) {
+        _marketEngineFilter.value = engine
     }
 
     /**
@@ -164,7 +173,10 @@ class ModelsViewModel @Inject constructor(
         }
     }
 
-    fun catalogRows(filter: DownloadFilter = _downloadFilter.value): List<CatalogRow> {
+    fun catalogRows(
+        filter: DownloadFilter = _downloadFilter.value,
+        engineFilter: EngineId? = _marketEngineFilter.value,
+    ): List<CatalogRow> {
         val downloaded = _downloadedIds.value
         val paths = _localPaths.value
         val states = downloader.states.value
@@ -172,6 +184,9 @@ class ModelsViewModel @Inject constructor(
             val isDl = m.id in downloaded
             if (filter == DownloadFilter.DOWNLOADED && !isDl) return@mapNotNull null
             if (filter == DownloadFilter.NOT_DOWNLOADED && isDl) return@mapNotNull null
+            if (engineFilter != null && engineIdFromStorage(m.engine) != engineFilter) {
+                return@mapNotNull null
+            }
             CatalogRow(
                 model = m,
                 downloaded = isDl,

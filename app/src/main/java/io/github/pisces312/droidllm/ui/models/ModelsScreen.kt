@@ -469,8 +469,17 @@ private fun MarketTab(vm: ModelsViewModel) {
     val downloaded by vm.downloadedIds.collectAsState()
     val downloadStates by vm.downloadStates.collectAsState()
     val downloadFilter by vm.downloadFilter.collectAsState()
-    val rows = remember(source, downloaded, downloadStates, downloadFilter) {
-        vm.catalogRows(downloadFilter)
+    val engineFilter by vm.marketEngineFilter.collectAsState()
+    val catalog by vm.catalog.collectAsState()
+    val rows = remember(source, downloaded, downloadStates, downloadFilter, engineFilter, catalog) {
+        vm.catalogRows(downloadFilter, engineFilter)
+    }
+
+    val engineOptions = remember(catalog) {
+        listOf<EngineId?>(null) +
+            EngineId.entries.filter { id ->
+                id != EngineId.FAKE && catalog.models.any { engineIdFromStorage(it.engine) == id }
+            }
     }
 
     Column {
@@ -479,6 +488,20 @@ private fun MarketTab(vm: ModelsViewModel) {
             selected = source,
             label = { it.displayName },
             onSelected = { vm.setSource(it) },
+        )
+        Spacer(Modifier.height(6.dp))
+        ChoiceChipRow(
+            options = engineOptions,
+            selected = engineFilter,
+            label = { id ->
+                if (id == null) {
+                    "全部引擎"
+                } else {
+                    val count = catalog.models.count { engineIdFromStorage(it.engine) == id }
+                    "${id.displayName} · $count"
+                }
+            },
+            onSelected = { vm.setMarketEngineFilter(it) },
         )
         Spacer(Modifier.height(6.dp))
         ChoiceChipRow(
