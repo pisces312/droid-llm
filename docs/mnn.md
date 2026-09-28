@@ -178,7 +178,16 @@ free 仅 200MB、swap 已用 500MB+）。**只能 `adb shell am force-stop` 恢�
 - 模拟器仍然可用于**纯 UI 布局验证** —— Compose 渲染不碰 native，界面照常出帧，
   翻页、截图、`uiautomator dump` 读文字都正常。
 
-## 7. 调试手法
+## 7. PC 端回归
+
+改 `engine/mnn/src/main/cpp/` 后先跑 `scripts/mnn_host_regress.ps1`（秒级），再打 APK。
+共享核心 `mnn_chat_core.{hpp,cpp}`、Windows MNN host 构建与用例清单见
+`docs/mnn-pc-regression.md`。
+
+**唯一真源**：JNI 与 host harness 必须都走 `mnn_chat_core`，不要在 `mnn_chat_jni.cpp`
+里再复制一套 generate 逻辑。
+
+## 8. 调试手法
 
 - 按 PID 看日志：`adb logcat -d --pid=$(adb shell pidof io.github.pisces312.droidllm.debug)`
 - 原生埋点：`__android_log_print(ANDROID_LOG_INFO, "<tag>", ...)`；MNN 自身的 `MNN_ERROR`

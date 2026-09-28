@@ -33,9 +33,25 @@ message(STATUS "MNN_LIB=${MNN_LIB}")
 add_library(MNN SHARED IMPORTED)
 set_target_properties(MNN PROPERTIES IMPORTED_LOCATION "${MNN_LIB}")
 
+add_library(mnn_chat_core STATIC
+    mnn_chat_core.cpp
+)
+set_target_properties(mnn_chat_core PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+)
+target_compile_features(mnn_chat_core PRIVATE cxx_std_17)
+target_compile_options(mnn_chat_core PRIVATE -fvisibility=hidden)
+target_include_directories(mnn_chat_core PUBLIC
+    "${CMAKE_CURRENT_LIST_DIR}"
+    "${MNN_ROOT}/include"
+    "${MNN_ROOT}/transformers/llm/engine/include"
+)
+
 add_library(mnn_chat_jni SHARED
     mnn_chat_jni.cpp
 )
+target_link_libraries(mnn_chat_jni PRIVATE mnn_chat_core)
 
 set_target_properties(mnn_chat_jni PROPERTIES
     CXX_VISIBILITY_PRESET hidden

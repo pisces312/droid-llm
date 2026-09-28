@@ -10,6 +10,7 @@
 | `UI_DESIGN.md` | 界面与交互权威（StreamClip + PixelPlayerOSS token） |
 | `IMPLEMENTATION.md` | 可执行实施计划、阶段进度、DoD 清单。每阶段完成后更新 |
 | `docs/<engine>.md` | **单引擎笔记**（现有 `docs/mnn.md`）：该引擎专属的坑、实测结论、计时字段、调试手法 |
+| `docs/mnn-pc-regression.md` | MNN PC 端回归：共享 core + `mnn_host_test`、模型落盘、Windows MNN host 构建、日常回归环 |
 
 **记录规则**：凡是指向单个引擎的坑与结论，写进对应的 `docs/<engine>.md`，不要堆进
 `ENGINE_INTEGRATION.md`（那里只放依赖获取、编译开关、模型格式等通用信息）。
@@ -105,6 +106,16 @@ third_party/llama.cpp    vendored 源码树
 6. **符号隔离**：每个 native 库 `CXX_VISIBILITY_PRESET hidden` + `-Wl,--exclude-libs,ALL`；跨引擎 so 共存必须过 `EngineCoexistenceTest`。
 7. **模型根目录迁移**（`ModelRootMigrator`）：**永不删除/覆盖目标已有文件**；重名交用户跳过或取消；原目录有数据询问是否迁移，可不迁移。
 8. **不做**：功耗测量、DFM、雷达图、质量评测、OpenAI 兼容 API（P5+ 才可选）。
+
+## MNN PC 回归（改 native 后必跑）
+
+改 `engine/mnn/src/main/cpp/`（含抽出的 `mnn_chat_core`）后，先在 PC 上回归，再打 APK：
+
+1. 模型：`D:\models\LFM2-350M-MNN`（从模拟器 pull，见 `docs/mnn-pc-regression.md` §2）。
+2. 重编 host harness（秒级）：`scripts/mnn_host_regress.ps1`。
+3. 全部 PASS 后再 `:app:assembleDebug` / 真机验收。
+
+细节与边界见 `docs/mnn-pc-regression.md`。PC 不测性能数字、不测 Kotlin/UI；真机 arm64 仍是最终验收。
 
 ## 阶段流程
 
