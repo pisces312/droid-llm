@@ -93,8 +93,13 @@ data class SamplingUiState(
     val maxNewTokens: Int = 4096,
     val backend: Backend = Backend.AUTO,
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
-    /** Reasoning on/off for the next turn (UI_REVIEW §3.2 模式 3). */
-    val enableThinking: Boolean = true,
+    /**
+     * Reasoning on/off for the next turn (UI_REVIEW §3.2 模式 3).
+     * Default OFF — gallery LLM_CHAT also ships thinking off; forcing
+     * `enable_thinking=true` into LiteRT extraContext can make small models
+     * emit an unclosed `众所周` stream instead of a normal reply.
+     */
+    val enableThinking: Boolean = false,
     /**
      * Per-model overlay for the currently selected model. Null = every field
      * falls back to the global Settings defaults. Non-null fields are marked

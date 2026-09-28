@@ -236,7 +236,8 @@ class LiteRtEngine @Inject constructor(
                         override fun onMessage(message: Message) {
                             if (cancelled.get() || hitTokenCap.get() || hitRepeat.get()) return
                             val piece = message.toString()
-                            if (piece.isEmpty()) return
+                            // Gallery drops tokenizer control pieces before UI.
+                            if (piece.isEmpty() || piece.startsWith("<ctrl")) return
 
                             // LiteRT may deliver either a token delta or the accumulated
                             // text so far. Accept both so a cumulative callback cannot
@@ -457,12 +458,15 @@ class LiteRtEngine @Inject constructor(
         config: InferenceConfig,
         initialMessages: List<ChatMessage>,
     ): Conversation {
-        val system = config.systemPrompt
+        // Gallery: systemInstruction is null when the prompt is blank, and
+        // ConversationConfig has no initialMessages on the normal path.
+        val system = config.systemPrompt?.takeIf { it.isNotBlank() }?.let { Contents.of(it) }
         val sampler = mapSampler(config)
         return engine.createConversation(
             ConversationConfig(
                 samplerConfig = sampler,
-                systemInstruction = system?.let { Contents.of(it) },
+                systemInstruction = system,
+                tools = emptyList(),
                 initialMessages = initialMessages.toLitertMessages(),
             ),
         )
