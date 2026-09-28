@@ -13,6 +13,7 @@ enum class ConfigField {
     SEED,
     BACKEND,
     MAX_NEW_TOKENS,
+    THINKING,
 }
 
 object ConfigApplicability {
@@ -35,6 +36,7 @@ object ConfigApplicability {
                 else -> "此引擎不支持线程数"
             }
             ConfigField.SEED -> "此引擎不支持固定随机种子"
+            ConfigField.THINKING -> "此引擎不支持 Thinking 开关"
             else -> "此引擎不支持该参数"
         }
     }

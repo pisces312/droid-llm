@@ -62,6 +62,13 @@
 | MNN 目录 | MNN `llmexport` / `transformers` 转换；MNN 官方 ModelZoo 部分模型 |
 | Genie 目录 | Qualcomm AI Hub 导出、`chatapp_android` 样例、qnn 转换流水线（ctx bin + config + tokenizer） |
 
+## 注册 vs 下载
+
+| 来源 | 路径策略 |
+|------|----------|
+| **外部模型注册**（本地文件/目录） | **原路径直接使用**，只登记进模型表，不复制、不移动 |
+| **市场下载**（HF / ModelScope） | 严格放在模型根目录 `{hf\|modelscope}/models--org--repo/snapshots/` |
+
 ## 注意
 
 1. **路径一律真实路径**。native 引擎直接 open；不要用 `content://`

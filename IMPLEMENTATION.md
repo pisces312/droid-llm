@@ -529,10 +529,10 @@
   | llama.cpp | 单文件 `*.gguf` | `{根}/llamacpp/` |
 
 - `AppSettings.modelRootPath`（单根，null = `DeviceProbe.defaultModelRoot()` = `files/models/`）。引擎子目录：`llamacpp/` `mnn/` `litert/` `genie/`。
-- **第三方模型导入**（非市场下载）：
-  - 「仅引用原路径」：校验后把任意绝对路径登记进模型表（不搬文件）。
-  - 「导入并复制到模型目录」：把源文件/目录**复制**到 `{根}/{引擎子目录}/{同名}` 再登记；永不覆盖已有目标（迁移契约）；已在目标位置则只登记。
-  - 也可手动复制到上表位置后用「仅引用原路径」登记。
+- **外部模型注册**（非市场下载）：**只登记、不搬文件**——校验后把任意绝对路径写入模型表，
+  引擎直接打开原路径。不提供「复制到模型目录」：搬移既占双份空间，又让源路径失效后列表对不上。
+  术语用「注册」而非「导入」，语义是登记索引。
+- **仅市场下载**严格遵循模型根目录结构（`{hf|modelscope}/models--org--repo/snapshots/`）。
 - 迁移契约不变（`ModelRootMigrator`：永不删目标、重名跳过、可不迁移）。
 - **模型市场**（Models 页 Tab「模型市场」）：
   - 目录 `assets/model_catalog.json`（`CatalogModel`：id/name/engine/size/kind=repo|file|mnn_repo/localPath/sources/tags）。由 `scripts/gen_model_catalog.py` 从 MnnLlmChat `model_market.json` 生成，当前 **159 条 MNN** + LiteRT/GGUF 共 162 条。
@@ -541,7 +541,7 @@
     - MS 文件 `https://modelscope.cn/api/v1/models/{repo}/repo?FilePath={path}`；文件列表 `.../repo/files?Recursive=1`
   - **下载状态过滤**：市场第二行 **全部 / 已下载 / 未下载**（`DownloadFilter`）。
   - 下载器 `ModelDownloader`（HttpURLConnection + `.part` 临时文件 + 进度 StateFlow）。MNN 走 `kind=mnn_repo`，LiteRT/GGUF 走 `kind=file`。
-  - **下载即入库**：对话模型下载成功后自动 `registerDownloaded` 写入 `ModelPathStore`（已导入 Tab / 聊天模型选择器可见）；ImageGen/AudioGen 等非对话模型只落盘不入库。按路径去重，重复注册提示「已在模型列表中」。
+  - **下载即注册**：对话模型下载成功后自动 `registerDownloaded` 写入 `ModelPathStore`（已注册 Tab / 聊天模型选择器可见）；ImageGen/AudioGen 等非对话模型只落盘不入库。按路径去重，重复注册提示「已在模型列表中」。
   - **本地关联**（`findModelDir`）：按候选相对路径扫描；命中即标「已下载」并显示实际路径。
   - 聊天页持续 `observeModels()`，市场新下载无需切页/重启即可出现在模型选择器。
 
@@ -587,7 +587,7 @@
 **状态：✅ 已完成（2026-09-27 立项并当日收尾；R1 → R1.5 → R2 → R3 → R4 全部落地）**
 
 > **遗留**：R2 的②③⑤、R3 的手感复核、R4 的视觉复核三项需**真机 arm64**手测（模拟器跑不了真实流式与评测），
-> 见各「交付说明」末尾的「未验证」段与 `docs/mnn.md` §5.1。代码侧无待办。
+> 见各「交付说明」末尾的「未验证」段与 `docs/mnn.md` §6.1。代码侧无待办。
 
 > **权威输入**：[`docs/UI_REVIEW.md`](docs/UI_REVIEW.md) —— 现状盘点 + 问题清单（含文件:行号）+ 布局方案 + 与 MnnLlmChat 的逐条对照。
 > 本节只做落地拆解，不重复论证。**动手前先通读该文档**；契约约束见 `DESIGN.md` §1.2，界面权威见 `UI_DESIGN.md`。
@@ -713,7 +713,7 @@
 ④：`backend` 点开列出 `CPU / GPU / OPENCL / NPU_HTP / AUTO`，选中落盘回显（节点从纯 `EditText` 变成带
 `android.widget.Spinner` 子节点）。截图 `build/uicheck/20_chat_sampling.png`。
 
-**未能在模拟器验证**：②跟随滚动需要真实流式回复（要 load 模型，模拟器跑不了，见 `docs/mnn.md` §5.1）、
+**未能在模拟器验证**：②跟随滚动需要真实流式回复（要 load 模型，模拟器跑不了，见 `docs/mnn.md` §6.1）、
 ③⑤需要跑一次评测才有结果表。**三项均待真机 arm64 手测。**
 
 
@@ -781,7 +781,7 @@
 | 11 | Models 市场 | 工具栏一行 = 说明 + **一颗**「刷新状态」；条目 `MNN · Gemma · 3.7 GB`（`formatModelSize` 生效） |
 
 **未验证（模拟器不可及）**：跟随滚动（②R2）与结果表（需 real 流式 / 评测）
-仍待真机 arm64，见 `docs/mnn.md` §5.1。
+仍待真机 arm64，见 `docs/mnn.md` §6.1。
 
 **一处文案连带修正**：Settings 的 backend 说明原写「见聊天页『展开采样参数』里的灰显说明」，
 面板搬进 sheet 后该指代已失效 → 改为「见聊天页参数 chip 打开的『采样参数』里的灰显说明」。
@@ -894,7 +894,7 @@ Chat 与 Benchmark 的跳转共用 `DroidLlmRoot` 抽出的 `goToModels`，避�
 
 **未验证（模拟器不可及，待真机 arm64）**：logo 在 3x 高密度屏的清晰度（192px 源 → 显示 40dp，
 在 3x 屏需 120px，余量够但要看实际观感）、浅色主题描边的观感、市场长列表滚动时 logo 的解码开销。
-**R2 的跟随滚动与结果表、R3 的手势手感**同样仍待真机（`docs/mnn.md` §5.1）。
+**R2 的跟随滚动与结果表、R3 的手势手感**同样仍待真机（`docs/mnn.md` §6.1）。
 
 **未做（明确记录，不是遗漏）**：聊天页 `titleLarge` 标题（会挤掉消息区，`UI_REVIEW` §4.3 建议不做）、
 消息长按复制（属**新功能**，不在"打磨"范围）、评测结果"行展开看样本"（`UI_REVIEW` §4.1 遗留，仍未实现）。
@@ -923,7 +923,7 @@ Chat 与 Benchmark 的跳转共用 `DroidLlmRoot` 抽出的 `goToModels`，避�
 
 - R1 / R2：`gradlew :app:assembleDebug` BUILD SUCCESSFUL；四个界面同一引擎显示一致（**截图比对**）；`Settings` 改 `0.7 → 0.75` 不再吞掉中间态；生成长回复时列表持续跟到底部。
   - R1 的"同一引擎显示一致"**已截图验证**；R2 的数值框**已在模拟器验证**（含半截状态不污染存储）；
-  - R2 剩下的**跟随滚动**（需流式回复）与**结果表单位/行高**（需跑一次评测）**必须真机 arm64**——模拟器跑不了评测，见 `docs/mnn.md` §5.1。
+  - R2 剩下的**跟随滚动**（需流式回复）与**结果表单位/行高**（需跑一次评测）**必须真机 arm64**——模拟器跑不了评测，见 `docs/mnn.md` §6.1。
 - R3：顶栏单入口可开两级弹层（引擎 chip 状态点三态正确）；**选引擎/模型不触发自动 load**（`DESIGN §1.2` 回归）；
   采样 chip 点击开 sheet；每屏最多一个 Filled 主操作；`UI_DESIGN.md` 已补 §4.4 控件三层职责。
   - **模拟器已验证 1–11 项**（见「R3 交付说明」实测表，含 `DESIGN §1.2` 回归）；真机只需复核视觉与手势
@@ -945,10 +945,40 @@ Chat 与 Benchmark 的跳转共用 `DroidLlmRoot` 抽出的 `goToModels`，避�
 ✅ **R4 已完成**（评测页密度重构 + 13 个厂商 logo〔96.5KB〕+ 空态统一 + P2 打磨；模拟器实测 10 项）。
 **当前进度：R1 ✅ → R1.5 ✅ → R2 ✅ → R3 ✅ → R4 ✅ —— §8d 全部完成（2026-09-27）**。
 **剩余只差真机 arm64 复核**（代码侧无待办）：R2 的②跟随滚动 / ③⑤结果表，R3 的 sheet 与 chip 手感，
-R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑不了真实流式与评测（`docs/mnn.md` §5.1）。
+R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑不了真实流式与评测（`docs/mnn.md` §6.1）。
 **R3 遗留已闭环**（2026-09-27 收尾）：`UI_DESIGN.md` §4.4 把"每个列表行都挂一个 Filled"列为反例，而模型市场
 原本每条目仍挂一颗 Filled「下载」/「已下载 · 添加到列表」（R3 只收敛了「刷新状态」那一颗）→ 已降为
 `OutlinedToolButton`，市场页 Filled 数为 0；同步修正 §4.4 与 §5.2 措辞（§5.2 原写"下载是唯一 Filled"，自相矛盾）。
+
+### R5 交付说明（Thinking 开关 + 回答截断 + 注册模型，2026-09-27）
+
+**① Thinking 开关**（对话框附近，`UI_REVIEW` §3.2 模式 3）
+
+| 项 | 落地 |
+|---|---|
+| UI | `Composer` 参数 chip 同行 `FilterChip`（`Thinking 开/关`）；仅模型支持时显示 |
+| 契约 | `InferenceConfig.enableThinking`（默认 true）+ `ConfigField.THINKING` |
+| 检测 | `ThinkingSupport`（名字：qwen3/thinking/r1 等）+ MNN `templateHasEnableThinking`（读 chat_template） |
+| MNN | `set_config` 写 `jinja.context.enable_thinking`（见 `docs/mnn.md` §5） |
+| 其它引擎 | Qwen3 系用户消息尾附 `/think` `/no_think`（MNN 不用后缀，避免双重控制） |
+
+**② 回答显示不全**
+
+- **不是 UI 限制**：`MessageBubble` 的 `Text(msg.content)` 无 `maxLines`，长回复可完整换行滚动。
+- **是生成长度不够**：`maxNewTokens` 默认 **128** 太小；Thinking 模型还会把额度吃在 `<think>` 上。
+  - 默认值 **128 → 4096**（对齐并超过 MnnLlmChat 的默认 2048 / 上限 4096；`InferenceConfig` / `AppSettings`）。
+  - 达上限时气泡尾注「已达 maxNewTokens=N 上限…」+ 状态行「达 maxNewTokens 上限」。
+
+**③ 导入 → 注册（外部模型保留原路径）**
+
+| 项 | 落地 |
+|---|---|
+| 术语 | 「导入」→「注册」（Tab「已注册」、卡片「注册外部模型」） |
+| 行为 | 外部模型**只登记、不搬文件**；删除「导入并复制到模型目录」 |
+| 主操作 | 「注册模型（保留原路径）」= 唯一 Filled |
+| 例外 | 仅市场下载严格走模型根目录 `{hf\|modelscope}/models--org--repo/snapshots/` |
+
+**验证**：`:core:engine-api` / `:core:common` 单测 + `:app:assembleDebug` 全绿。
 
 ---
 
@@ -962,4 +992,4 @@ R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑
 6. **不要扩大范围**：功耗测量、Dynamic Feature、雷达图、质量评测、OpenAI 兼容 API 均明确不做（API 是 P5+ 可选增强，不在本计划内）
 7. **目录改名**：仓库建立后工作目录可从 `LlmChatAndroid` 改为 `droid-llm`，改名时同步 `DESIGN.md` 头部说明
 8. **第三方路径**：一律走环境变量（`MNN_ROOT` / `QAIRT_PATH` 等，见 AGENTS.md「第三方仓库」表），禁止把 `D:\...` 写进仓库
-9. **评测只在真机 arm64 上跑，别在模拟器上试**：模拟器（x86_64 + 2GB RAM + native bridge 翻译）点「开始评测」会卡死在 `llm->load()`——`createLLM` 之后无任何 native 日志、进程 CPU 0%、无崩溃/OOM，只能 `adb shell am force-stop` 恢复。**这是环境限制不是代码 bug**，在模拟器上排查评测流程纯属浪费时间。模拟器仍可用于**纯 UI 布局**验证（Compose 不碰 native）。详见 `docs/mnn.md` §5.1
+9. **评测只在真机 arm64 上跑，别在模拟器上试**：模拟器（x86_64 + 2GB RAM + native bridge 翻译）点「开始评测」会卡死在 `llm->load()`——`createLLM` 之后无任何 native 日志、进程 CPU 0%、无崩溃/OOM，只能 `adb shell am force-stop` 恢复。**这是环境限制不是代码 bug**，在模拟器上排查评测流程纯属浪费时间。模拟器仍可用于**纯 UI 布局**验证（Compose 不碰 native）。详见 `docs/mnn.md` §6.1

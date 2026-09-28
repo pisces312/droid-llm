@@ -35,6 +35,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -95,6 +96,7 @@ fun ChatScreen(
     val sampling by vm.sampling.collectAsState()
     val generating by vm.generating.collectAsState()
     val sessionState by vm.sessionState.collectAsState()
+    val thinkingSupported by vm.thinkingSupported.collectAsState()
     val canStart = selectedModel != null && selectedEngine?.available == true
     val canSend = sessionState == SessionState.READY && !generating
     val loading = sessionState == SessionState.LOADING
@@ -197,6 +199,9 @@ fun ChatScreen(
                 canSend = canSend,
                 onSend = vm::send,
                 onStop = vm::stopGenerate,
+                thinkingSupported = thinkingSupported,
+                thinkingEnabled = sampling.enableThinking,
+                onThinkingChange = vm::setThinking,
             )
             Spacer(Modifier.height(8.dp))
         }
@@ -744,10 +749,14 @@ private fun BackendField(
 }
 
 /**
- * Parameter chip + input + send.
+ * Parameter chip + Thinking switch + input + send.
  *
  * Only the filled send button lives here; starting the model is handled by the status line
  * above, and the two never appear filled at the same time.
+ *
+ * The Thinking chip sits with the parameter chip (UI_REVIEW §3.2 模式 3: per-message
+ * controls belong next to the composer). It is hidden when the selected model has no
+ * thinking mode — a toggle that does nothing is worse than no toggle.
  */
 @Composable
 private fun Composer(
@@ -757,22 +766,46 @@ private fun Composer(
     canSend: Boolean,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
+    thinkingSupported: Boolean = false,
+    thinkingEnabled: Boolean = true,
+    onThinkingChange: (Boolean) -> Unit = {},
 ) {
     var text by remember { mutableStateOf("") }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        AssistChip(
-            onClick = onOpenParams,
-            label = {
-                Text(summary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            },
-            leadingIcon = {
-                Icon(
-                    Icons.Filled.Tune,
-                    contentDescription = null,
-                    modifier = Modifier.size(AssistChipDefaults.IconSize),
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AssistChip(
+                onClick = onOpenParams,
+                label = {
+                    Text(summary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Filled.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(AssistChipDefaults.IconSize),
+                    )
+                },
+            )
+            if (thinkingSupported) {
+                FilterChip(
+                    selected = thinkingEnabled,
+                    onClick = { onThinkingChange(!thinkingEnabled) },
+                    label = { Text(if (thinkingEnabled) "Thinking 开" else "Thinking 关") },
+                    leadingIcon = {
+                        if (thinkingEnabled) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(AssistChipDefaults.IconSize),
+                            )
+                        }
+                    },
                 )
-            },
-        )
+            }
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -59,7 +59,7 @@ data class AppSettings(
     val topK: Int = 40,
     val topP: Float = 0.95f,
     val threads: Int = 4,
-    val maxNewTokens: Int = 128,
+    val maxNewTokens: Int = 4096,
     val backend: Backend = Backend.AUTO,
     /** Blank = no system message is sent at all. */
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
@@ -126,7 +126,7 @@ class DataStoreAppSettingsStore @Inject constructor(
             topK = prefs[Keys.topK] ?: 40,
             topP = prefs[Keys.topP] ?: 0.95f,
             threads = prefs[Keys.threads] ?: 4,
-            maxNewTokens = prefs[Keys.maxNewTokens] ?: 128,
+            maxNewTokens = prefs[Keys.maxNewTokens] ?: 4096,
             backend = prefs[Keys.backend]?.let { raw ->
                 Backend.entries.firstOrNull { it.name == raw }
             } ?: Backend.AUTO,

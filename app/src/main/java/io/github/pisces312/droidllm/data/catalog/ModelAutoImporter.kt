@@ -25,7 +25,7 @@ fun engineFormatTag(engineId: EngineId): String = when (engineId) {
  * absent from [ModelPathStore].
  *
  * Needed because the market scan ([findModelDir]) only reports "downloaded"; the
- * "已导入" tab and the chat model picker read the store. Without this, switching
+ * "已注册" tab and the chat model picker read the store. Without this, switching
  * the model root leaves both empty even though the files are recognized.
  */
 @Singleton
@@ -38,15 +38,16 @@ class ModelAutoImporter @Inject constructor(
      * Scan [root] and register every matching catalog model that is not in the
      * store yet. Models the user deleted are re-added only when their files are
      * still present under the scanned root — that is the intent of a root switch.
-     * @return number of newly registered models.
+     *
+     * @return display names of newly registered models.
      */
-    suspend fun registerFound(root: File): Int {
+    suspend fun registerFound(root: File): List<String> {
         val catalog = runCatching { ModelCatalogLoader.load(context) }
-            .getOrElse { return 0 }
+            .getOrElse { return emptyList() }
         val knownPaths = store.listModels()
             .mapNotNull { (it.location as? ModelLocation.FilePath)?.path }
             .toHashSet()
-        var added = 0
+        val added = mutableListOf<String>()
         catalog.models.forEach { model ->
             if (model.tags.any { it == "ImageGen" || it == "AudioGen" }) return@forEach
             val engineId = EngineId.entries
@@ -65,8 +66,26 @@ class ModelAutoImporter @Inject constructor(
                 ),
             )
             knownPaths += path
-            added++
+            added += model.name
         }
         return added
+    }
+
+    /**
+     * Drop registrations whose file/directory is gone from disk. Applies to every
+     * stored model (external original paths included), not only catalog downloads.
+     *
+     * @return display names of removed registrations.
+     */
+    suspend fun pruneMissing(): List<String> {
+        val removed = mutableListOf<String>()
+        store.listModels().forEach { model ->
+            val path = (model.location as? ModelLocation.FilePath)?.path ?: return@forEach
+            if (!File(path).exists()) {
+                store.delete(model.id)
+                removed += model.displayName
+            }
+        }
+        return removed
     }
 }

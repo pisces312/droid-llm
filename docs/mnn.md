@@ -114,7 +114,23 @@ decode_tps  = gen_seq_len / (decode_us  / 1e6)
   （`response(history_, &os, "<eop>", 0)` 只 prefill + 手动 `generate(1)`），
   需要靠 `resolveAndroidSteppingEop()` 在输出流里检测这个哨兵文本来判断本轮结束。
 
-## 5. 其它已踩过的坑
+## 5. Thinking 开关（`enable_thinking`）
+
+Qwen3 系模板读 jinja context 里的 `enable_thinking`，决定 assistant 轮是否以
+`<think>` 开头（MNN `llm_demo` / dflash 同键）：
+
+```json
+{"jinja":{"context":{"enable_thinking":false}}}
+```
+
+本项目：`MnnEngine.buildConfigJson` 每轮 `set_config` 写入该键；开关 UI 在对话框旁
+（`Composer` 的 Thinking chip）。检测模型是否支持走 `MnnEngine.templateHasEnableThinking`
+（读 `config.json` → `llm_config` → `chat_template` 是否含 `enable_thinking`，与
+MnnLlmChat `ModelConfig.supportsThinkingSwitch` 同口径）。
+
+**不要**再往用户消息尾附 `/think` `/no_think`（会与 jinja 双重控制）；非 MNN 引擎才用消息后缀。
+
+## 6. 其它已踩过的坑
 
 | 坑 | 依据 | 处理 |
 |---|---|---|
@@ -123,9 +139,9 @@ decode_tps  = gen_seq_len / (decode_us  / 1e6)
 | `createLLM` 要传 `config.json` 的绝对路径 | 传纯目录会拼出 `<dir>tokenizer.txt`（缺分隔符），tokenizer 加载失败 | Kotlin 侧传 `File(dir, "config.json").absolutePath` |
 | 模型自带 `config.json` 已写死 `backend_type=cpu` / `thread_num=4` / `precision=low` / `memory=low` | — | 我们传 `cpu` + `threads`，与 MnnLlmChat 的缺省一致；**跨 app 比速度时这一项不构成差异** |
 | 模拟器上数值不可信 | `emulator-5554` 是 x86_64，arm64 产物走 `libndk_translation.so` 二进制翻译 | 性能与采样结论一律以真机 arm64 为准 |
-| **模拟器连"跑通评测流程"都做不到** | 实测卡在 `llm->load()`，见 §5.1 | 评测（含结果表/历史卡/失败行）一律真机 arm64；模拟器只用于纯 UI 布局验证 |
+| **模拟器连"跑通评测流程"都做不到** | 实测卡在 `llm->load()`，见 §6.1 | 评测（含结果表/历史卡/失败行）一律真机 arm64；模拟器只用于纯 UI 布局验证 |
 
-### 5.1 模拟器为什么不能用来跑评测
+### 6.1 模拟器为什么不能用来跑评测
 
 **结论：不要尝试在模拟器上运行评测。** 这不是代码 bug，也不是配置问题，是环境限制，
 在模拟器上排查评测流程只会浪费时间。
@@ -162,7 +178,7 @@ free 仅 200MB、swap 已用 500MB+）。**只能 `adb shell am force-stop` 恢�
 - 模拟器仍然可用于**纯 UI 布局验证** —— Compose 渲染不碰 native，界面照常出帧，
   翻页、截图、`uiautomator dump` 读文字都正常。
 
-## 6. 调试手法
+## 7. 调试手法
 
 - 按 PID 看日志：`adb logcat -d --pid=$(adb shell pidof io.github.pisces312.droidllm.debug)`
 - 原生埋点：`__android_log_print(ANDROID_LOG_INFO, "<tag>", ...)`；MNN 自身的 `MNN_ERROR`

@@ -41,6 +41,14 @@ data class CatalogRow(
     val localPath: String?,
 )
 
+/** What one root scan changed; non-null prompts the summary dialog. */
+data class ScanChanges(
+    val added: List<String>,
+    val removed: List<String>,
+) {
+    val isEmpty: Boolean get() = added.isEmpty() && removed.isEmpty()
+}
+
 enum class DownloadFilter { ALL, DOWNLOADED, NOT_DOWNLOADED }
 
 @HiltViewModel
@@ -59,6 +67,10 @@ class ModelsViewModel @Inject constructor(
 
     private val _message = MutableStateFlow("")
     val message: StateFlow<String> = _message.asStateFlow()
+
+    /** Set after a scan that added or removed registrations; cleared on dismiss. */
+    private val _scanChanges = MutableStateFlow<ScanChanges?>(null)
+    val scanChanges: StateFlow<ScanChanges?> = _scanChanges.asStateFlow()
 
     private val _pendingPath = MutableStateFlow("")
     val pendingPath: StateFlow<String> = _pendingPath.asStateFlow()
@@ -112,21 +124,31 @@ class ModelsViewModel @Inject constructor(
     }
 
     /**
-     * Rescan the current model root, publish what is present, and register any
-     * catalog model found on disk that is missing from the imported list.
-     * Same work the settings page does right after a root switch.
+     * Rescan the model root: register newly found catalog models and drop
+     * registrations whose files are gone. When anything changed, [scanChanges]
+     * is set so the UI can raise a summary dialog.
+     *
+     * @param quiet suppress the "nothing changed" banner; the dialog still
+     *   appears whenever there were additions or removals.
      */
-    fun syncFoundModels() {
+    fun syncFoundModels(quiet: Boolean = false) {
         val rootDir = File(modelRoot())
         refreshDownloaded()
         viewModelScope.launch(Dispatchers.IO) {
+            val removed = autoImporter.pruneMissing()
             val added = autoImporter.registerFound(rootDir)
-            _message.value = if (added > 0) {
-                "已自动登记 $added 个模型（来自当前模型根目录）"
-            } else {
-                "扫描完成，没有发现新的模型"
+            val changes = ScanChanges(added = added, removed = removed)
+            if (!changes.isEmpty) {
+                _scanChanges.value = changes
+                _message.value = "扫描完成：+${added.size} / -${removed.size}"
+            } else if (!quiet) {
+                _message.value = "扫描完成，没有变化"
             }
         }
+    }
+
+    fun dismissScanChanges() {
+        _scanChanges.value = null
     }
 
     fun refreshDownloaded() {
@@ -175,7 +197,7 @@ class ModelsViewModel @Inject constructor(
                 val chatable = model.tags.none { it == "ImageGen" || it == "AudioGen" }
                 if (chatable) {
                     registerDownloaded(model)
-                    _message.value = "已下载并加入模型列表：${model.name}\n$out"
+                    _message.value = "已下载并注册到模型列表：${model.name}\n$out"
                 } else {
                     _message.value = "已下载：${model.name}（非对话模型，未自动加入列表）\n$out"
                 }
@@ -189,102 +211,57 @@ class ModelsViewModel @Inject constructor(
         _pendingPath.value = path
     }
 
-    /** Expected layout under the model root, used as UI hint and import target. */
+    /**
+     * Expected file/dir shape. External models are registered in place at their
+     * original path — only market downloads live under the model root (see
+     * `docs/MODEL_PATHS.md`).
+     */
     fun engineFormatHint(engineId: EngineId): String = when (engineId) {
-        EngineId.LITERT -> "单文件 *.task / *.litertlm → {根}/litert/"
-        EngineId.MNN -> "模型目录（config.json + *.mnn）→ {根}/mnn/"
-        EngineId.GENIE -> "模型目录（genie_config.json + *.bin + tokenizer.json）→ {根}/genie/"
-        EngineId.LLAMACPP -> "单文件 *.gguf → {根}/llamacpp/"
+        EngineId.LITERT -> "单文件 *.task / *.litertlm（任意路径均可注册）"
+        EngineId.MNN -> "模型目录（config.json + *.mnn）（任意路径均可注册）"
+        EngineId.GENIE -> "模型目录（genie_config.json + *.bin + tokenizer.json）（任意路径均可注册）"
+        EngineId.LLAMACPP -> "单文件 *.gguf（任意路径均可注册）"
         EngineId.FAKE -> "任意"
     }
 
     /**
-     * Copy [sourcePath] into `<modelRoot>/<engine>/<name>` then register it.
-     * Never overwrites an existing target (same contract as model-root migration).
+     * Register [path] in the model list **in place**. External models are never
+     * copied or moved: the original path is what engines open. Only market
+     * downloads follow the model-root layout.
+     *
+     * @return whether the request passed validation and was queued; false keeps the
+     * registration sheet open so the user can fix the form.
      */
-    fun importToModelRoot(engineId: EngineId, displayName: String, sourcePath: String) {
+    fun register(engineId: EngineId, displayName: String, path: String): Boolean {
         val name = displayName.trim()
-        val src = File(sourcePath.trim())
-        if (name.isEmpty()) {
-            _message.value = "显示名不能为空"
-            return
-        }
-        if (!src.exists()) {
-            _message.value = "路径不存在：$sourcePath"
-            return
-        }
-        val validation = FileFormatValidator.validatePath(engineId, src)
-        if (validation is ValidationResult.Failed) {
-            _message.value = "格式校验失败：${validation.reason}"
-            return
-        }
-        viewModelScope.launch(Dispatchers.IO) {
-            val engineDir = File(engineDir(engineId))
-            engineDir.mkdirs()
-            val dest = File(engineDir, src.name)
-            val finalPath = try {
-                when {
-                    src.canonicalPath == dest.canonicalPath -> src.absolutePath
-                    dest.exists() -> {
-                        val ok = FileFormatValidator.validatePath(engineId, dest)
-                        if (ok is ValidationResult.Ok || ok is ValidationResult.Unknown) {
-                            dest.absolutePath
-                        } else {
-                            _message.value = "目标已存在且无效，未覆盖：${dest.absolutePath}"
-                            return@launch
-                        }
-                    }
-                    else -> {
-                        if (src.isDirectory) src.copyRecursively(dest, overwrite = false)
-                        else src.copyTo(dest, overwrite = false)
-                        dest.absolutePath
-                    }
-                }
-            } catch (e: Exception) {
-                _message.value = "导入失败：${e.message}"
-                return@launch
-            }
-            val finalFile = File(finalPath)
-            val result = FileFormatValidator.validatePath(engineId, finalFile)
-            if (result is ValidationResult.Failed) {
-                _message.value = "导入后校验失败：${result.reason}"
-                return@launch
-            }
-            modelStore.upsert(
-                LocalModel(
-                    id = UUID.randomUUID().toString(),
-                    engineId = engineId,
-                    displayName = name,
-                    location = ModelLocation.FilePath(finalPath),
-                    formatHint = formatHint(engineId),
-                    fileSizeBytes = if (finalFile.isFile) finalFile.length() else null,
-                ),
-            )
-            _pendingPath.value = finalPath
-            _message.value = "已导入：$name → $finalPath"
-        }
-    }
-
-    fun add(engineId: EngineId, displayName: String, path: String) {
-        if (displayName.isEmpty() || path.isEmpty()) {
+        val raw = path.trim()
+        if (name.isEmpty() || raw.isEmpty()) {
             _message.value = "显示名和路径不能为空"
-            return
+            return false
         }
-        val file = File(path)
+        val file = File(raw)
         if (!file.exists()) {
-            _message.value = "路径不存在：$path；检查是否已授权存储或路径拼写"
-            return
+            _message.value = "路径不存在：$raw；检查是否已授权存储或路径拼写"
+            return false
         }
         val result = FileFormatValidator.validatePath(engineId, file)
         if (result is ValidationResult.Failed) {
             _message.value = "格式校验失败：${result.reason}"
-            return
+            return false
+        }
+        val existing = models.value.firstOrNull { m ->
+            (m.location as? ModelLocation.FilePath)?.path == file.absolutePath
+        }
+        if (existing != null) {
+            _message.value = "该路径已在模型列表中：${existing.displayName}"
+            return false
         }
         viewModelScope.launch {
-            upsertModel(engineId, displayName, path)
-            _message.value = "已添加：$displayName"
+            upsertModel(engineId, name, file.absolutePath)
+            _message.value = "已注册：$name（原路径 ${file.absolutePath}）"
             _pendingPath.value = ""
         }
+        return true
     }
 
     private suspend fun upsertModel(engineId: EngineId, displayName: String, path: String) {
@@ -317,7 +294,7 @@ class ModelsViewModel @Inject constructor(
                 _message.value = "已在模型列表中：${existing.displayName}"
                 return@launch
             }
-            add(
+            register(
                 engineId = EngineId.entries.firstOrNull { it.name.equals(model.engine, true) } ?: EngineId.LLAMACPP,
                 displayName = model.name,
                 path = path,

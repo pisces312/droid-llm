@@ -268,6 +268,37 @@ class MnnEngine @Inject constructor() : LlmEngine {
         }
     }
 
+    companion object {
+        /**
+         * True when the model's jinja chat template reads `enable_thinking`
+         * (same probe as MnnLlmChat `ModelConfig.supportsThinkingSwitch`).
+         * Reads `config.json` → `llm_config` (default `llm_config.json`) →
+         * `jinja.chat_template`. Null when the files cannot be read.
+         */
+        fun templateHasEnableThinking(modelDir: String): Boolean? {
+            return try {
+                val dir = File(modelDir)
+                val configFile = File(dir, "config.json")
+                if (!configFile.isFile) {
+                    null
+                } else {
+                    val configText = configFile.readText()
+                    val llmConfigName = Regex("\"llm_config\"\\s*:\\s*\"([^\"]+)\"")
+                        .find(configText)?.groupValues?.get(1) ?: "llm_config.json"
+                    val llmConfig = File(dir, llmConfigName)
+                    if (llmConfig.isFile) {
+                        llmConfig.readText().contains("enable_thinking")
+                    } else {
+                        // Some packs fold the template into config.json itself.
+                        configText.contains("enable_thinking")
+                    }
+                }
+            } catch (_: Throwable) {
+                null
+            }
+        }
+    }
+
     private fun applyConfig(handle: Long, config: InferenceConfig) =
         MnnNative.nativeSetConfig(handle, buildConfigJson(config))
 
@@ -285,7 +316,13 @@ class MnnEngine @Inject constructor() : LlmEngine {
             append("\"max_new_tokens\":").append(config.maxNewTokens).append(',')
             append("\"temperature\":").append(config.temperature).append(',')
             append("\"top_k\":").append(config.topK).append(',')
-            append("\"top_p\":").append(config.topP)
+            append("\"top_p\":").append(config.topP).append(',')
+            // Qwen3-style templates read this jinja context to decide whether the
+            // assistant turn opens with <think> (MNN llm_demo / dflash use the same key).
+            // Harmless for templates that ignore it.
+            append("\"jinja\":{\"context\":{\"enable_thinking\":")
+            append(config.enableThinking)
+            append("}}")
             append('}')
         }
     }

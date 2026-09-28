@@ -197,6 +197,12 @@ flowchart TD
   点击打开 `SamplingSheet`：temp / top_k / top_p / threads / backend / maxNewTokens + 底部「完成」。
   默认值取自 Settings；不适用当前引擎的字段灰显 + 12sp 说明（`DESIGN §1.2` 字段适用性）。
   此项为 `DESIGN §4` 信息架构要求，P0 已实现，**不可移除**——只是从内联折叠卡搬进 sheet（决策 4）
+- **Thinking 开关**：参数 chip 同一行的 `FilterChip`（`Thinking 开` / `Thinking 关`，选中带勾）。
+  **每条消息级**控制（可逐轮切换），故放在对话框旁而非 Settings（UI_REVIEW §3.2 模式 3）。
+  仅当模型支持 Thinking 时显示（`ThinkingSupport`：模型名命中 qwen3/thinking/r1 等，
+  或 MNN `chat_template` 含 `enable_thinking`）；不支持则整颗隐藏，不做假开关。
+  生效路径：MNN 走 `jinja.context.enable_thinking`；其余引擎对 Qwen3 系在用户消息尾附
+  `/think` 或 `/no_think`。默认开（对齐上游模板默认）
 - 输入：多行，发送钮 `Primary`；生成中变「停止」。**仅 READY 可发送**，否则灰显 + 占位提示
   「启动模型后可发送消息」
 - 空态：`EmptyState`——Folder 图标 + 「先在「模型」页添加模型，再回到这里启动它」+ **Filled**
@@ -205,27 +211,37 @@ flowchart TD
 
 ### 5.2 模型（Models）
 
-- 两个 Tab：`已导入` / `模型市场`。页头显示共享模型根目录，**行尾带复制按钮**——路径 80+ 字符，
+- 两个 Tab：`已注册` / `模型市场`。页头显示共享模型根目录，**行尾带复制按钮**——路径 80+ 字符，
   本来就是给人粘到文件管理器或 `adb` 里的；模型条目的路径同样各带一颗
-- **`已导入`**：
-  - 顶部「添加 / 导入第三方模型」卡：引擎选择用 `ChoiceChipRow`（横向滚动 chip，替掉原来 4 个
-    等宽按钮——`LiteRT-LM` / `llama.cpp` 会被断成 `LITER T`），引擎格式提示一行；
-    显示名 + 源路径两个输入框（**路径框的尾部图标按钮**开内置文件浏览器）；
-    底部三颗动作按 §4.4 分层：`导入并复制到模型目录` 是唯一 Filled，`仅引用原路径` /
-    `扫描模型根目录` 走 Outlined
-  - 已导入列表：名称 + `引擎 · 格式 · 量化` + 路径（带复制）+ 「校验」「删除」（均 Outlined）
-  - **空列表**：`EmptyState`，「浏览模型市场」直接切到市场 Tab。**这里不加厂商 logo**——
+- **页头工具位**（标题行右侧两颗图标钮，与聊天页「新建会话」同构）：
+  - `＋` **注册外部模型** → `ModalBottomSheet`（复用 `SheetTitle`）。表单不占列表纵向空间；
+    注册是低频动作，不常连着注册多个模型，故不为批录单独做二级页
+  - `⟳` **语义随 Tab**：已注册 = 扫描模型根目录；模型市场 = 刷新下载状态。
+    `contentDescription` 写清当前语义。市场 Tab 不再在说明行末另挂「刷新状态」
+- **`已注册` = 纯列表**：
+  - 顶部引擎过滤 `ChoiceChipRow`：`全部 · n` + 各引擎 `displayName · n`（数量实时），
+    `null` = 全部。筛选只作用于列表卡片
+  - 列表卡：名称 + `引擎 · 格式 · 量化` + 路径（带复制）+ 「校验」「删除」（均 Outlined）。
+    **本 Tab Filled 数为 0**——主操作「注册」在 Sheet 里，扫描在页头图标
+  - **空态两档**：整库空 → `EmptyState`「浏览模型市场」（并提示右上角 ＋）；
+    筛选空 → 「该引擎下暂无已注册模型」+「显示全部」。**这里不加厂商 logo**——
     `LocalModel` 没有 `vendor` 字段（引擎只知道路径），靠名字猜会把 `TinyLlama` 标成 Meta Llama
-  - 添加：绝对路径 + **内置文件浏览器**（按引擎过滤：`.gguf` / `.litertlm` / `.task` 文件，
+- **注册 Sheet**：引擎 `ChoiceChipRow` + 格式提示 + 显示名 + 路径（尾部图标开内置文件浏览器）+
+  **`注册模型（保留原路径）` 是 Sheet 内唯一 Filled** + 市场路径说明 caption。
+  校验失败 **不关 Sheet**（`register()` 返回是否通过），错误走页头消息行
+  - **外部模型只登记、不搬文件**：引擎直接打开原路径；只有市场下载的模型严格放在
+    模型根目录（`{hf|modelscope}/models--org--repo/snapshots/`）。名称用「注册」而非「导入」——
+    语义是登记索引，不是搬移文件
+  - 注册成功：关 Sheet、筛选复位到「全部」，保证新条目可见
+  - 路径选择：绝对路径 + **内置文件浏览器**（按引擎过滤：`.gguf` / `.litertlm` / `.task` 文件，
     MNN/Genie 选目录；需 `MANAGE_EXTERNAL_STORAGE`，未授权仅可浏览 App 私有目录并给授权引导；
     其他 App 的 `Android/data/` 灰显不可选）。SAF 降级为可选外部分享入口，P5 不强制（`DESIGN §1.3`）
-  - 校验失败：行内红字原因（缺哪个文件写哪个）
+  - 校验失败（列表行）：行内红字原因（缺哪个文件写哪个）
 - **`模型市场`**：下载源 chip 行（`HF官方 / HF镜像 / ModelScope`）+ 下载过滤 chip 行
-  （`全部 / 已下载 / 未下载`）+ 说明行末的**一颗**「刷新状态」（不再每个条目挂一颗）；
-  条目：**左侧厂商 logo**（`VendorLogo`，40dp；catalog 的 `vendor` 精确匹配，未命中回落首字母）+
-  名称 / `引擎 · 厂商 · 体积` / tags / 描述 / 下载进度；动作按 §4.4 分层，
-  `下载` / `已下载 · 添加到列表` 走 `OutlinedToolButton`（这一屏 Filled 数为 0：上百条目各挂一颗 Filled
-  正是 §4.4 举的反例）
+  （`全部 / 已下载 / 未下载`）；条目：**左侧厂商 logo**（`VendorLogo`，40dp；catalog 的 `vendor`
+  精确匹配，未命中回落首字母）+ 名称 / `引擎 · 厂商 · 体积` / tags / 描述 / 下载进度；
+  动作按 §4.4 分层，`下载` / `已下载 · 注册` 走 `OutlinedToolButton`（这一屏 Filled 数为 0：
+  上百条目各挂一颗 Filled 正是 §4.4 举的反例）
 - 引擎与厂商显示名一律走 `EngineId.displayName` / `engineIdFromStorage()` 反解，
   **不得**直接打印持久化的 `EngineId.name`（详见 `docs/UI_REVIEW.md` §4.1 P0-1）
 

@@ -255,8 +255,8 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private fun addedSuffix(added: Int): String =
-        if (added > 0) "；已自动登记 $added 个已下载模型" else ""
+    private fun addedSuffix(added: List<String>): String =
+        if (added.isNotEmpty()) "；已自动注册 ${added.size} 个已下载模型" else ""
 
     private suspend fun rewriteRegisteredPaths(moved: Map<String, String>) {
         if (moved.isEmpty()) return

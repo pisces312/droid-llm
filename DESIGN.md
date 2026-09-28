@@ -85,7 +85,7 @@ enum class EngineId { LITERT, MNN, GENIE, LLAMACPP }
 enum class Backend { CPU, GPU, OPENCL, NPU_HTP, AUTO }
 
 data class InferenceConfig(
-    val maxNewTokens: Int = 128,
+    val maxNewTokens: Int = 4096,
     val temperature: Float = 0.7f,
     val topK: Int = 40,
     val topP: Float = 0.95f,
@@ -93,6 +93,7 @@ data class InferenceConfig(
     val backend: Backend = Backend.AUTO,
     val seed: Long? = null,
     val systemPrompt: String? = null,
+    val enableThinking: Boolean = true,
 )
 
 data class GenerateRequest(

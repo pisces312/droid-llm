@@ -7,18 +7,22 @@ import io.github.pisces312.droidllm.common.model.ModelPathStore
 import io.github.pisces312.droidllm.common.settings.AppSettings
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
 import io.github.pisces312.droidllm.common.settings.DEFAULT_SYSTEM_PROMPT
+import io.github.pisces312.droidllm.engine.mnn.MnnEngine
 import io.github.pisces312.droidllm.engineapi.Availability
 import io.github.pisces312.droidllm.engineapi.Backend
 import io.github.pisces312.droidllm.engineapi.ChatMessage
 import io.github.pisces312.droidllm.engineapi.ChatRole
 import io.github.pisces312.droidllm.engineapi.EngineEvent
 import io.github.pisces312.droidllm.engineapi.EngineException
+import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.GenerateJob
 import io.github.pisces312.droidllm.engineapi.GenerateRequest
 import io.github.pisces312.droidllm.engineapi.InferenceConfig
 import io.github.pisces312.droidllm.engineapi.LlmEngine
 import io.github.pisces312.droidllm.engineapi.LocalModel
+import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.SessionHandle
+import io.github.pisces312.droidllm.engineapi.ThinkingSupport
 import io.github.pisces312.droidllm.engineapi.labelledName
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -82,9 +86,11 @@ data class SamplingUiState(
     val topK: Int = 40,
     val topP: Float = 0.95f,
     val threads: Int = 4,
-    val maxNewTokens: Int = 128,
+    val maxNewTokens: Int = 4096,
     val backend: Backend = Backend.AUTO,
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
+    /** Reasoning on/off for the next turn (UI_REVIEW §3.2 模式 3). */
+    val enableThinking: Boolean = true,
 )
 
 @HiltViewModel
@@ -125,6 +131,13 @@ class ChatViewModel @Inject constructor(
 
     private val _sessionState = MutableStateFlow(SessionState.IDLE)
     val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+
+    /**
+     * Whether the current engine+model can flip Thinking. Resolved after model
+     * selection; false hides the composer chip (UI_REVIEW §3.2 模式 3).
+     */
+    private val _thinkingSupported = MutableStateFlow(false)
+    val thinkingSupported: StateFlow<Boolean> = _thinkingSupported.asStateFlow()
 
     private var session: SessionHandle? = null
     private var sessionEngine: LlmEngine? = null
@@ -179,6 +192,9 @@ class ChatViewModel @Inject constructor(
         maxNewTokens = maxNewTokens,
         backend = backend,
         systemPrompt = systemPrompt,
+        // Thinking is a per-turn knob, not a Settings default; keep the current
+        // session value when Settings pushes a new sampling snapshot.
+        enableThinking = _sampling.value.enableThinking,
     )
 
     /** Picking an engine releases any running model; the new one waits for [startModel]. */
@@ -197,6 +213,36 @@ class ChatViewModel @Inject constructor(
             releaseSession()
             _selectedModel.value = choice
             markIdle()
+            refreshThinkingSupport(choice)
+        }
+    }
+
+    /** Per-turn Thinking switch. No-op when the model has no thinking mode. */
+    fun setThinking(enabled: Boolean) {
+        _sampling.value = _sampling.value.copy(enableThinking = enabled)
+    }
+
+    private fun refreshThinkingSupport(choice: ModelChoice?) {
+        viewModelScope.launch {
+            val engine = _selectedEngine.value?.engine
+            val model = choice?.model
+            if (engine == null || model == null) {
+                _thinkingSupported.value = false
+                return@launch
+            }
+            val templateFlag = withContext(Dispatchers.IO) {
+                if (engine.id == EngineId.MNN) {
+                    val path = when (val loc = model.location) {
+                        is ModelLocation.FilePath -> loc.path
+                        is ModelLocation.AppPrivate -> loc.relativePath
+                        is ModelLocation.SafUri -> null
+                    }
+                    path?.let { MnnEngine.templateHasEnableThinking(it) }
+                } else {
+                    null
+                }
+            }
+            _thinkingSupported.value = ThinkingSupport.supports(model, templateFlag)
         }
     }
 
@@ -242,6 +288,22 @@ class ChatViewModel @Inject constructor(
         _sampling.value = transform(_sampling.value)
     }
 
+    /**
+     * Engines without a native `enable_thinking` flag still honor the Qwen3
+     * `/think` / `/no_think` turn suffix. MNN takes the jinja route instead
+     * (see `MnnEngine.buildConfigJson`) so the tag is not doubled.
+     */
+    private fun applyThinkingTurn(
+        text: String,
+        config: InferenceConfig,
+        engine: LlmEngine,
+    ): String {
+        if (engine.id == EngineId.MNN) return text
+        if (!ThinkingSupport.byName(_selectedModel.value?.displayName.orEmpty())) return text
+        val tag = if (config.enableThinking) "/think" else "/no_think"
+        return if (text.trimEnd().endsWith(tag)) text else text.trimEnd() + "\n" + tag
+    }
+
     fun newSession() {
         viewModelScope.launch {
             stopGenerate()
@@ -283,8 +345,12 @@ class ChatViewModel @Inject constructor(
         _models.value = list
         val current = _selectedModel.value
         if (current == null || list.none { it.model.id == current.model.id }) {
-            _selectedModel.value = list.firstOrNull()
+            val next = list.firstOrNull()
+            _selectedModel.value = next
             markIdle()
+            refreshThinkingSupport(next)
+        } else {
+            refreshThinkingSupport(current)
         }
     }
 
@@ -355,10 +421,11 @@ class ChatViewModel @Inject constructor(
         // The system turn is materialised here instead of being stored in the
         // transcript: chat templates read the system instruction from
         // messages[0], while the bubble list stays user/assistant only.
+        val userText = applyThinkingTurn(text, config, engine)
         val history = buildList {
             config.systemPrompt?.let { add(ChatMessage(ChatRole.SYSTEM, it)) }
             addAll(_messages.value.map { ChatMessage(it.role, it.content) })
-            add(ChatMessage(ChatRole.USER, text))
+            add(ChatMessage(ChatRole.USER, userText))
         }
         _messages.value = _messages.value + ChatUiMessage(ChatRole.USER, text)
         _status.value = "生成中…"
@@ -390,7 +457,13 @@ class ChatViewModel @Inject constructor(
                         (firstTokenNs - startedAt) / 1_000_000
                     } else null
                     val emptyReply = sb.isBlank()
-                    val content = sb.toString().ifBlank { "（空回复，可重试）" }
+                    val hitTokenCap = m.generatedTokens >= config.maxNewTokens && !emptyReply
+                    val content = buildString {
+                        append(sb.toString().ifBlank { "（空回复，可重试）" })
+                        if (hitTokenCap) {
+                            append("\n\n· 已达 maxNewTokens=${config.maxNewTokens} 上限，回答可能不完整；可在参数里调大")
+                        }
+                    }
                     val bubble = ChatUiMessage(
                         role = ChatRole.ASSISTANT,
                         content = content,
@@ -411,6 +484,7 @@ class ChatViewModel @Inject constructor(
                     }
                     _status.value = buildString {
                         append(if (emptyReply) "完成（无输出）" else "完成")
+                        if (hitTokenCap) append(" · 达 maxNewTokens 上限")
                         ttft?.let { append(" · TTFT ${it}ms") }
                         m.prefillTps?.let { append(" · prefill %.1f tok/s".format(it)) }
                         m.decodeTps?.let { append(" · decode %.1f tok/s".format(it)) }
@@ -456,5 +530,6 @@ class ChatViewModel @Inject constructor(
         threads = threads,
         backend = backend,
         systemPrompt = systemPrompt.takeIf { it.isNotBlank() },
+        enableThinking = enableThinking,
     )
 }

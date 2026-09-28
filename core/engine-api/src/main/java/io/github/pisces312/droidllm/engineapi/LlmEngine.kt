@@ -86,7 +86,7 @@ enum class Backend {
  * [EngineMetrics.effectiveConfig].
  */
 data class InferenceConfig(
-    val maxNewTokens: Int = 128,
+    val maxNewTokens: Int = 4096,
     val temperature: Float = 0.7f,
     val topK: Int = 40,
     val topP: Float = 0.95f,
@@ -103,6 +103,15 @@ data class InferenceConfig(
      * carries that role (see `docs/mnn.md`).
      */
     val systemPrompt: String? = null,
+    /**
+     * Reasoning / "Thinking" mode for models whose chat template exposes a switch
+     * (Qwen3 `enable_thinking`, `/think` `/no_think`, …). Default ON to match the
+     * upstream template default.
+     *
+     * How each adapter applies it is engine-specific; see `ConfigApplicability`
+     * and `docs/<engine>.md`. Unsupported engines ignore it with a warning.
+     */
+    val enableThinking: Boolean = true,
 )
 
 enum class ChatRole { SYSTEM, USER, ASSISTANT }
