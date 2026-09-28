@@ -4,6 +4,10 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import io.github.pisces312.droidllm.api.ApiServerPreferences
+import io.github.pisces312.droidllm.api.DefaultApiInferenceBridge
+import io.github.pisces312.droidllm.apiserver.ApiInferenceBridge
+import io.github.pisces312.droidllm.apiserver.ApiServerConfigSource
 import io.github.pisces312.droidllm.common.model.DataStoreModelPathStore
 import io.github.pisces312.droidllm.common.model.FileFormatValidator
 import io.github.pisces312.droidllm.common.model.ModelFormatValidator
@@ -27,6 +31,14 @@ abstract class AppBindings {
 
     @Binds
     abstract fun bindValidator(impl: FileFormatValidatorImpl): ModelFormatValidator
+
+    @Binds
+    @Singleton
+    abstract fun bindApiConfigSource(impl: ApiServerPreferences): ApiServerConfigSource
+
+    @Binds
+    @Singleton
+    abstract fun bindApiInferenceBridge(impl: DefaultApiInferenceBridge): ApiInferenceBridge
 }
 
 @Singleton

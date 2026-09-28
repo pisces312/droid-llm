@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -40,6 +41,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.pisces312.droidllm.common.bench.BenchmarkDao
 import io.github.pisces312.droidllm.common.device.DeviceProbe
+import io.github.pisces312.droidllm.api.ApiServerPreferences
+import io.github.pisces312.droidllm.apiserver.ApiServerConfig
 import io.github.pisces312.droidllm.common.model.ModelPathStore
 import io.github.pisces312.droidllm.common.model.ModelRootMigrator
 import io.github.pisces312.droidllm.common.settings.AppSettings
@@ -47,6 +50,7 @@ import io.github.pisces312.droidllm.common.settings.AppSettingsStore
 import io.github.pisces312.droidllm.common.settings.DEFAULT_SYSTEM_PROMPT
 import io.github.pisces312.droidllm.common.settings.ThemeMode
 import io.github.pisces312.droidllm.data.catalog.ModelAutoImporter
+import io.github.pisces312.droidllm.service.ApiForegroundService
 import io.github.pisces312.droidllm.engineapi.Backend
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.ModelLocation
@@ -94,10 +98,65 @@ class SettingsViewModel @Inject constructor(
     private val benchmarkDao: BenchmarkDao,
     private val modelStore: ModelPathStore,
     private val autoImporter: ModelAutoImporter,
+    private val apiPrefs: ApiServerPreferences,
 ) : ViewModel() {
 
     private val _probe = MutableStateFlow<ProbeContext?>(null)
     val probe: StateFlow<ProbeContext?> = _probe.asStateFlow()
+
+    private val _apiConfig = MutableStateFlow(ApiServerConfig())
+    val apiConfig: StateFlow<ApiServerConfig> = _apiConfig.asStateFlow()
+
+    init {
+        _probe.value = deviceProbe.probe()
+        viewModelScope.launch {
+            _apiConfig.value = apiPrefs.current()
+        }
+    }
+
+    fun setApiEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            apiPrefs.setEnabled(enabled)
+            _apiConfig.value = apiPrefs.current()
+            if (enabled) {
+                ApiForegroundService.start(context)
+                _message.value = "API 服务器启动中…"
+            } else {
+                ApiForegroundService.stop(context)
+                _message.value = "API 服务器已停止"
+            }
+        }
+    }
+
+    fun updateApiConfig(
+        port: Int? = null,
+        bindAddress: String? = null,
+        authEnabled: Boolean? = null,
+        apiKey: String? = null,
+    ) {
+        viewModelScope.launch {
+            val cur = apiPrefs.current()
+            val next = cur.copy(
+                port = port ?: cur.port,
+                bindAddress = bindAddress ?: cur.bindAddress,
+                authEnabled = authEnabled ?: cur.authEnabled,
+                apiKey = apiKey ?: cur.apiKey,
+            )
+            apiPrefs.update(next)
+            _apiConfig.value = apiPrefs.current()
+            if (next.enabled) {
+                ApiForegroundService.stop(context)
+                ApiForegroundService.start(context)
+            }
+        }
+    }
+
+    fun regenerateApiKey() {
+        viewModelScope.launch {
+            _apiConfig.value = apiPrefs.regenerateApiKey()
+            _message.value = "已重新生成 API Key"
+        }
+    }
 
     /** Null until [loadLibraries] runs — hashing several MB is not free. */
     private val _libraries = MutableStateFlow<List<NativeLibraryInfo>?>(null)
@@ -108,10 +167,6 @@ class SettingsViewModel @Inject constructor(
 
     private val _message = MutableStateFlow("")
     val message: StateFlow<String> = _message.asStateFlow()
-
-    init {
-        _probe.value = deviceProbe.probe()
-    }
 
     fun modelRoot(): String =
         settings.value.modelRootPath ?: deviceProbe.defaultModelRoot().absolutePath
@@ -273,6 +328,7 @@ class SettingsViewModel @Inject constructor(
 fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     val probe by vm.probe.collectAsState()
     val settings by vm.settings.collectAsState()
+    val apiConfig by vm.apiConfig.collectAsState()
     val message by vm.message.collectAsState()
     val libraries by vm.libraries.collectAsState()
     val context = LocalContext.current
@@ -443,6 +499,102 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     color = DroidTheme.extra.warn,
                 )
             }
+        }
+
+        SectionCard("API 服务器") {
+            Text(
+                "内嵌 OpenAI 兼容接口，供 PC / Cherry Studio 等客户端调用本机模型。" +
+                    "首期与聊天页互斥使用会话，避免并发生成。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("启用 API 服务器", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "前台服务常驻，通知栏可停止",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = apiConfig.enabled,
+                    onCheckedChange = vm::setApiEnabled,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NumericField(
+                    label = "端口",
+                    value = apiConfig.port.toString(),
+                    onCommit = { v ->
+                        v.toIntOrNull()?.let { vm.updateApiConfig(port = it) }
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = apiConfig.bindAddress,
+                    onValueChange = { vm.updateApiConfig(bindAddress = it) },
+                    label = { Text("绑定 IP") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "默认 127.0.0.1 仅本机可访问（需 adb forward）；局域网访问改为 0.0.0.0。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("鉴权", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Bearer / x-api-key 校验 API Key",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = apiConfig.authEnabled,
+                    onCheckedChange = { vm.updateApiConfig(authEnabled = it) },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("API Key", style = MaterialTheme.typography.labelSmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    apiConfig.apiKey,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.weight(1f),
+                )
+                val ctx = LocalContext.current
+                OutlinedToolButton(
+                    "复制",
+                    onClick = {
+                        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("api_key", apiConfig.apiKey))
+                    },
+                )
+                Spacer(Modifier.width(8.dp))
+                OutlinedToolButton("重置", onClick = vm::regenerateApiKey)
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "示例：curl -H \"Authorization: Bearer ${apiConfig.apiKey}\" " +
+                    "http://${if (apiConfig.bindAddress == "0.0.0.0") "<手机IP>" else "127.0.0.1"}:${apiConfig.port}/v1/models",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         SectionCard("数据") {

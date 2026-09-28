@@ -124,6 +124,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:benchmark"))
     implementation(project(":core:chattemplate"))
+    implementation(project(":core:apiserver"))
     implementation(project(":engine:litert"))
     implementation(project(":engine:mnn"))
     implementation(project(":engine:genie"))
@@ -144,6 +145,7 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.datastore.preferences)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 

@@ -13,6 +13,7 @@
 | P4 | ✅ 完成，待审阅 | 2026-09-26 | 核心 + UI 已通；见「P4 交付说明」 |
 | P5 | ✅ 完成，待审阅 | 2026-09-26 | 打磨；见「P5 交付说明」 |
 | P6 | 🔄 进行中（R1 ✅、R1.5 ✅、R2 ✅、R3 ✅） | 2026-09-27 | UI/UX 重构；审查与方案见 [`docs/UI_REVIEW.md`](docs/UI_REVIEW.md)，见 §8d |
+| P7 | 🔄 实施中（A1 ✅、A2 ✅、A3 ✅、A4 ✅） | 2026-09-28 | OpenAI 兼容 API 服务器；方案见 [`docs/API_SERVER.md`](docs/API_SERVER.md)，拆解见 §8e |
 
 ### P0 交付摘要（2026-09-26）
 
@@ -433,7 +434,7 @@
 |----|------|
 | SAF 选择器 | 仍为可选占位（DESIGN §1.3 已降级） |
 | Material You 动态取色 | UI_DESIGN §2.2 可选增强，默认关闭且未做开关 |
-| OpenAI 兼容 API | 明确不做（P5+ 可选，不在范围） |
+| OpenAI 兼容 API | P5+ 可选；**方案已定**见 [`docs/API_SERVER.md`](docs/API_SERVER.md)，实施列入 P7，不在 P0–P6 范围 |
 | 真机截图入 README | 待用户手测后补 |
 
 ---
@@ -982,6 +983,35 @@ R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑
 
 ---
 
+## 8e. P7：OpenAI 兼容 API 服务器（A1–A4 已实现）
+
+**状态**：🔄 A1–A4 ✅（2026-09-28），A5（Anthropic）未做。方案见 [`docs/API_SERVER.md`](docs/API_SERVER.md)。
+
+| 项 | 摘要 |
+|---|---|
+| 范围 | 手机内嵌 HTTP Server，对外暴露 OpenAI 兼容 `/v1/chat/completions` + `/v1/models` |
+| 选型 | Ktor 3.1.3 + **CIO**（非 Netty）+ 单飞队列 + 前台 Service |
+| 模块 | `:core:apiserver`；桥接 `DefaultApiInferenceBridge`（`:app`） |
+| 入口 | Settings →「API 服务器」；`ApiForegroundService` 前台服务 |
+| 鉴权 | Bearer / x-api-key，默认开，Key 随机 16 位（DataStore `droid_api_server`） |
+| 流式 | SSE `chat.completion.chunk` + `[DONE]`；客户端断开 → `GenerateJob.cancel` |
+| 红线 | 不改 `LlmEngine` 契约；首期纯文本；API 与 UI 聊天互斥使用会话 |
+
+**A1–A4 交付**
+
+1. `:core:apiserver`：`ApiServer`（Ktor CIO）、`ApiServerRoutes`、`RequestQueueManager`（单飞 FIFO）、`OpenAiDtos`/`OpenAiFormatter`、`ApiInferenceBridge`
+2. `:app`：`DefaultApiInferenceBridge`（LlmEngine 会话）、`ApiServerPreferences`/`ApiServerConfigStore`、`ApiForegroundService`、Settings UI 分区
+3. 单测：`ApiProtocolTest`（请求解析/拒 image/格式化）、`RequestQueueManagerTest`（FIFO/单飞/失败不堵队）
+4. 验证：`:core:apiserver:testDebugUnitTest` + `:app:assembleDebug` 全绿
+
+**真机 DoD（待手测）**
+
+1. Settings 开启 API 后 `curl http://127.0.0.1:8080/v1/models`（或 adb forward）返回模型列表
+2. 非流式 / 流式 `/v1/chat/completions` 调通；错误 Key 401；image content 400
+3. 断开流式后可继续下一请求；通知栏可停止服务
+
+---
+
 ## 9. 执行者注意事项（坑位速查）
 
 1. **GitHub 直连不稳**：submodule/大文件优先 `gh-proxy.com` 镜像；失败重试前先 `rm -rf` 残留目录
@@ -989,7 +1019,7 @@ R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑
 3. **模型路径一律真实路径**：SAF 已降级为可选（DESIGN §1.3），不引入 `content://` 反解负担；内置文件浏览器基于 `java.io.File`，前提是 `MANAGE_EXTERNAL_STORAGE`（无运行时弹窗，只能跳系统设置页授权）；Android 11+ 该权限也读不了其他 App 的 `Android/data/`，浏览器需灰显
 4. **计时口径统一**：TTFT 从请求发出到首个 token 回调，不含模型加载和模板格式化；各适配器不得自行其是
 5. **Genie 只支持骁龙 HTP**：开发机/模拟器上必须优雅降级，所有 P0–P2、P4 工作不依赖 Genie 可用
-6. **不要扩大范围**：功耗测量、Dynamic Feature、雷达图、质量评测、OpenAI 兼容 API 均明确不做（API 是 P5+ 可选增强，不在本计划内）
+6. **不要扩大范围**：功耗测量、Dynamic Feature、雷达图、质量评测均明确不做。OpenAI 兼容 API 为 P5+ 可选增强，方案见 [`docs/API_SERVER.md`](docs/API_SERVER.md)，仅在显式启动 P7 时实施，勿夹带进 P0–P6
 7. **目录改名**：仓库建立后工作目录可从 `LlmChatAndroid` 改为 `droid-llm`，改名时同步 `DESIGN.md` 头部说明
 8. **第三方路径**：一律走环境变量（`MNN_ROOT` / `QAIRT_PATH` 等，见 AGENTS.md「第三方仓库」表），禁止把 `D:\...` 写进仓库
 9. **评测只在真机 arm64 上跑，别在模拟器上试**：模拟器（x86_64 + 2GB RAM + native bridge 翻译）点「开始评测」会卡死在 `llm->load()`——`createLLM` 之后无任何 native 日志、进程 CPU 0%、无崩溃/OOM，只能 `adb shell am force-stop` 恢复。**这是环境限制不是代码 bug**，在模拟器上排查评测流程纯属浪费时间。模拟器仍可用于**纯 UI 布局**验证（Compose 不碰 native）。详见 `docs/mnn.md` §6.1

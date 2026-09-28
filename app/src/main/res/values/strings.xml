@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- app_name comes from buildType resValue (debug/release can coexist). -->
+    <string name="api_server_channel">API 服务器</string>
+    <string name="api_server_notification_title">OpenAI 兼容 API</string>
+    <string name="api_server_notification_text">本地 API 服务器运行中</string>
+    <string name="api_server_stop">停止</string>
 </resources>
