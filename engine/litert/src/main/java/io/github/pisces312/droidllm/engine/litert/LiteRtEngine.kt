@@ -223,6 +223,7 @@ class LiteRtEngine @Inject constructor(
                 val lastIndex = intArrayOf(0)
                 val maxNew = request.config.maxNewTokens.coerceAtLeast(1)
                 val hitTokenCap = AtomicBoolean(false)
+                val hitRepeat = AtomicBoolean(false)
 
                 // Match gallery: thinking is a runtime flag, not a text suffix.
                 val extraContext = mapOf<String, Any>(
@@ -233,7 +234,7 @@ class LiteRtEngine @Inject constructor(
                     Contents.of(Content.Text(history.lastUser)),
                     object : MessageCallback {
                         override fun onMessage(message: Message) {
-                            if (cancelled.get() || hitTokenCap.get()) return
+                            if (cancelled.get() || hitTokenCap.get() || hitRepeat.get()) return
                             val piece = message.toString()
                             if (piece.isEmpty()) return
 
@@ -253,6 +254,14 @@ class LiteRtEngine @Inject constructor(
                             text.append(delta)
                             lastIndex[0] += 1
                             onEvent(EngineEvent.Token(delta, lastIndex[0]))
+
+                            // Small models can miss EOS and loop a greeting
+                            // ("您好您好…"). Cut the turn before it fills maxNewTokens.
+                            if (isDegenerateRepeat(text.toString())) {
+                                hitRepeat.set(true)
+                                runCatching { conversation.cancelProcess() }
+                                return
+                            }
                             if (lastIndex[0] >= maxNew) {
                                 hitTokenCap.set(true)
                                 runCatching { conversation.cancelProcess() }
@@ -264,7 +273,7 @@ class LiteRtEngine @Inject constructor(
                         }
 
                         override fun onError(throwable: Throwable) {
-                            if (hitTokenCap.get()) {
+                            if (hitTokenCap.get() || hitRepeat.get()) {
                                 done.complete(Unit)
                             } else {
                                 done.completeExceptionally(throwable)
@@ -277,8 +286,8 @@ class LiteRtEngine @Inject constructor(
                 try {
                     done.await()
                 } catch (t: Throwable) {
-                    if (hitTokenCap.get()) {
-                        // cancelled on purpose after reaching maxNewTokens
+                    if (hitTokenCap.get() || hitRepeat.get()) {
+                        // cancelled on purpose (max tokens / degenerate repeat)
                     } else {
                         val cause = t.cause ?: t
                         if (cause is kotlinx.coroutines.CancellationException ||
@@ -305,6 +314,11 @@ class LiteRtEngine @Inject constructor(
                     warnings = warningsFor(request.config) +
                         (if (backend !== mapBackend(session.config.backend)) {
                             listOf("backend switch requires reload; used load-time backend")
+                        } else {
+                            emptyList()
+                        }) +
+                        (if (hitRepeat.get()) {
+                            listOf("输出陷入短语重复循环，已提前截断")
                         } else {
                             emptyList()
                         }),
@@ -419,6 +433,23 @@ class LiteRtEngine @Inject constructor(
             ChatRole.ASSISTANT -> Message.model(m.content)
             ChatRole.SYSTEM -> Message.user(m.content) // unused: system goes via systemInstruction
         }
+    }
+
+    /**
+     * True when [s] ends in a short unit repeated many times ("您好您好…").
+     * Small LiteRT models sometimes miss EOS after a greeting and loop.
+     */
+    internal fun isDegenerateRepeat(s: String): Boolean {
+        if (s.length < 10) return false
+        val window = s.takeLast(16)
+        for (period in 1..4) {
+            if (window.length % period != 0) continue
+            val unit = window.substring(0, period)
+            if (unit.all { it.isWhitespace() }) continue
+            val repeats = window.length / period
+            if (repeats >= 5 && window == unit.repeat(repeats)) return true
+        }
+        return false
     }
 
     private fun createConversation(
