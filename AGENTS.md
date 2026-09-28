@@ -9,8 +9,9 @@
 | `DESIGN.md` | 设计决策唯一权威。与实施计划冲突时以 DESIGN.md 为准 |
 | `UI_DESIGN.md` | 界面与交互权威（StreamClip + PixelPlayerOSS token） |
 | `IMPLEMENTATION.md` | 可执行实施计划、阶段进度、DoD 清单。每阶段完成后更新 |
-| `docs/<engine>.md` | **单引擎笔记**（现有 `docs/mnn.md`）：该引擎专属的坑、实测结论、计时字段、调试手法 |
+| `docs/<engine>.md` | **单引擎笔记**（现有 `docs/mnn.md`、`docs/llamacpp.md`）：该引擎专属的坑、实测结论、计时字段、调试手法 |
 | `docs/mnn-pc-regression.md` | MNN PC 端回归：共享 core + `mnn_host_test`、模型落盘、Windows MNN host 构建、日常回归环 |
+| `docs/llamacpp-decode-repro.md` | llama.cpp arm64 独立 decode 回归 CLI（`tools/llama_decode_repro`），native 重构后先跑 |
 
 **记录规则**：凡是指向单个引擎的坑与结论，写进对应的 `docs/<engine>.md`，不要堆进
 `ENGINE_INTEGRATION.md`（那里只放依赖获取、编译开关、模型格式等通用信息）。
