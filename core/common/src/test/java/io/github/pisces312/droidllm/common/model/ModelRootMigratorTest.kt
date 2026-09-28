@@ -124,4 +124,21 @@ class ModelRootMigratorTest {
         Files.exists(dst.toPath())
         assertTrue(result.isOk)
     }
+
+    @Test
+    fun `moveItem relocates file and never overwrites`() {
+        val src = tmp.newFolder("src")
+        val destDir = tmp.newFolder("dest")
+        val file = File(src, "m.gguf").apply { writeText("gguf") }
+        val dest = File(destDir, "nested/m.gguf")
+
+        assertTrue(ModelRootMigrator.moveItem(file, dest))
+        assertTrue(dest.isFile)
+        assertFalse(file.exists())
+
+        val other = File(src, "m.gguf").apply { writeText("again") }
+        assertFalse(ModelRootMigrator.moveItem(other, dest))
+        assertEquals("gguf", dest.readText())
+        assertTrue(other.exists())
+    }
 }

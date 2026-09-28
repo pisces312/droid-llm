@@ -150,51 +150,17 @@ interface LlmEngine {
 
 **Session 线程安全契约**（写在 engine-api，而非各适配器自行处理）：同一 `SessionHandle` 上 `generate` 与 `unload`/`reset` 互斥；同一时刻至多一个 `generate` 在跑；`generate` 进行中调用 `unload` 必须阻塞等待或明确失败，不得崩溃。
 
-### 1.3 模型路径：每引擎独立配置（重点调整）
+### 1.3 模型路径：每引擎独立配置
 
-**不要求**「同一基座 × 四份导出」。用户在手机存储里自己组织模型，App 只保存「哪个引擎 → 哪个路径」。
+**不要求**「同一基座 × 四份导出」。每个引擎独立配置「引擎 → 文件/目录路径」；默认模型根为 `getExternalFilesDir("models")`，可改为任意目录。
 
-```
-/sdcard/Android/data/<pkg>/files/models/     （或用户任意目录，经内置文件浏览器/直接路径）
-├── litert/
-│   └── qwen1.5b.litertlm
-├── mnn/
-│   └── qwen1.5b/            # config.json + llm.mnn(+分片)
-├── genie/
-│   └── qwen1.5b_genie/      # *.bin + genie_config.json + tokenizer.json
-└── llamacpp/
-    └── qwen1.5b-q4_k_m.gguf
-```
+**详细设计（目录布局、市场下载 cache、导入命中市场后移入规范布局、格式校验、权限/浏览器）→ [`docs/MODEL_PATHS.md`](docs/MODEL_PATHS.md)**（唯一权威）。此处只保留契约摘要：
 
-**配置模型（Models 页）**
-
-- 每个引擎一张卡片：当前已配置路径、格式校验结果、更换 / 浏览（内置文件浏览器）/ 清除
-- 支持「收藏模型列表」：可给同一引擎存多个模型条目，聊天/Benchmark 时下拉选
-- 路径来源：
-  1. App 私有目录 `getExternalFilesDir("models")`（默认，免权限）
-  2. 直接路径 `/sdcard/...` + **内置文件浏览器**（`java.io.File` 语义，需 `MANAGE_EXTERNAL_STORAGE`，引导跳系统设置页授权；未授权时仅可浏览 App 私有目录。注意 Android 11+ 即使有所有文件权限也读不了**其他 App** 的 `Android/data/`，浏览器中灰显）
-  3. SAF `content://` URI：**降级为可选**（仅外部分享场景，P5 不强制实现）。native 引擎需真实路径，SAF 必须反解（参考 StreamClip `FileUtils.getPathResultFromUri()` 的四级 fallback）；目录型模型（MNN/Genie）fd 方案不可用，GB 级模型复制到私有目录不可接受
-- **格式校验**（load 前快速探测）：
-  - LiteRT：扩展名 `.litertlm` / `.task` 或文件头
-  - MNN：目录内存在 `config.json` + `llm.mnn`
-  - Genie：目录内存在 `genie_config.json` + `tokenizer.json` + `*.bin`
-  - llama.cpp：`.gguf` 魔数
-
-`LocalModel` 数据结构：
-
-```kotlin
-data class LocalModel(
-    val id: String,              // uuid
-    val engineId: EngineId,
-    val displayName: String,     // 用户可改，如 "Qwen1.5B-Q4"
-    val location: ModelLocation, // FilePath | SafUri | AppPrivate
-    val formatHint: String?,     // "gguf" / "mnn_dir" / "genie_dir" / "litertlm"
-    val fileSizeBytes: Long?,
-    val quantHint: String?,      // 可选，用户标注
-)
-```
-
-**Benchmark 时**：用户为每个待测引擎分别选择一个 `LocalModel`（可以是完全不同的基座/量化），App 只保证「测的是用户指定的那份文件」，并在结果里完整记录路径、文件名、大小、用户标注的 quant。
+1. 路径一律**真实路径**（native 直读）；SAF `content://` 降级为可选。
+2. **市场下载**写入 `models/{hf\|modelscope}/models--org--repo/snapshots/_no_sha_/`（MnnLlmChat 布局）。
+3. **导入模型**：非市场条目**原地注册**；与市场 catalog 一致且模型根下尚无该条目时，**移入**上述规范布局（目标冲突永不覆盖）。
+4. **根目录迁移**（`ModelRootMigrator`）：永不删除/覆盖目标已有文件；重名跳过或取消。
+5. Benchmark 结果记录所测 `LocalModel` 的路径/文件名/大小/quant，只保证测的是用户指定的那一份。
 
 ---
 
@@ -429,7 +395,7 @@ droid-llm/
 │   └── export_benchmark.ps1
 └── docs/
     ├── ENGINE_INTEGRATION.md
-    └── MODEL_PATHS.md
+    └── MODEL_PATHS.md          # 模型下载与存放（权威）
 ```
 
 ---

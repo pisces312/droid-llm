@@ -68,7 +68,7 @@ $env:ANDROID_HOME = "D:\dev\android_sdk"
 | `UI_DESIGN.md` | 界面与交互（权威） |
 | `IMPLEMENTATION.md` | 阶段执行与交付 |
 | `docs/ENGINE_INTEGRATION.md` | 依赖、编译开关、模型导出 |
-| `docs/MODEL_PATHS.md` | 目录组织与获取渠道 |
+| `docs/MODEL_PATHS.md` | 模型下载与存放（布局、导入迁移） |
 
 ## 许可
 

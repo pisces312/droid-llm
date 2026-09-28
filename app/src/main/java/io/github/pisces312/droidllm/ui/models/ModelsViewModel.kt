@@ -8,6 +8,7 @@ import android.content.Context
 import io.github.pisces312.droidllm.common.device.DeviceProbe
 import io.github.pisces312.droidllm.common.model.FileFormatValidator
 import io.github.pisces312.droidllm.common.model.ModelPathStore
+import io.github.pisces312.droidllm.common.model.ModelRootMigrator
 import io.github.pisces312.droidllm.common.model.ValidationResult
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
 import io.github.pisces312.droidllm.data.catalog.CatalogModel
@@ -19,6 +20,7 @@ import io.github.pisces312.droidllm.data.catalog.ModelDownloader
 import io.github.pisces312.droidllm.data.catalog.ModelSource
 import io.github.pisces312.droidllm.data.catalog.engineFormatTag
 import io.github.pisces312.droidllm.data.catalog.findModelDir
+import io.github.pisces312.droidllm.data.catalog.matchImported
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.engineIdFromStorage
 import io.github.pisces312.droidllm.engineapi.LocalModel
@@ -33,6 +35,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class CatalogRow(
     val model: CatalogModel,
@@ -227,9 +230,9 @@ class ModelsViewModel @Inject constructor(
     }
 
     /**
-     * Expected file/dir shape. External models are registered in place at their
-     * original path — only market downloads live under the model root (see
-     * `docs/MODEL_PATHS.md`).
+     * Expected file/dir shape. Non-market models stay at their original path;
+     * imports that match the market catalog move into the model-root layout
+     * when the root does not already hold that entry (see `docs/MODEL_PATHS.md`).
      */
     fun engineFormatHint(engineId: EngineId): String = when (engineId) {
         EngineId.LITERT -> "单文件 *.task / *.litertlm（任意路径均可注册）"
@@ -240,9 +243,9 @@ class ModelsViewModel @Inject constructor(
     }
 
     /**
-     * Register [path] in the model list **in place**. External models are never
-     * copied or moved: the original path is what engines open. Only market
-     * downloads follow the model-root layout.
+     * Register [path] in the model list. Market-matching imports outside the
+     * model root are relocated into the canonical market layout when free;
+     * everything else stays where it is (engines open the registered path).
      *
      * @return whether the request passed validation and was queued; false keeps the
      * registration sheet open so the user can fix the form.
@@ -272,11 +275,46 @@ class ModelsViewModel @Inject constructor(
             return false
         }
         viewModelScope.launch {
-            upsertModel(engineId, name, file.absolutePath)
-            _message.value = "已注册：$name（原路径 ${file.absolutePath}）"
+            val (finalPath, note) = relocateCatalogMatch(engineId, file)
+            upsertModel(engineId, name, finalPath)
+            _message.value = "已注册：$name（$note）"
             _pendingPath.value = ""
         }
         return true
+    }
+
+    /**
+     * When [file] is outside the model root but matches a market catalog entry
+     * (same engine + basename) and the root does not already have that entry,
+     * move it to [CatalogModel.canonicalRelPath]. Otherwise keep the original path.
+     */
+    private suspend fun relocateCatalogMatch(engineId: EngineId, file: File): Pair<String, String> {
+        val abs = file.absolutePath
+        val root = File(modelRoot())
+        if (ModelRootMigrator.isSameOrNested(file, root)) {
+            return abs to "原路径 $abs"
+        }
+        val catalog = matchImported(
+            models = _catalog.value.models,
+            engineName = engineId.name,
+            name = file.name,
+        ) ?: return abs to "原路径 $abs"
+        // Root already holds a copy → leave the import alone, register as-is.
+        if (findModelDir(catalog, root) != null) {
+            return abs to "原路径 $abs（根目录已有市场副本，未移动）"
+        }
+        val dest = File(root, catalog.canonicalRelPath())
+        if (dest.exists()) {
+            return abs to "原路径 $abs（目标已存在，未移动）"
+        }
+        val ok = withContext(Dispatchers.IO) {
+            ModelRootMigrator.moveItem(file, dest)
+        }
+        return if (ok) {
+            dest.absolutePath to "已移入 ${catalog.canonicalRelPath()}"
+        } else {
+            abs to "原路径 $abs（移入模型根目录失败）"
+        }
     }
 
     private suspend fun upsertModel(engineId: EngineId, displayName: String, path: String) {

@@ -58,6 +58,27 @@ data class CatalogModel(
         return localPath
     }
 
+    /**
+     * Preferred on-disk home under the model root for this market entry.
+     * Market downloads and relocated imports both use this layout
+     * (MnnLlmChat HF/ModelScope cache when a repo source exists, else `{engine}/{localPath}`).
+     */
+    fun canonicalRelPath(): String = when {
+        sources.HuggingFace != null -> downloadRelPath(ModelSource.HuggingFace)
+        sources.ModelScope != null -> downloadRelPath(ModelSource.ModelScope)
+        else -> "${engine.lowercase()}/$localPath"
+    }
+
+    /** Whether [name] (file or directory name) identifies this catalog entry. */
+    fun matchesName(name: String): Boolean {
+        if (name == localPath || name == localPath.substringAfterLast('/')) return true
+        fileInRepo?.let { if (name == it) return true }
+        listOfNotNull(sources.HuggingFace, sources.ModelScope).forEach { repo ->
+            if (name == repoFolderName(repo)) return true
+        }
+        return false
+    }
+
     /** Relative candidate paths (under model root) that count as "already downloaded". */
     fun candidateRelPaths(): List<String> {
         val out = linkedSetOf<String>()
@@ -131,6 +152,25 @@ object ModelCatalogLoader {
     fun load(context: Context): ModelCatalog {
         val text = context.assets.open("model_catalog.json").bufferedReader().use { it.readText() }
         return json.decodeFromString(ModelCatalog.serializer(), text)
+    }
+}
+
+/**
+ * Match a user-imported file/dir name against the market catalog for [engineName].
+ * Returns the catalog entry when the basename is unambiguous for that engine.
+ */
+fun matchImported(
+    models: List<CatalogModel>,
+    engineName: String,
+    name: String,
+): CatalogModel? {
+    val hits = models.filter {
+        it.engine.equals(engineName, ignoreCase = true) && it.matchesName(name)
+    }
+    return when (hits.size) {
+        0 -> null
+        1 -> hits.first()
+        else -> hits.firstOrNull { it.fileInRepo == name || it.localPath == name } ?: hits.first()
     }
 }
 

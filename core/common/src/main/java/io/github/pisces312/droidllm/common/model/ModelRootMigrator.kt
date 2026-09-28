@@ -94,6 +94,16 @@ object ModelRootMigrator {
         return null
     }
 
+    /**
+     * Moves a single file/dir to [dest]. Never overwrites an existing dest.
+     * rename first, then copy+delete the source copy only.
+     */
+    fun moveItem(src: File, dest: File): Boolean {
+        if (dest.exists()) return false
+        dest.parentFile?.let { if (!it.exists() && !it.mkdirs()) return false }
+        return moveRecursively(src, dest)
+    }
+
     private fun moveRecursively(src: File, dest: File): Boolean {
         return try {
             if (src.renameTo(dest)) return true
