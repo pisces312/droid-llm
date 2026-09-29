@@ -9,9 +9,20 @@
 | `DESIGN.md` | 设计决策唯一权威。与实施计划冲突时以 DESIGN.md 为准 |
 | `UI_DESIGN.md` | 界面与交互权威（StreamClip + PixelPlayerOSS token） |
 | `IMPLEMENTATION.md` | 可执行实施计划、阶段进度、DoD 清单。每阶段完成后更新 |
-| `docs/<engine>.md` | **单引擎笔记**（现有 `docs/mnn.md`、`docs/llamacpp.md`）：该引擎专属的坑、实测结论、计时字段、调试手法 |
+| `docs/<engine>.md` | **单引擎笔记**（现有 `docs/mnn.md`、`docs/llamacpp.md`、`docs/litert.md`）：该引擎专属的坑、实测结论、计时字段、调试手法 |
 | `docs/mnn-pc-regression.md` | MNN PC 端回归：共享 core + `mnn_host_test`、模型落盘、Windows MNN host 构建、日常回归环 |
 | `docs/llamacpp-decode-repro.md` | llama.cpp arm64 独立 decode 回归 CLI（`tools/llama_decode_repro`），native 重构后先跑 |
+| `docs/DIAGNOSTICS.md` | 诊断日志与崩溃收集：用户侧流程、模块地图、设计决策、10 条实测坑、回归清单。**改诊断日志前必读** |
+| `docs/MODEL_PARAMS.md` | 采样 / 执行参数的层次与键空间：两层结构（逐模型覆盖 → 引擎 `EngineDefaults`）、`"ENGINE:modelId"` 键、UI 语义、上游四项目对照调研、生效路径、验收清单。**改采样、设置存储、模型参数 UI 前必读** |
+
+**引擎诊断日志**（2026-09-29 加）：设置 → 诊断 → 查看运行日志，可在真机复现后直接分享 `.txt`。
+链路 = `DiagLogger`（core:common）← `DiagEngineLogSink` ← `LoggingLlmEngine`（engine-api 装饰器）
+← 四个引擎的 Hilt 绑定。**改 `:engine:*` 的注入绑定前先读 `docs/ENGINE_INTEGRATION.md`
+「引擎诊断日志」一节**（把 `@Provides` 改回 `@Binds` 会静默丢日志，编译不报错）。
+
+> **采样参数没有 App 级默认值**（2026-09-29 删）：只有「逐模型覆盖 → 引擎 `EngineDefaults`」两层，
+> 逐模型覆盖的键是 `"<ENGINEID>:<modelId>"`。**改 `AppSettings` 采样字段、`ModelParamsStore`
+> 或会话采样面板前先读 `docs/MODEL_PARAMS.md`**（含「为什么不能再加全局层」与上游四项目对照）。
 
 **记录规则**：凡是指向单个引擎的坑与结论，写进对应的 `docs/<engine>.md`，不要堆进
 `ENGINE_INTEGRATION.md`（那里只放依赖获取、编译开关、模型格式等通用信息）。

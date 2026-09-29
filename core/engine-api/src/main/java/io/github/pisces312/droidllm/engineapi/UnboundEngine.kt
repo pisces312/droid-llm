@@ -10,6 +10,16 @@ class UnboundEngine(
     private val reason: String,
 ) : LlmEngine {
 
+    /** Never reached: probe() reports MissingDependency, so no session ever starts. */
+    override val defaults: EngineDefaults = EngineDefaults(
+        temperature = 0.7f,
+        topK = 40,
+        topP = 0.95f,
+        threads = 4,
+        maxNewTokens = 4096,
+        backend = Backend.CPU,
+    )
+
     override suspend fun probe(probeContext: ProbeContext): Availability =
         Availability.MissingDependency(reason)
 

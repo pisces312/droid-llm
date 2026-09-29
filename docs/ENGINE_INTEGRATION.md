@@ -33,8 +33,12 @@ Fake 只作 `LlmEngine` 契约的可执行规格（`FakeEngineTest`）与写新�
   - 一个 `Conversation` 长驻，每轮只 `sendMessageAsync` 新的 USER 文本；历史由 native 累积
   - 仅当 `GenerateRequest.messages` 与 `liveHistory` 不一致，或上一轮被取消（`liveHistory=null`）时，才用 `initialMessages` 重建
   - `enable_thinking` 走 `sendMessageAsync` 的 `extraContext`，**默认 false**（与 gallery LLM_CHAT 一致；强制 true 会让小模型刷 `众所周`）
-  - `onMessage` 可能是 token 增量或累计全文；适配器两者都兼容；丢弃 `<ctrl…>` 控制片
-  - 达到 `maxNewTokens` 或检测到短语重复循环时 `cancelProcess`，按「完成」而不是「已停止」上报
+  - `onMessage` **只发 token 增量**（反编译确认：`Message.toString()` → `Contents.toString()` → `joinToString("")`，JNI 每片都带完整 JSON 的单个增量）。**无条件当增量追加**，不要做「累计全文」探测
+  - 达到 `maxNewTokens` 时 `cancelProcess`，按「完成」而不是「已停止」上报
+- **不要自创「防复读」逻辑**（2026-09-29 移除 `isDegenerateRepeat`）：gallery 全仓对退化输出**零处理**
+  （`cancelProcess` 仅用于用户点「停止」），模型复读是模型自身问题。自加的短语重复截断治标不治本，
+  且会掩盖真实症状。「累计全文 vs 增量」的猜测分支同理有害——它对增量回调误判后会把错误文本
+  写回 `liveHistory`，下一轮又被当历史喂回模型，反而**制造**复读循环。对齐 gallery 的朴素写法即可。
 
 ## 2. MNN（阿里）
 
@@ -141,6 +145,61 @@ MnnLlmChat 之所以不空，是因为它**无条件注入**了一条 system。�
 | decode_tps | `(generatedTokens-1) / decodeSeconds`（generatedTokens>1） |
 
 不适用的 `InferenceConfig` 字段：忽略 + 记入 `EngineMetrics.warnings`，`effectiveConfig` 标注生效值。
+
+## 引擎默认采样值（跨引擎通用）
+
+> **完整版见 `docs/MODEL_PARAMS.md`** —— 两层结构、键空间与兼容、UI 语义、上游四个项目的
+> 对照调研、生效路径与验收清单都在那里。本节只留最容易踩的三条。
+
+**采样参数没有 App 级默认值。** 只有两层：`逐模型覆盖`（DataStore，键
+`"<ENGINEID>:<modelId>"`）→ `引擎 EngineDefaults`（`LlmEngine.defaults`，
+`core/engine-api/LlmEngine.kt`，**无默认实现** —— 漏声明编译不过）。
+原 `AppSettings` 里的 temperature / topK / topP / threads / maxNewTokens / backend 已删除，
+旧 DataStore 值直接废弃。
+
+1. **四家的默认值不同，是刻意的**：同一个 `gemma3-1b` 在 Qualcomm NPU 是 `0.8/top-k 1`，
+   在 Google LiteRT 是 `1.0/top-k 64`。逐模型覆盖的键因此必须带引擎。
+2. **合并必须发生在 app 层**（`ChatViewModel.effectiveSampling()` /
+   `DefaultApiInferenceBridge.baseConfig()`）。进到适配器之后，「用户选的」和「继承来的」是同一个数。
+3. **`LoggingLlmEngine` 要转发 `defaults`**，且 `backend` 只在 `load()` 生效一次 ——
+   所以默认值必须同时进 `load` 的 config。
+
+LiteRT 那一套（`1.0 / 64 / 0.95 / 4 / 4096 / CPU`）的定案过程见 `docs/litert.md` §3.3 / §6。
+
+## 引擎诊断日志（跨引擎通用）
+
+> 完整设计、踩坑记录与回归清单见 **`docs/DIAGNOSTICS.md`**。这里只留入口与跨引擎事实。
+
+真机复现问题时往往**手边没有 PC**，`adb logcat` 取不到。四个引擎的调用统一经过一个装饰器，
+把关键节点写进 App 内的环形缓冲，用户可在 设置 → 诊断 → 查看运行日志 里导出 `.txt` 分享。
+
+链路（`core/engine-api` → `core:common` → `app`）：
+`EngineLogSink` + `LoggingLlmEngine` + `EngineLogging` → `DiagEngineLogSink` →
+`DiagLogger`（环形 2000 条 + logcat 镜像）→ `LogScreen`。
+native 盲区由 `EngineLogcatCapture`（读本进程 logcat）补上，Java 崩溃由 `CrashReporter` 兜住。
+
+三条最容易踩的（细节见 `docs/DIAGNOSTICS.md` §3 / §6）：
+
+1. 四家引擎的绑定是 `@Provides @IntoSet` + `EngineLogging.wrap(impl)`。
+   **改回 `@Binds` 会静默丢掉全部引擎日志，而且照常编译通过**
+   （验证：Hilt 生成物里应为 `newSetBuilder(4)`）。
+2. `LoggingLlmEngine.safe {}` 包住每一处 sink 调用 —— 否则 sink 异常会从 `onEvent` 漏出去，
+   在用户眼里就是一次**假的推理失败**。
+3. 读 logcat 是**两次 dump**，`crash` 那趟刻意不带 `--pid`：tombstone 由 `crash_dump`
+   这个独立进程写入，加了 `--pid` 反而会返回 0 行（API 34 实测 0 vs 73）。
+
+### 四家引擎的日志回调能力
+
+| 引擎 | 能否挂日志回调 | 事实依据 |
+|------|----------------|----------|
+| llama.cpp | ✅ `llama_log_set(callback, user_data)` | `include/llama.h:1515-1516` |
+| MNN | ❌ | `MNN_PRINT` / `MNN_ERROR` 是编译期宏，写死 `__android_log_print(TAG="MNNJNI")`；全仓无 `SetLogHandler` |
+| LiteRT-LM | ❌ | 闭源 AAR，无任何日志 hook（gallery 里只有 `MetricsLogger`，那是指标不是日志） |
+| Genie | ❌ | `chatapp_android/src/main/cpp/GenieWrapper.cpp` 只有 `__android_log_print` |
+
+→ 只有「读本进程 logcat」能在不改任何 native 源码的前提下覆盖全部四家
+（自 Android 4.1 起 App 可读自己进程日志，无需 `READ_LOGS`；logd 已按 uid 收窄）。
+
 
 ## 许可摘要
 

@@ -1,7 +1,7 @@
 package io.github.pisces312.droidllm.engine.genie
 
-import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
@@ -16,7 +16,9 @@ import io.github.pisces312.droidllm.engineapi.ChatRole
 import io.github.pisces312.droidllm.engineapi.displayName
 import io.github.pisces312.droidllm.engineapi.EngineEvent
 import io.github.pisces312.droidllm.engineapi.EngineException
+import io.github.pisces312.droidllm.engineapi.EngineDefaults
 import io.github.pisces312.droidllm.engineapi.EngineId
+import io.github.pisces312.droidllm.engineapi.EngineLogging
 import io.github.pisces312.droidllm.engineapi.EngineMetrics
 import io.github.pisces312.droidllm.engineapi.EngineVersion
 import io.github.pisces312.droidllm.engineapi.GenerateJob
@@ -58,6 +60,25 @@ class GenieEngine @Inject constructor(
     override val version: EngineVersion = EngineVersion(
         version = BuildConfig.ENGINE_VERSION.takeIf { it.isNotBlank() },
         commit = BuildConfig.ENGINE_COMMIT.takeIf { it.isNotBlank() },
+    )
+
+    /**
+     * App baseline, now that there is no app-wide settings layer.
+     *
+     * `backend = NPU_HTP` is the point of this engine and the only backend it
+     * accepts (`load` rejects everything else), so it is stated explicitly. That
+     * also matters beyond cosmetics: an app-wide `CPU` default would have made
+     * Genie throw `UnsupportedBackend` on every session.
+     *
+     * `threads` is ignored (HTP schedules on its own) — see `warningsFor`.
+     */
+    override val defaults: EngineDefaults = EngineDefaults(
+        temperature = 0.7f,
+        topK = 40,
+        topP = 0.95f,
+        threads = 4,
+        maxNewTokens = 4096,
+        backend = Backend.NPU_HTP,
     )
 
     private class GenieSession(
@@ -469,7 +490,16 @@ class GenieEngine @Inject constructor(
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class GenieEngineModule {
-    @Binds
-    @IntoSet
-    abstract fun bindEngine(impl: GenieEngine): LlmEngine
+    companion object {
+        /**
+         * Binds through [EngineLogging.wrap] so every call is recorded by the
+         * app's diagnostic sink. The sink is installed in `Application.onCreate`,
+         * after Hilt has built the graph, so the decorator resolves it lazily
+         * per call and must not capture it at construction time.
+         */
+        @Provides
+        @IntoSet
+        fun provideLoggedEngine(impl: GenieEngine): LlmEngine =
+            EngineLogging.wrap(impl)
+    }
 }

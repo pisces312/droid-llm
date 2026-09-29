@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.pisces312.droidllm.common.model.ModelParamsOverride
 import io.github.pisces312.droidllm.common.model.ModelParamsStore
 import io.github.pisces312.droidllm.common.model.ModelPathStore
+import io.github.pisces312.droidllm.common.model.find
 import io.github.pisces312.droidllm.common.settings.AppSettings
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
 import io.github.pisces312.droidllm.common.settings.DEFAULT_SYSTEM_PROMPT
@@ -85,6 +86,19 @@ data class ChatUiMessage(
     val error: String? = null,
 )
 
+/**
+ * The effective sampling / execution values for the currently selected
+ * engine + model, plus the overlay that produced them.
+ *
+ * The constructor defaults only apply before an engine is picked (the state is
+ * created before [ChatViewModel.init] resolves the engine list); once one is
+ * selected every value comes from [effectiveSampling].
+ *
+ * There is deliberately **no app-wide sampling layer**. The chain is
+ * `<per-model override> → <selected engine's EngineDefaults>`, and only
+ * `systemPrompt` still has an app-level default (it is a prompt, not a sampling
+ * knob — see `EngineDefaults`' KDoc).
+ */
 data class SamplingUiState(
     val temperature: Float = 0.7f,
     val topK: Int = 40,
@@ -101,13 +115,13 @@ data class SamplingUiState(
      */
     val enableThinking: Boolean = false,
     /**
-     * Per-model overlay for the currently selected model. Null = every field
-     * falls back to the global Settings defaults. Non-null fields are marked
-     * "仅本模型" in the sampling sheet.
+     * Overlay stored for this **engine + model** pair (`ENGINE:modelId`). A null
+     * field falls back to the engine's own `EngineDefaults`; non-null fields are
+     * marked "仅本模型" in the sampling sheet.
      */
     val override: ModelParamsOverride = ModelParamsOverride(),
 ) {
-    /** Fields currently pinned to this model rather than the global default. */
+    /** Fields currently pinned to this model rather than the engine default. */
     val overriddenFields: Set<ParamsField>
         get() = buildSet {
             if (override.temperature != null) add(ParamsField.TEMPERATURE)
@@ -202,7 +216,7 @@ class ChatViewModel @Inject constructor(
     /** Kept sessions when multi-model residency is on (DESIGN §3.3). */
     private val resident = LinkedHashMap<String, Pair<LlmEngine, SessionHandle>>()
 
-    /** Latest global defaults; the per-model overlay is applied on top of these. */
+    /** Latest `AppSettings` snapshot (systemPrompt / residency / theme). Holds no sampling knobs. */
     private var globalSettings = AppSettings()
 
     init {
@@ -219,7 +233,7 @@ class ChatViewModel @Inject constructor(
         // A settings import rewrites the overlay for the selected model too.
         viewModelScope.launch {
             modelParamsStore.observe().collect { map ->
-                overridesByModel = map
+                overridesByKey = map
                 if (!_generating.value) refreshSampling()
             }
         }
@@ -250,31 +264,44 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Global defaults with the selected model's overlay applied on top.
-     * Reading the overlay from the in-memory [ModelParamsStore] snapshot is not
-     * possible synchronously, so callers that need the *stored* value must go
-     * through [loadOverrideForSelected]; this uses the last observed snapshot.
+     * Effective values for the selected engine + model: the overlay stored for
+     * that exact pair, then the engine's own `EngineDefaults`.
+     *
+     * There is deliberately **no app-wide sampling layer** — an app-level
+     * `0.7 / 40` inherited by a model family that needs `1.0 / 64` is exactly how
+     * the LiteRT greeting loop reached a real device (`docs/litert.md` §3).
+     *
+     * Reading the overlay from the in-memory snapshot is not possible
+     * synchronously, so callers that need the *stored* value must go through
+     * [loadOverrideForSelected]; this uses the last observed snapshot.
      */
     private fun effectiveSampling(): SamplingUiState {
-        val s = globalSettings
-        val o = overridesByModel[_selectedModel.value?.model?.id] ?: ModelParamsOverride()
+        val model = _selectedModel.value?.model
+        val engine = _selectedEngine.value?.engine
+        val current = _sampling.value
+        val o = if (engine == null || model == null) {
+            ModelParamsOverride()
+        } else {
+            overridesByKey.find(engine.id, model.id) ?: ModelParamsOverride()
+        }
+        val d = engine?.defaults
         return SamplingUiState(
-            temperature = o.temperature ?: s.temperature,
-            topK = o.topK ?: s.topK,
-            topP = o.topP ?: s.topP,
-            threads = o.threads ?: s.threads,
-            maxNewTokens = o.maxNewTokens ?: s.maxNewTokens,
-            backend = ModelParamsOverride.backendOf(o.backend) ?: s.backend,
-            systemPrompt = o.systemPrompt ?: s.systemPrompt,
-            // Thinking is a per-turn knob, not a Settings default; keep the current
-            // session value when Settings pushes a new sampling snapshot.
-            enableThinking = _sampling.value.enableThinking,
+            temperature = o.temperature ?: d?.temperature ?: current.temperature,
+            topK = o.topK ?: d?.topK ?: current.topK,
+            topP = o.topP ?: d?.topP ?: current.topP,
+            threads = o.threads ?: d?.threads ?: current.threads,
+            maxNewTokens = o.maxNewTokens ?: d?.maxNewTokens ?: current.maxNewTokens,
+            backend = ModelParamsOverride.backendOf(o.backend) ?: d?.backend ?: current.backend,
+            systemPrompt = o.systemPrompt ?: globalSettings.systemPrompt,
+            // Thinking is a per-turn knob, not a settings default; keep the current
+            // session value when settings push a new snapshot.
+            enableThinking = current.enableThinking,
             override = o,
         )
     }
 
-    /** Latest overlay snapshot, refreshed by the `modelParamsStore.observe()` collector. */
-    private var overridesByModel: Map<String, ModelParamsOverride> = emptyMap()
+    /** Latest overlay snapshot, keyed by `ENGINE:modelId`; refreshed by the collector in [init]. */
+    private var overridesByKey: Map<String, ModelParamsOverride> = emptyMap()
 
     private fun refreshSampling() {
         val next = effectiveSampling()
@@ -298,7 +325,7 @@ class ChatViewModel @Inject constructor(
             _selectedModel.value = choice
             markIdle()
             refreshThinkingSupport(choice)
-            // Swap in this model's overlay (or drop back to global defaults).
+            // Swap in this model's overlay (or fall back to the engine's own defaults).
             refreshSampling()
         }
     }
@@ -375,15 +402,17 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Pin one sampling field to the selected model (overlay write), or unpin it
-     * with `value = null` so the field falls back to the global Settings default.
+     * Pin one sampling field to the selected engine + model (overlay write), or
+     * unpin it with `value = null` so the field falls back to the engine's own
+     * defaults.
      *
      * Callers edit the *effective* value they see on screen: pinning with a value
      * persists that value, editing a pinned field overwrites it, and unpinning
-     * always falls back to the global default.
+     * always falls back to the engine default.
      */
     fun setModelOverride(field: ParamsField, value: FieldValue?) {
         val modelId = _selectedModel.value?.model?.id ?: return
+        val engineId = _selectedEngine.value?.engine?.id ?: return
         val cur = _sampling.value.override
         val next = when (field) {
             ParamsField.TEMPERATURE -> cur.copy(temperature = (value as? FieldValue.Dec)?.v)
@@ -394,13 +423,18 @@ class ChatViewModel @Inject constructor(
             ParamsField.BACKEND -> cur.copy(backend = (value as? FieldValue.BackendValue)?.v?.name)
             ParamsField.SYSTEM_PROMPT -> cur.copy(systemPrompt = (value as? FieldValue.Text)?.v)
         }
-        viewModelScope.launch { modelParamsStore.set(modelId, next) }
+        viewModelScope.launch { modelParamsStore.set(engineId, modelId, next) }
     }
 
-    /** Drop every per-model override; the model reverts to global defaults. */
+    /**
+     * Drop every override pinned to this engine + model; it reverts to the
+     * engine's own defaults. Overrides pinned to the same model under a
+     * different engine are untouched — see [modelParamsKey].
+     */
     fun clearModelOverride() {
         val modelId = _selectedModel.value?.model?.id ?: return
-        viewModelScope.launch { modelParamsStore.set(modelId, null) }
+        val engineId = _selectedEngine.value?.engine?.id ?: return
+        viewModelScope.launch { modelParamsStore.set(engineId, modelId, null) }
     }
 
     /**

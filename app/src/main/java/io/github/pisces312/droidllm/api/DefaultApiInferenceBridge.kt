@@ -5,6 +5,8 @@ import io.github.pisces312.droidllm.apiserver.ApiGenerateResult
 import io.github.pisces312.droidllm.apiserver.ApiInferenceBridge
 import io.github.pisces312.droidllm.apiserver.ApiModelInfo
 import io.github.pisces312.droidllm.common.bench.SessionRegistry
+import io.github.pisces312.droidllm.common.model.ModelParamsOverride
+import io.github.pisces312.droidllm.common.model.ModelParamsStore
 import io.github.pisces312.droidllm.common.model.ModelPathStore
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
 import io.github.pisces312.droidllm.engineapi.ChatMessage
@@ -33,6 +35,7 @@ import kotlinx.coroutines.withContext
 class DefaultApiInferenceBridge @Inject constructor(
     private val engines: Set<@JvmSuppressWildcards LlmEngine>,
     private val modelStore: ModelPathStore,
+    private val modelParamsStore: ModelParamsStore,
     private val settingsStore: AppSettingsStore,
     private val sessionRegistry: SessionRegistry,
 ) : ApiInferenceBridge {
@@ -61,15 +64,14 @@ class DefaultApiInferenceBridge @Inject constructor(
         val model = resolveModel(params.model)
         val handle = ensureSession(model)
 
-        val appSettings = settingsStore.current()
-        val config = InferenceConfig(
-            maxNewTokens = params.maxTokens ?: appSettings.maxNewTokens,
-            temperature = params.temperature ?: appSettings.temperature,
-            topP = params.topP ?: appSettings.topP,
-            topK = appSettings.topK,
-            threads = appSettings.threads,
-            backend = appSettings.backend,
-            systemPrompt = appSettings.systemPrompt.takeIf { it.isNotBlank() },
+        val activeEngine = sessionEngine ?: throw IllegalStateException("no active session engine")
+        // [baseConfig] already applied the engine defaults and the per-model pin, so
+        // only the request body goes on top of it.
+        val base = baseConfig(activeEngine, model)
+        val config = base.copy(
+            maxNewTokens = params.maxTokens ?: base.maxNewTokens,
+            temperature = params.temperature ?: base.temperature,
+            topP = params.topP ?: base.topP,
         )
 
         val history = buildList {
@@ -97,7 +99,7 @@ class DefaultApiInferenceBridge @Inject constructor(
         val sb = StringBuilder()
         val done = CompletableDeferred<GenerateResultData>()
         var jobRef: GenerateJob? = null
-        val job = sessionEngine!!.generate(
+        val job = activeEngine.generate(
             handle,
             GenerateRequest(history, configWithSystem),
         ) { event ->
@@ -187,7 +189,7 @@ class DefaultApiInferenceBridge @Inject constructor(
             val engine = engines.firstOrNull { it.id == model.engineId }
                 ?: throw IllegalStateException("engine not available: ${model.engineId}")
             val handle = withContext(Dispatchers.IO) {
-                engine.load(model, settingsStore.current().toInferenceConfig())
+                engine.load(model, baseConfig(engine, model))
             }
             session = handle
             sessionEngine = engine
@@ -195,6 +197,32 @@ class DefaultApiInferenceBridge @Inject constructor(
             sessionRegistry.register(engine, handle)
             return handle
         }
+    }
+
+    /**
+     * The config a session is opened with: the **engine's own defaults**, with the
+     * overlay pinned to this engine + model applied on top — the same chain the
+     * chat UI uses. There is no app-wide sampling layer.
+     *
+     * The backend must be right *here*: LiteRT-LM builds its delegate inside
+     * `load()`, so a later generate-time value cannot correct it.
+     *
+     * The API server applies request fields on top of this by itself.
+     */
+    private suspend fun baseConfig(engine: LlmEngine, model: LocalModel): InferenceConfig {
+        val d = engine.defaults
+        val o = modelParamsStore.get(engine.id, model.id) ?: ModelParamsOverride()
+        val settings = settingsStore.current()
+        return InferenceConfig(
+            maxNewTokens = o.maxNewTokens ?: d.maxNewTokens,
+            temperature = o.temperature ?: d.temperature,
+            topK = o.topK ?: d.topK,
+            topP = o.topP ?: d.topP,
+            threads = o.threads ?: d.threads,
+            backend = ModelParamsOverride.backendOf(o.backend) ?: d.backend,
+            // The one app-level value left: a prompt, not a sampling knob.
+            systemPrompt = o.systemPrompt ?: settings.systemPrompt.takeIf { it.isNotBlank() },
+        )
     }
 
     private data class GenerateResultData(

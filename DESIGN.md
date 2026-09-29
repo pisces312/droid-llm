@@ -96,6 +96,10 @@ data class InferenceConfig(
     val enableThinking: Boolean = true,
 )
 
+> 上面这些构造默认值是**占位**，不是 App 级默认值：真正生效的值由
+> 「逐模型覆盖 → 引擎的 `EngineDefaults`」两层解析得到（`docs/MODEL_PARAMS.md`）。
+> 引擎默认值不再来自全局设置，`AppSettings` 里的采样字段已删除。
+
 data class GenerateRequest(
     val messages: List<ChatMessage>,
     val config: InferenceConfig,
@@ -309,7 +313,7 @@ Home
 │   ├── 引擎选择器（显示可用性）
 │   ├── 模型选择器（该引擎已配置模型下拉）
 │   ├── 流式对话（显示 TTFT / 本次 tps）
-│   └── 采样参数面板（temp/top_k/top_p/threads/backend/max_tokens）
+│   └── 采样参数面板（temp/top_k/top_p/threads/backend/max_tokens，按「引擎+模型」钉）
 ├── Models
 │   ├── 四张引擎卡片：各自模型路径 / 添加(文件浏览器/路径) / 校验 / 删除
 │   └── 同引擎多模型收藏
@@ -318,8 +322,7 @@ Home
 │   ├── 进行中：进度、实时 tps
 │   └── 结果表 + 导出 JSON
 └── Settings
-    ├── 默认采样参数
-    ├── 后端偏好 / 线程数
+    ├── 引擎默认采样（只读，无全局采样设置）
     └── 数据目录与导出
 ```
 
@@ -394,6 +397,7 @@ droid-llm/
 │   ├── build_native.ps1
 │   └── export_benchmark.ps1
 └── docs/
+    ├── MODEL_PARAMS.md         # 采样参数层次与键空间（权威）
     ├── ENGINE_INTEGRATION.md
     └── MODEL_PATHS.md          # 模型下载与存放（权威）
 ```

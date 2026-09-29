@@ -21,6 +21,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.pisces312.droidllm.ui.benchmark.BenchmarkScreen
 import io.github.pisces312.droidllm.ui.chat.ChatScreen
+import io.github.pisces312.droidllm.ui.diag.LogScreen
 import io.github.pisces312.droidllm.ui.models.ModelsScreen
 import io.github.pisces312.droidllm.ui.settings.SettingsScreen
 
@@ -74,7 +75,10 @@ fun DroidLlmRoot() {
             composable("chat") { ChatScreen(onGoToModels = goToModels) }
             composable("models") { ModelsScreen() }
             composable("benchmark") { BenchmarkScreen(onGoToModels = goToModels) }
-            composable("settings") { SettingsScreen() }
+            composable("settings") { SettingsScreen(onOpenLogs = { nav.navigate("logs") }) }
+            // Pushed on top of the tabs rather than added as a fifth tab: logs
+            // are opened to reproduce a bug, not browsed habitually.
+            composable("logs") { LogScreen(onBack = { nav.popBackStack() }) }
         }
     }
 }

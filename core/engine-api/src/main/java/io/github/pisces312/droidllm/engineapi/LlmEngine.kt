@@ -114,6 +114,33 @@ data class InferenceConfig(
     val enableThinking: Boolean = true,
 )
 
+/**
+ * The sampling / execution values an engine ships with — the base every call of
+ * that engine is layered on.
+ *
+ * Every field is required on purpose: an engine has to state all of them, so a
+ * knob can never be silently inherited from a value nobody chose. An app-wide
+ * `0.7 / 40` default being inherited by a model family that needs `1.0 / 64` is
+ * exactly how the LiteRT greeting loop shipped (`docs/litert.md` §3.3).
+ *
+ * The correct values are a property of the model family an engine runs, or of the
+ * engine itself — never of the app. Gemma 3 wants its own sampling, and Genie is
+ * NPU-only, so one app-wide backend could not have been right for all four.
+ */
+data class EngineDefaults(
+    val temperature: Float,
+    val topK: Int,
+    val topP: Float,
+    val threads: Int,
+    val maxNewTokens: Int,
+    /**
+     * Explicit, never [Backend.AUTO]: every adapter knows which backend it really
+     * uses, and `AUTO` only hid that behind a second resolution step ("AUTO
+     * resolved to …" warnings on every turn).
+     */
+    val backend: Backend,
+)
+
 enum class ChatRole { SYSTEM, USER, ASSISTANT }
 
 data class ChatMessage(
@@ -248,6 +275,25 @@ interface LlmEngine {
      * [displayName] in the chat picker, benchmark rows and exported JSON.
      */
     val version: EngineVersion get() = EngineVersion()
+
+    /**
+     * Values every model of this engine starts from — see [EngineDefaults].
+     *
+     * Required, with no default implementation on purpose: a missing declaration
+     * used to mean "whatever the app-wide constants were", which is how the LiteRT
+     * greeting loop reached a real device (`docs/litert.md` §3.3).
+     *
+     * The app resolves the final value as **per-model override → this**, with no
+     * app-wide layer in between. Adapters must not merge it themselves: inside
+     * `load`/`generate` a user-chosen value and an inherited one are the same
+     * number, so the merge has to happen where the intent is still known.
+     *
+     * `systemPrompt` is deliberately **not** part of this — it stays an app-level
+     * setting (`AppSettings.systemPrompt`) plus a per-model override, because the
+     * same prompt is wanted across engines and an empty one breaks MNN
+     * (`docs/mnn.md` §2).
+     */
+    val defaults: EngineDefaults
 
     suspend fun probe(probeContext: ProbeContext): Availability
 

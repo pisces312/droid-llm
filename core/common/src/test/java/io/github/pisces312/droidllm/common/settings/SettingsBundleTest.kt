@@ -25,17 +25,17 @@ class SettingsBundleTest {
     fun `round trip preserves settings models and params`() {
         val bundle = SettingsBundle(
             appVersion = "0.1.0",
-            settings = BundledSettings(temperature = 0.3f, hfUseMirror = false),
+            settings = BundledSettings(systemPrompt = "be terse", hfUseMirror = false),
             models = listOf(model("a"), model("b")),
-            modelParams = mapOf("a" to ModelParamsOverride(topK = 7)),
+            modelParams = mapOf("MNN:a" to ModelParamsOverride(topK = 7)),
         )
         val decoded = SettingsBundleCodec.decode(SettingsBundleCodec.encode(bundle))
         assertTrue(decoded is BundleParseResult.Ok)
         val ok = (decoded as BundleParseResult.Ok).bundle
-        assertEquals(0.3f, ok.settings.temperature)
+        assertEquals("be terse", ok.settings.systemPrompt)
         assertEquals(false, ok.settings.hfUseMirror)
         assertEquals(listOf("a", "b"), ok.models.map { it.id })
-        assertEquals(7, ok.modelParams.getValue("a").topK)
+        assertEquals(7, ok.modelParams.getValue("MNN:a").topK)
     }
 
     @Test
@@ -70,20 +70,20 @@ class SettingsBundleTest {
                 models = listOf(model("shared", "New name"), model("new", "New")),
             ),
             existingModels = listOf(localOnly, shared),
-            existingParams = mapOf("local" to ModelParamsOverride(topK = 1)),
+            existingParams = mapOf("MNN:local" to ModelParamsOverride(topK = 1)),
             includeApiServer = false,
         )
         assertEquals(listOf("new"), plan.modelsToAdd.map { it.id })
         assertEquals(listOf("shared"), plan.modelsToUpdate.map { it.id })
         assertEquals("New name", plan.modelsToUpdate.first().displayName)
         // The local-only overlay survives — merge is additive.
-        assertEquals(1, plan.modelParamsToWrite.getValue("local").topK)
+        assertEquals(1, plan.modelParamsToWrite.getValue("MNN:local").topK)
     }
 
     @Test
     fun `empty overrides are dropped when planning`() {
         val plan = SettingsBundleMerger.plan(
-            bundle = SettingsBundle(modelParams = mapOf("a" to ModelParamsOverride())),
+            bundle = SettingsBundle(modelParams = mapOf("MNN:a" to ModelParamsOverride())),
             existingModels = emptyList(),
             existingParams = emptyMap(),
             includeApiServer = false,

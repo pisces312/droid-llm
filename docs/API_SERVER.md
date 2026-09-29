@@ -122,6 +122,11 @@ app 侧：
 请求映射：
 
 - `temperature / top_p / max_tokens / stop` → `InferenceConfig`（不适用字段由引擎记 warning）
+  - 未在请求体里给的字段**不是**取自某个全局默认：它们走
+    「逐模型覆盖（`ENGINE:modelId`）→ 引擎 `EngineDefaults`」，
+    即与聊天页同一套解析（`DefaultApiInferenceBridge.baseConfig()`，见
+    `docs/MODEL_PARAMS.md`）。`topK / threads / backend` 只能
+    由这两层决定 —— 请求体里没有对应字段。
 - `messages[]` → `List<ChatMessage>`；system 由 app 层解析进 `InferenceConfig.systemPrompt`
   （契约：适配器不得再前置）
 - `stream=true` → SSE `chat.completion.chunk` + 结尾 `data: [DONE]`

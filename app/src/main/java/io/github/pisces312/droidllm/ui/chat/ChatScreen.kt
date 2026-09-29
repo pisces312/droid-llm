@@ -671,9 +671,9 @@ private fun MessageBubble(msg: ChatUiMessage) {
  * row above the transcript for something that is opened rarely, and it double-counted the tap
  * target (card + inner button).
  *
- * Every field has a "仅本模型" pin. Unpinned edits write the global default in
- * Settings; pinned edits write only the selected model's overlay, so one model
- * can diverge without moving every other model's baseline.
+ * Every field has a "仅本模型" pin. Pinned edits persist a per-model overlay on top of the
+ * selected engine's own `EngineDefaults`; unpinned edits only move this session's in-memory
+ * value — there is no global sampling layer to write to any more (`docs/MODEL_PARAMS.md`).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -699,9 +699,10 @@ private fun SamplingSheet(
             SheetTitle(
                 text = "采样参数",
                 subtitle = if (modelName == null) {
-                    "默认值来自「设置」页；灰显字段当前引擎不生效。"
+                    "默认值来自本引擎的出厂设置（可见「设置」页）；灰显字段当前引擎不生效。"
                 } else {
-                    "默认值来自「设置」页。点「仅本模型」可让 $modelName 单独覆盖该项。"
+                    "默认值来自本引擎的出厂设置（可见「设置」页）。点「仅本模型」让 $modelName 单独" +
+                        "覆盖并保存；不点的改动只在本次会话内生效。"
                 },
             )
             Spacer(Modifier.height(12.dp))
@@ -899,7 +900,7 @@ private fun PinRow(pinned: Boolean, enabled: Boolean, onToggle: (Boolean) -> Uni
     ) {
         if (pinned) {
             Text(
-                "已覆盖全局默认",
+                "已覆盖引擎默认",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )

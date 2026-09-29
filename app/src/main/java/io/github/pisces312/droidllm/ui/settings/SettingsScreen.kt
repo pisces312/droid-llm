@@ -63,13 +63,13 @@ import io.github.pisces312.droidllm.common.settings.SettingsBundleMerger
 import io.github.pisces312.droidllm.common.settings.ThemeMode
 import io.github.pisces312.droidllm.data.catalog.ModelAutoImporter
 import io.github.pisces312.droidllm.service.ApiForegroundService
-import io.github.pisces312.droidllm.engineapi.Backend
+import io.github.pisces312.droidllm.engineapi.EngineDefaults
 import io.github.pisces312.droidllm.engineapi.EngineId
+import io.github.pisces312.droidllm.engineapi.LlmEngine
 import io.github.pisces312.droidllm.engineapi.ModelLocation
 import io.github.pisces312.droidllm.engineapi.ProbeContext
 import io.github.pisces312.droidllm.ui.components.ChoiceChipRow
 import io.github.pisces312.droidllm.ui.components.DroidCard
-import io.github.pisces312.droidllm.ui.components.LabeledDropdown
 import io.github.pisces312.droidllm.ui.components.NumericField
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
@@ -102,6 +102,16 @@ data class NativeLibraryInfo(
     val md5: String,
 )
 
+/**
+ * One engine's own sampling defaults, rendered read-only in Settings.
+ *
+ * @param name the engine's [LlmEngine.displayName].
+ */
+data class EngineDefaultsRow(
+    val name: String,
+    val defaults: EngineDefaults,
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -112,6 +122,7 @@ class SettingsViewModel @Inject constructor(
     private val modelParamsStore: ModelParamsStore,
     private val autoImporter: ModelAutoImporter,
     private val apiPrefs: ApiServerPreferences,
+    private val engines: Set<@JvmSuppressWildcards LlmEngine>,
 ) : ViewModel() {
 
     private val _probe = MutableStateFlow<ProbeContext?>(null)
@@ -203,26 +214,19 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setHfUseMirror(useMirror) }
     }
 
-    fun setSampling(
-        temperature: Float?,
-        topK: Int?,
-        topP: Float?,
-        threads: Int?,
-        maxNewTokens: Int?,
-        backend: Backend?,
-    ) {
-        val cur = settings.value
-        viewModelScope.launch {
-            settingsStore.setSampling(
-                temperature = temperature ?: cur.temperature,
-                topK = topK ?: cur.topK,
-                topP = topP ?: cur.topP,
-                threads = threads ?: cur.threads,
-                maxNewTokens = maxNewTokens ?: cur.maxNewTokens,
-                backend = backend ?: cur.backend,
-            )
-        }
-    }
+    /**
+     * The sampling / backend values each engine ships with — **for display only**.
+     *
+     * They are compiled into the adapters rather than stored here, because the
+     * right sampling for a model family is a property of the engine running it:
+     * Gemma 3 degenerates into a greeting loop at `0.7 / 40` on LiteRT-LM, while
+     * Qualcomm pins `temp 0.8 / top-k 1` for that same model on NPU (see
+     * `docs/ENGINE_INTEGRATION.md`). Changing a value happens per model, in the
+     * chat sampling sheet.
+     */
+    val engineDefaults: List<EngineDefaultsRow> = engines
+        .map { EngineDefaultsRow(name = it.displayName, defaults = it.defaults) }
+        .sortedBy { it.name }
 
     fun clearBenchDb() {
         viewModelScope.launch {
@@ -460,7 +464,10 @@ class SettingsViewModel @Inject constructor(
 }
 
 @Composable
-fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(
+    onOpenLogs: () -> Unit = {},
+    vm: SettingsViewModel = hiltViewModel(),
+) {
     val probe by vm.probe.collectAsState()
     val settings by vm.settings.collectAsState()
     val apiConfig by vm.apiConfig.collectAsState()
@@ -536,90 +543,19 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             )
         }
 
-        SectionCard("默认采样参数") {
+        SectionCard("引擎默认采样") {
             Text(
-                "聊天页采样面板的默认值",
+                "采样参数跟着引擎走：每个引擎在自己代码里声明一套默认值，单个模型可以在聊天页" +
+                    "按「引擎 + 模型」钉住自己的值（采样面板里标「仅本模型」）。此处只读 —— " +
+                    "没有全局采样设置，要调请去聊天页。",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NumericField(
-                    label = "temp",
-                    value = settings.temperature.toString(),
-                    decimal = true,
-                    onCommit = { v ->
-                        v.toFloatOrNull()?.let {
-                            vm.setSampling(temperature = it, topK = null, topP = null, threads = null, maxNewTokens = null, backend = null)
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                NumericField(
-                    label = "top_k",
-                    value = settings.topK.toString(),
-                    onCommit = { v ->
-                        v.toIntOrNull()?.let {
-                            vm.setSampling(temperature = null, topK = it, topP = null, threads = null, maxNewTokens = null, backend = null)
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
+            Spacer(Modifier.height(10.dp))
+            vm.engineDefaults.forEachIndexed { index, row ->
+                if (index > 0) Spacer(Modifier.height(8.dp))
+                EngineDefaultsRowUi(row)
             }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NumericField(
-                    label = "top_p",
-                    value = settings.topP.toString(),
-                    decimal = true,
-                    onCommit = { v ->
-                        v.toFloatOrNull()?.let {
-                            vm.setSampling(temperature = null, topK = null, topP = it, threads = null, maxNewTokens = null, backend = null)
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                NumericField(
-                    label = "threads",
-                    value = settings.threads.toString(),
-                    onCommit = { v ->
-                        v.toIntOrNull()?.let {
-                            vm.setSampling(temperature = null, topK = null, topP = null, threads = it, maxNewTokens = null, backend = null)
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NumericField(
-                    label = "maxNewTokens",
-                    value = settings.maxNewTokens.toString(),
-                    onCommit = { v ->
-                        v.toIntOrNull()?.let {
-                            vm.setSampling(temperature = null, topK = null, topP = null, threads = null, maxNewTokens = it, backend = null)
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                LabeledDropdown(
-                    label = "backend",
-                    options = Backend.entries.map { it.name to it.name },
-                    selectedKey = settings.backend.name,
-                    onSelected = { key ->
-                        vm.setSampling(temperature = null, topK = null, topP = null, threads = null, maxNewTokens = null, backend = Backend.valueOf(key))
-                    },
-                    emptyText = "—",
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "backend 是默认值，AUTO 由引擎自行决定；某个引擎实际支持哪几项、哪项不生效，" +
-                    "见聊天页参数 chip 打开的「采样参数」里的灰显说明。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
 
         SectionCard("系统提示词") {
@@ -911,6 +847,16 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                 onClick = { metricsHelp = true },
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        SectionCard("诊断") {
+            Text(
+                "引擎加载 / 生成的关键节点、提示词长度与首 token 延迟都会写进运行日志，" +
+                    "用于在真机上复现问题后把日志导出给开发者。",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedToolButton("查看运行日志", onClick = onOpenLogs, modifier = Modifier.fillMaxWidth())
         }
 
         SectionCard("关于") {
@@ -1231,6 +1177,29 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                     pendingRoot = null
                 }) { Text("跳过重名并迁移") }
             },
+        )
+    }
+}
+
+/**
+ * One engine's defaults, read-only: engine name first, the six knobs below it.
+ * Two lines because six values do not fit one line on a phone.
+ */
+@Composable
+private fun EngineDefaultsRowUi(row: EngineDefaultsRow) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(row.name, style = MaterialTheme.typography.labelLarge)
+        Text(
+            "temp ${row.defaults.temperature} · top_k ${row.defaults.topK} · " +
+                "top_p ${row.defaults.topP}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "threads ${row.defaults.threads} · max_new ${row.defaults.maxNewTokens} · " +
+                row.defaults.backend.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

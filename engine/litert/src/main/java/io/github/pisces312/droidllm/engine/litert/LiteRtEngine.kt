@@ -11,8 +11,8 @@ import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.MessageCallback
 import com.google.ai.edge.litertlm.SamplerConfig
-import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
@@ -25,9 +25,11 @@ import io.github.pisces312.droidllm.engineapi.Backend as AppBackend
 import io.github.pisces312.droidllm.engineapi.ChatMessage
 import io.github.pisces312.droidllm.engineapi.ChatRole
 import io.github.pisces312.droidllm.engineapi.displayName
+import io.github.pisces312.droidllm.engineapi.EngineDefaults
 import io.github.pisces312.droidllm.engineapi.EngineEvent
 import io.github.pisces312.droidllm.engineapi.EngineException
 import io.github.pisces312.droidllm.engineapi.EngineId
+import io.github.pisces312.droidllm.engineapi.EngineLogging
 import io.github.pisces312.droidllm.engineapi.EngineMetrics
 import io.github.pisces312.droidllm.engineapi.EngineVersion
 import io.github.pisces312.droidllm.engineapi.GenerateJob
@@ -68,6 +70,7 @@ class LiteRtEngine @Inject constructor(
         version = BuildConfig.ENGINE_VERSION.takeIf { it.isNotBlank() },
         commit = BuildConfig.ENGINE_COMMIT.takeIf { it.isNotBlank() },
     )
+    override val defaults: EngineDefaults get() = DEFAULT_INFERENCE
 
     private class LiteRtSession(
         override val modelId: String,
@@ -223,7 +226,6 @@ class LiteRtEngine @Inject constructor(
                 val lastIndex = intArrayOf(0)
                 val maxNew = request.config.maxNewTokens.coerceAtLeast(1)
                 val hitTokenCap = AtomicBoolean(false)
-                val hitRepeat = AtomicBoolean(false)
 
                 // Match gallery: thinking is a runtime flag, not a text suffix.
                 val extraContext = mapOf<String, Any>(
@@ -234,35 +236,16 @@ class LiteRtEngine @Inject constructor(
                     Contents.of(Content.Text(history.lastUser)),
                     object : MessageCallback {
                         override fun onMessage(message: Message) {
-                            if (cancelled.get() || hitTokenCap.get() || hitRepeat.get()) return
+                            if (cancelled.get() || hitTokenCap.get()) return
                             val piece = message.toString()
                             // Gallery drops tokenizer control pieces before UI.
                             if (piece.isEmpty() || piece.startsWith("<ctrl")) return
 
-                            // LiteRT may deliver either a token delta or the accumulated
-                            // text so far. Accept both so a cumulative callback cannot
-                            // paint endless "您好您好…".
-                            val current = text.toString()
-                            val delta = when {
-                                current.isEmpty() -> piece
-                                piece == current -> return
-                                piece.startsWith(current) -> piece.substring(current.length)
-                                else -> piece
-                            }
-                            if (delta.isEmpty()) return
-
                             collector.onToken()
-                            text.append(delta)
+                            text.append(piece)
                             lastIndex[0] += 1
-                            onEvent(EngineEvent.Token(delta, lastIndex[0]))
+                            onEvent(EngineEvent.Token(piece, lastIndex[0]))
 
-                            // Small models can miss EOS and loop a greeting
-                            // ("您好您好…"). Cut the turn before it fills maxNewTokens.
-                            if (isDegenerateRepeat(text.toString())) {
-                                hitRepeat.set(true)
-                                runCatching { conversation.cancelProcess() }
-                                return
-                            }
                             if (lastIndex[0] >= maxNew) {
                                 hitTokenCap.set(true)
                                 runCatching { conversation.cancelProcess() }
@@ -274,7 +257,7 @@ class LiteRtEngine @Inject constructor(
                         }
 
                         override fun onError(throwable: Throwable) {
-                            if (hitTokenCap.get() || hitRepeat.get()) {
+                            if (hitTokenCap.get()) {
                                 done.complete(Unit)
                             } else {
                                 done.completeExceptionally(throwable)
@@ -287,8 +270,8 @@ class LiteRtEngine @Inject constructor(
                 try {
                     done.await()
                 } catch (t: Throwable) {
-                    if (hitTokenCap.get() || hitRepeat.get()) {
-                        // cancelled on purpose (max tokens / degenerate repeat)
+                    if (hitTokenCap.get()) {
+                        // cancelled on purpose (max tokens)
                     } else {
                         val cause = t.cause ?: t
                         if (cause is kotlinx.coroutines.CancellationException ||
@@ -315,11 +298,6 @@ class LiteRtEngine @Inject constructor(
                     warnings = warningsFor(request.config) +
                         (if (backend !== mapBackend(session.config.backend)) {
                             listOf("backend switch requires reload; used load-time backend")
-                        } else {
-                            emptyList()
-                        }) +
-                        (if (hitRepeat.get()) {
-                            listOf("输出陷入短语重复循环，已提前截断")
                         } else {
                             emptyList()
                         }),
@@ -436,23 +414,6 @@ class LiteRtEngine @Inject constructor(
         }
     }
 
-    /**
-     * True when [s] ends in a short unit repeated many times ("您好您好…").
-     * Small LiteRT models sometimes miss EOS after a greeting and loop.
-     */
-    internal fun isDegenerateRepeat(s: String): Boolean {
-        if (s.length < 10) return false
-        val window = s.takeLast(16)
-        for (period in 1..4) {
-            if (window.length % period != 0) continue
-            val unit = window.substring(0, period)
-            if (unit.all { it.isWhitespace() }) continue
-            val repeats = window.length / period
-            if (repeats >= 5 && window == unit.repeat(repeats)) return true
-        }
-        return false
-    }
-
     private fun createConversation(
         engine: Engine,
         config: InferenceConfig,
@@ -523,12 +484,44 @@ class LiteRtEngine @Inject constructor(
         rssBefore?.let { w += "rss baseline before load: ${it}MB" }
         return w
     }
+
+    companion object {
+        /**
+         * Sampling this engine ships with, used unless a model pins its own.
+         *
+         * `temperature = 1.0 / top_k = 64` are Gemma 3's own recommended values and
+         * what Google AI Edge Gallery uses. `backend = CPU` is a deliberate retreat
+         * from the GPU delegate: on the HONOR BKQ-AN80 (SM8850, Android 17) the GPU
+         * path is where the greeting loop reproduced, and `1.0 / 64 / CPU` is the
+         * combination verified not to loop on that same device — see
+         * `docs/litert.md` §3.3 for the evidence and for what is still
+         * unattributed. Raising it back to `Backend.GPU` is a one-line change once
+         * a single-variable re-test clears the GPU.
+         */
+        val DEFAULT_INFERENCE = EngineDefaults(
+            temperature = 1.0f,
+            topK = 64,
+            topP = 0.95f,
+            threads = 4,
+            maxNewTokens = 4096,
+            backend = AppBackend.CPU,
+        )
+    }
 }
 
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class LiteRtEngineModule {
-    @Binds
-    @IntoSet
-    abstract fun bindEngine(impl: LiteRtEngine): LlmEngine
+    companion object {
+        /**
+         * Binds through [EngineLogging.wrap] so every call is recorded by the
+         * app's diagnostic sink. The sink is installed in `Application.onCreate`,
+         * after Hilt has built the graph, so the decorator resolves it lazily
+         * per call and must not capture it at construction time.
+         */
+        @Provides
+        @IntoSet
+        fun provideLoggedEngine(impl: LiteRtEngine): LlmEngine =
+            EngineLogging.wrap(impl)
+    }
 }

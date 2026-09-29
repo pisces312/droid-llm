@@ -2,7 +2,6 @@ package io.github.pisces312.droidllm.common.settings
 
 import io.github.pisces312.droidllm.common.model.ModelParamsOverride
 import io.github.pisces312.droidllm.common.model.StoredModel
-import io.github.pisces312.droidllm.engineapi.Backend
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -28,7 +27,14 @@ data class SettingsBundle(
     val exportedAt: String = "",
     val settings: BundledSettings = BundledSettings(),
     val models: List<StoredModel> = emptyList(),
-    /** modelId → per-model sampling overlay. */
+    /**
+     * `"ENGINE:modelId"` → per-model sampling overlay.
+     *
+     * Bundles exported by version 1 used a bare `modelId` here; those entries are
+     * still read through the fallback in
+     * [io.github.pisces312.droidllm.common.model.ModelParamsStore], so the schema
+     * version was not bumped.
+     */
     val modelParams: Map<String, ModelParamsOverride> = emptyMap(),
     /** OpenAI-compatible server settings; present only when the user opted in. */
     val apiServer: BundledApiServer? = null,
@@ -59,12 +65,6 @@ data class SettingsBundle(
 data class BundledSettings(
     val themeMode: String = ThemeMode.SYSTEM.name,
     val multiModelResidency: Boolean = false,
-    val temperature: Float = 0.7f,
-    val topK: Int = 40,
-    val topP: Float = 0.95f,
-    val threads: Int = 4,
-    val maxNewTokens: Int = 4096,
-    val backend: String = "AUTO",
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
     val hfUseMirror: Boolean = true,
 ) {
@@ -72,12 +72,6 @@ data class BundledSettings(
     fun customizedCount(): Int = listOf(
         themeMode != ThemeMode.SYSTEM.name,
         multiModelResidency,
-        temperature != 0.7f,
-        topK != 40,
-        topP != 0.95f,
-        threads != 4,
-        maxNewTokens != 4096,
-        backend != "AUTO",
         systemPrompt != DEFAULT_SYSTEM_PROMPT,
         !hfUseMirror,
     ).count { it }
@@ -85,12 +79,6 @@ data class BundledSettings(
     fun toAppSettings(): AppSettings = AppSettings(
         themeMode = ThemeMode.from(themeMode),
         multiModelResidency = multiModelResidency,
-        temperature = temperature,
-        topK = topK,
-        topP = topP,
-        threads = threads,
-        maxNewTokens = maxNewTokens,
-        backend = Backend.entries.firstOrNull { it.name == backend } ?: Backend.AUTO,
         systemPrompt = systemPrompt,
         hfUseMirror = hfUseMirror,
     )
@@ -99,12 +87,6 @@ data class BundledSettings(
         fun from(s: AppSettings): BundledSettings = BundledSettings(
             themeMode = s.themeMode.name,
             multiModelResidency = s.multiModelResidency,
-            temperature = s.temperature,
-            topK = s.topK,
-            topP = s.topP,
-            threads = s.threads,
-            maxNewTokens = s.maxNewTokens,
-            backend = s.backend.name,
             systemPrompt = s.systemPrompt,
             hfUseMirror = s.hfUseMirror,
         )
@@ -166,7 +148,9 @@ data class ImportPlan(
  *  - settings: the file wins outright (it is an explicit user action);
  *  - models: keyed by id; new ids are appended, existing ids are overwritten;
  *    models present only on this device are left untouched;
- *  - per-model params: same rule, keyed by model id.
+ *  - per-model params: same rule, keyed by `ENGINE:modelId` (one model can be
+ *    pinned differently under each engine — see
+ *    [io.github.pisces312.droidllm.common.model.modelParamsKey]).
  */
 object SettingsBundleMerger {
 

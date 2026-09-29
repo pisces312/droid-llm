@@ -1,6 +1,8 @@
 package io.github.pisces312.droidllm.engineapi.fake
 
 import io.github.pisces312.droidllm.engineapi.Availability
+import io.github.pisces312.droidllm.engineapi.Backend
+import io.github.pisces312.droidllm.engineapi.EngineDefaults
 import io.github.pisces312.droidllm.engineapi.EngineEvent
 import io.github.pisces312.droidllm.engineapi.EngineException
 import io.github.pisces312.droidllm.engineapi.EngineId
@@ -40,6 +42,21 @@ class FakeEngine : LlmEngine {
 
     override val id: EngineId = EngineId.FAKE
     override val displayName: String = "FakeEngine"
+
+    /**
+     * Deliberately unlike every real adapter's values. If a test ever observes
+     * these numbers, the merge fell through to the engine defaults instead of the
+     * value the test set up — which is exactly the failure mode the pre-`EngineDefaults`
+     * app-wide constants produced in production (LiteRT ran `0.7 / 40` on Gemma 3).
+     */
+    override val defaults: EngineDefaults = EngineDefaults(
+        temperature = 0.11f,
+        topK = 7,
+        topP = 0.22f,
+        threads = 2,
+        maxNewTokens = 128,
+        backend = Backend.CPU,
+    )
 
     private class FakeSession(
         override val modelId: String,

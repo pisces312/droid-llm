@@ -1,7 +1,7 @@
 package io.github.pisces312.droidllm.engine.mnn
 
-import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
@@ -16,7 +16,9 @@ import io.github.pisces312.droidllm.engineapi.displayName
 import io.github.pisces312.droidllm.engineapi.EngineEvent
 import io.github.pisces312.droidllm.engineapi.EngineException
 import io.github.pisces312.droidllm.engine.mnn.BuildConfig
+import io.github.pisces312.droidllm.engineapi.EngineDefaults
 import io.github.pisces312.droidllm.engineapi.EngineId
+import io.github.pisces312.droidllm.engineapi.EngineLogging
 import io.github.pisces312.droidllm.engineapi.EngineMetrics
 import io.github.pisces312.droidllm.engineapi.EngineVersion
 import io.github.pisces312.droidllm.engineapi.GenerateJob
@@ -52,6 +54,23 @@ class MnnEngine @Inject constructor() : LlmEngine {
     override val version: EngineVersion = EngineVersion(
         version = BuildConfig.ENGINE_VERSION.takeIf { it.isNotBlank() },
         commit = BuildConfig.ENGINE_COMMIT.takeIf { it.isNotBlank() },
+    )
+
+    /**
+     * App baseline, now that there is no app-wide settings layer. These are the
+     * values the project has shipped and tuned against (Qwen3 templates assume
+     * them); nothing here is justified by a real-device experiment the way the
+     * LiteRT set is. `backend = CPU` is what `AUTO` resolved to anyway
+     * (`buildConfigJson`), stated explicitly so the log stops saying "AUTO
+     * resolved to cpu" on every turn.
+     */
+    override val defaults: EngineDefaults = EngineDefaults(
+        temperature = 0.7f,
+        topK = 40,
+        topP = 0.95f,
+        threads = 4,
+        maxNewTokens = 4096,
+        backend = Backend.CPU,
     )
 
     private class MnnSession(
@@ -379,7 +398,16 @@ class MnnEngine @Inject constructor() : LlmEngine {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class MnnEngineModule {
-    @Binds
-    @IntoSet
-    abstract fun bindEngine(impl: MnnEngine): LlmEngine
+    companion object {
+        /**
+         * Binds through [EngineLogging.wrap] so every call is recorded by the
+         * app's diagnostic sink. The sink is installed in `Application.onCreate`,
+         * after Hilt has built the graph, so the decorator resolves it lazily
+         * per call and must not capture it at construction time.
+         */
+        @Provides
+        @IntoSet
+        fun provideLoggedEngine(impl: MnnEngine): LlmEngine =
+            EngineLogging.wrap(impl)
+    }
 }

@@ -42,7 +42,7 @@ MnnLlmChat 的对照给出一个高价值结论：**"引擎+模型合并成一�
 | 聊天 | `ui/chat/ChatScreen.kt` | 顶栏（引擎下拉 + 模型下拉 + 溢出菜单）→ 消息列表 → 采样参数折叠卡 → 输入行 |
 | 模型 | `ui/models/ModelsScreen.kt` | TabRow（已导入 / 模型市场）→ 引擎按钮行 → 列表 |
 | 评测 | `ui/benchmark/BenchmarkScreen.kt` | 引擎 × 模型卡片堆叠 → 提示词/用例 Chip → 折叠参数 → 「开始评测」 |
-| 设置 | `ui/settings/SettingsScreen.kt` | 采样默认值 → 外观 → 数据 → 关于 |
+| 设置 | `ui/settings/SettingsScreen.kt` | 外观 → 引擎默认采样（只读）→ 系统提示词 → 内存 → API 服务器 → 模型下载 → 数据 → 设备信息 → 指标说明 → 诊断 → 关于 |
 
 ### 2.2 主题与 token
 

@@ -5,13 +5,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.floatPreferencesKey
-import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.github.pisces312.droidllm.engineapi.Backend
-import io.github.pisces312.droidllm.engineapi.InferenceConfig
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -41,8 +37,17 @@ enum class ThemeMode {
 const val DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 
 /**
- * User defaults persisted in DataStore. Sampling values seed the Chat
- * sampling panel and can be overridden per session (UI_DESIGN §5.4).
+ * User defaults persisted in DataStore.
+ *
+ * Deliberately **no sampling values**: temperature / topK / topP / threads /
+ * maxNewTokens / backend are a property of the engine (its `EngineDefaults`) and
+ * of the individual model (the per-model overlay), never of the app. An
+ * app-wide default was inherited by Gemma 3 on LiteRT-LM and turned the greeting
+ * into a repetition loop — see `docs/litert.md` §3.3.
+ *
+ * `systemPrompt` is the one exception and stays here: it is a prompt, not a
+ * sampling knob, and an empty one breaks MNN (`docs/mnn.md` §2). It can still be
+ * pinned per model in the chat sampling sheet.
  */
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -61,25 +66,15 @@ data class AppSettings(
      * on-disk `hf/` layout are identical, so switching needs no migration.
      */
     val hfUseMirror: Boolean = true,
-    val temperature: Float = 0.7f,
-    val topK: Int = 40,
-    val topP: Float = 0.95f,
-    val threads: Int = 4,
-    val maxNewTokens: Int = 4096,
-    val backend: Backend = Backend.AUTO,
     /** Blank = no system message is sent at all. */
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
-) {
-    fun toInferenceConfig(): InferenceConfig = InferenceConfig(
-        maxNewTokens = maxNewTokens,
-        temperature = temperature,
-        topK = topK,
-        topP = topP,
-        threads = threads,
-        backend = backend,
-        systemPrompt = systemPrompt.takeIf { it.isNotBlank() },
-    )
-}
+    /**
+     * In-app diagnostic log capture (设置 → 诊断). ON by default so a bug can be
+     * reproduced without first visiting settings; the buffer is a bounded ring,
+     * so leaving it on costs memory only, never growing without limit.
+     */
+    val diagnosticLogging: Boolean = true,
+)
 
 interface AppSettingsStore {
     fun observe(): Flow<AppSettings>
@@ -90,14 +85,7 @@ interface AppSettingsStore {
     suspend fun setStorageGuideSeen(seen: Boolean)
     suspend fun setHfUseMirror(useMirror: Boolean)
     suspend fun setSystemPrompt(prompt: String)
-    suspend fun setSampling(
-        temperature: Float,
-        topK: Int,
-        topP: Float,
-        threads: Int,
-        maxNewTokens: Int,
-        backend: Backend,
-    )
+    suspend fun setDiagnosticLogging(enabled: Boolean)
 
     /**
      * Overwrite every user-authored setting at once (settings import).
@@ -124,13 +112,13 @@ class DataStoreAppSettingsStore @Inject constructor(
         val modelRoot = stringPreferencesKey("model_root_path")
         val storageGuideSeen = booleanPreferencesKey("storage_guide_seen")
         val hfUseMirror = booleanPreferencesKey("hf_use_mirror")
-        val temperature = floatPreferencesKey("temperature")
-        val topK = intPreferencesKey("top_k")
-        val topP = floatPreferencesKey("top_p")
-        val threads = intPreferencesKey("threads")
-        val maxNewTokens = intPreferencesKey("max_new_tokens")
-        val backend = stringPreferencesKey("backend")
         val systemPrompt = stringPreferencesKey("system_prompt")
+        val diagnosticLogging = booleanPreferencesKey("diagnostic_logging")
+        // Retired sampling keys (temperature / top_k / top_p / threads /
+        // max_new_tokens / backend) are intentionally not declared: sampling now
+        // lives on the engine (`EngineDefaults`) and the per-model overlay. Any
+        // leftover values in DataStore are ignored, which is the chosen migration
+        // (they cannot be attributed to an engine after the fact).
     }
 
     override fun observe(): Flow<AppSettings> = context.appSettingsDataStore.data.map { prefs ->
@@ -140,15 +128,8 @@ class DataStoreAppSettingsStore @Inject constructor(
             modelRootPath = prefs[Keys.modelRoot]?.takeIf { it.isNotBlank() },
             storageGuideSeen = prefs[Keys.storageGuideSeen] ?: false,
             hfUseMirror = prefs[Keys.hfUseMirror] ?: true,
-            temperature = prefs[Keys.temperature] ?: 0.7f,
-            topK = prefs[Keys.topK] ?: 40,
-            topP = prefs[Keys.topP] ?: 0.95f,
-            threads = prefs[Keys.threads] ?: 4,
-            maxNewTokens = prefs[Keys.maxNewTokens] ?: 4096,
-            backend = prefs[Keys.backend]?.let { raw ->
-                Backend.entries.firstOrNull { it.name == raw }
-            } ?: Backend.AUTO,
             systemPrompt = prefs[Keys.systemPrompt] ?: DEFAULT_SYSTEM_PROMPT,
+            diagnosticLogging = prefs[Keys.diagnosticLogging] ?: true,
         )
     }
 
@@ -181,22 +162,8 @@ class DataStoreAppSettingsStore @Inject constructor(
         context.appSettingsDataStore.edit { it[Keys.systemPrompt] = prompt }
     }
 
-    override suspend fun setSampling(
-        temperature: Float,
-        topK: Int,
-        topP: Float,
-        threads: Int,
-        maxNewTokens: Int,
-        backend: Backend,
-    ) {
-        context.appSettingsDataStore.edit {
-            it[Keys.temperature] = temperature
-            it[Keys.topK] = topK
-            it[Keys.topP] = topP
-            it[Keys.threads] = threads
-            it[Keys.maxNewTokens] = maxNewTokens
-            it[Keys.backend] = backend.name
-        }
+    override suspend fun setDiagnosticLogging(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[Keys.diagnosticLogging] = enabled }
     }
 
     override suspend fun applyImported(imported: AppSettings) {
@@ -204,13 +171,10 @@ class DataStoreAppSettingsStore @Inject constructor(
             it[Keys.themeMode] = imported.themeMode.name
             it[Keys.multiResidency] = imported.multiModelResidency
             it[Keys.hfUseMirror] = imported.hfUseMirror
-            it[Keys.temperature] = imported.temperature
-            it[Keys.topK] = imported.topK
-            it[Keys.topP] = imported.topP
-            it[Keys.threads] = imported.threads
-            it[Keys.maxNewTokens] = imported.maxNewTokens
-            it[Keys.backend] = imported.backend.name
             it[Keys.systemPrompt] = imported.systemPrompt
+            // diagnosticLogging is a device-local preference (like modelRootPath):
+            // BundledSettings never carries it, so writing `imported.diagnosticLogging`
+            // here would force the default (true) over the user's local choice.
         }
     }
 }

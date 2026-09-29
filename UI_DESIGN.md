@@ -286,10 +286,11 @@ flowchart TD
 
 ### 5.4 设置（Settings）
 
-- 默认采样：temp / top_k / top_p / threads / maxNewTokens / backend
-  - 数值框全部走 `NumericField`（§4.5 的两条反直觉事实即出自此处）
-  - **backend 是 `LabeledDropdown`，不是只读输入框**——只读 `OutlinedTextField` 长得像能输入，
-    点了没反应；候选为该引擎支持的 backend
+- 引擎默认采样：**只读展示**四个引擎各自的默认值（引擎名 + 六个旋钮两行）
+  - 这里**改不了** —— 采样参数跟引擎走（写在适配器代码里）。单模型要调，去聊天页的会话采样面板
+    按「引擎 + 模型」钉，那里会标「仅本模型」
+  - **没有全局采样设置**：App 级默认值已删除，`AppSettings` 不再有 temperature/top_k/… 字段
+    （理由与实测见 `docs/MODEL_PARAMS.md`、`docs/litert.md` §3.3）
 - 内存：**多模型驻留开关**（默认关 = 单模型驻留，切换即 unload；`DESIGN §3.3`），开启行附 12sp 警告「8GB 机型易 OOM」
 - 系统提示词：默认 `You are a helpful assistant.`，可改可清空（清空会导致 MNN 上极短首轮直接出 EOS，
   详见 `docs/mnn.md` §2）

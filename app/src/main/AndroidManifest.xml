@@ -56,5 +56,18 @@
             android:name=".service.ApiForegroundService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Shares the diagnostic log .txt via ACTION_SEND (设置 → 诊断 → 分享日志).
+             grantUriPermissions is what lets the receiving app read the file
+             without any storage permission. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>
