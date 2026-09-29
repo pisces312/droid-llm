@@ -73,3 +73,10 @@ target_link_libraries(mnn_chat_jni PRIVATE
 )
 
 target_link_options(mnn_chat_jni PRIVATE "-Wl,--exclude-libs,ALL")
+
+# 16 KB page size (required on Android 15+ 16 KB-page devices). Mirrors NDK r27's
+# APP_SUPPORT_FLEXIBLE_PAGE_SIZES recipe (build/core/build-binary.mk:135-140): the
+# link flag 16 KB-aligns LOAD segments, the define keeps our own code away from the
+# 4 KB PAGE_SIZE macro. libMNN.so itself is prebuilt and already 16 KB aligned.
+target_compile_options(mnn_chat_jni PRIVATE "-D__BIONIC_NO_PAGE_SIZE_MACRO")
+target_link_options(mnn_chat_jni PRIVATE "-Wl,-z,max-page-size=16384")

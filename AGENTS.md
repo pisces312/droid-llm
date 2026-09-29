@@ -168,3 +168,10 @@ third_party/llama.cpp    vendored 源码树
   从 `engine/genie/build.gradle.kts` 的 `copyQnnJniLibs` include 列表里删掉它会立刻复发。
   排查这类问题用 `$QAIRT_PATH/bin/aarch64-android/{qnn-platform-validator,genie-t2t-run}`
   （**完整配方见 `docs/genie.md` §9**；先跑它再看 app 日志，顺序反了查不出来）。
+- **16 KB page size 对齐**：Android 15+ 的 16 KB 页设备会在 **debuggable** 应用启动时弹「Android
+  应用兼容性」对话框逐库报告（release 不弹，但 Google Play 自 2025-11-01 起强制）。三个 native 模块
+  已按 NDK r27 官方配方加 `-Wl,-z,max-page-size=16384` + `-D__BIONIC_NO_PAGE_SIZE_MACRO`。
+  **改完 so 后必须 `adb reboot` 才看得到系统判定更新** —— 只重装 APK 时它仍按**旧** APK 报告，
+  别据此认为修复无效；判定一律用 `llvm-readelf -l` 读**设备上** `lib/arm64/` 的实际文件。
+  `libQnnHtpV*Skel.so` 修不了（QAIRT 2.50 全部变体都是 0x1000），但系统对它判「未知错误」不触发警告。
+  详见 `docs/ENGINE_INTEGRATION.md`「16 KB page size 对齐（跨引擎）」。

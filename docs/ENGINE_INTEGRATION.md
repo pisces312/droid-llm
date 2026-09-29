@@ -178,6 +178,50 @@ native 盲区由 `EngineLogcatCapture`（读本进程 logcat）补上，Java 崩
 （自 Android 4.1 起 App 可读自己进程日志，无需 `READ_LOGS`；logd 已按 uid 收窄）。
 
 
+## 16 KB page size 对齐（跨引擎）
+
+Android 15+ 的 16 KB 页设备要求所有 `.so` 的 LOAD 段 16 KB 对齐。**debuggable 应用启动时**
+系统会弹「Android 应用兼容性」对话框逐库列出（AOSP `AppWarnings` → `PageSizeMismatchDialog`，
+logcat 里有 `W AppWarnings: Showing PageSizeMismatchDialog for package ...`）；release 不弹，
+但 **Google Play 自 2025-11-01 起对 Android 15+ 的新包/更新强制该要求**。
+
+**合规判据**（两条都要满足）：
+
+```
+p_align >= 16384    且    p_offset ≡ p_vaddr (mod 16384)
+```
+
+查法（NDK 自带 readelf）：
+
+```bash
+RE=$ANDROID_HOME/ndk/<ver>/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-readelf.exe
+"$RE" -l libfoo.so | awk '$1=="LOAD"{print $NF}'    # 应全部 >= 0x4000
+```
+
+**修法**：三个 native 模块各自在 `CMakeLists.txt` 按 NDK r27 的官方配方
+（`build/core/build-binary.mk:135-140` 的 `APP_SUPPORT_FLEXIBLE_PAGE_SIZES`）加两行 ——
+链接期对齐 LOAD 段，编译期切断对 4 KB `PAGE_SIZE` 宏的依赖：
+
+```cmake
+target_compile_options(<target> PRIVATE "-D__BIONIC_NO_PAGE_SIZE_MACRO")
+target_link_options(<target> PRIVATE "-Wl,-z,max-page-size=16384")
+```
+
+`:engine:genie` / `:engine:llamacpp` / `:engine:mnn` 已加（2026-09-29）。`libMNN.so` 是预编译
+产物，本身已是 `0x4000`。
+
+**三条实测结论**（真机 BKQ-AN80 / SM8850 / Android 17）：
+
+1. **系统的判定结果会被缓存 —— 改完必须重启设备**。装上新 APK（`install -r`）后弹窗仍按**旧**
+   APK 的内容逐库报告；`adb reboot` 后对话框才消失。排查时不要拿「重装后还弹」当成修复无效，
+   要**直接 `llvm-readelf` 读设备上 `/data/app/.../lib/arm64/` 的实际文件**来判定。
+2. **弹窗会把全部 so 都列出来**，状态分「LOAD 区段未对齐」与「未知错误」两类；实测后者里的库
+   readelf 查下来完全合规，且修好前者后整个对话框不再出现。**合规与否只能靠 readelf 判**，
+   不要照抄弹窗列表。
+3. **Qualcomm 的 `libQnnHtpV<arch>Skel.so` 修不了**：QAIRT 2.50 里全部变体（含 `lib-safe/`）
+   都是 `p_align=0x1000`，没有合规版本可换。实际影响有限 —— skel 不在 app 进程 mmap
+   （由 adsprpc 读给 CDSP），且系统对它判「未知错误」不触发警告。
+
 ## 许可摘要
 
 | 组件 | 许可 |
