@@ -3360,6 +3360,26 @@
       "tags": []
     },
     {
+      "id": "genie-qwen3-4b-instruct-2507-qnn",
+      "name": "Qwen3-4B-Instruct-2507 (QNN/Genie)",
+      "engine": "GENIE",
+      "vendor": "Qwen",
+      "description": "骁龙 NPU（HTP）w4a16 · ctx 4096 · 4 分片 · 需 QAIRT 2.45+",
+      "sizeBytes": 3184834343,
+      "kind": "repo",
+      "localPath": "qwen3_4b_instruct",
+      "markerFile": "genie_config.json",
+      "sources": {
+        "HuggingFace": "pisces312-hf/Qwen3-4B-Instruct-2507-QNN-Genie"
+      },
+      "tags": [
+        "NPU",
+        "QNN",
+        "Genie",
+        "w4a16"
+      ]
+    },
+    {
       "id": "gemma3-1b-it-int4-litertlm",
       "name": "Gemma3-1B-IT int4 (.litertlm)",
       "engine": "LITERT",

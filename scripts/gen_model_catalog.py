@@ -488,6 +488,31 @@ def main() -> None:
             },
             "tags": [],
         },
+        # Self-published Genie / QNN HTP build, hosted under the project's own HF
+        # namespace. Not present in MnnLlmChat's `model_market.json`, so it is
+        # maintained here — regenerate the catalog and this entry stays.
+        #
+        # kind=repo: Genie consumes a whole directory (genie_config.json +
+        # tokenizer.json + 4 ctx-bin shards, ~3.2 GB), never a single file.
+        # markerFile=genie_config.json is the same check GenieConfigResolver
+        # validates on import. localPath is the folder name such a model arrives
+        # as when copied from a device by hand, so an existing local copy is
+        # recognised as this entry and relocated into the market layout.
+        {
+            "id": "genie-qwen3-4b-instruct-2507-qnn",
+            "name": "Qwen3-4B-Instruct-2507 (QNN/Genie)",
+            "engine": "GENIE",
+            "vendor": "Qwen",
+            "description": "骁龙 NPU（HTP）w4a16 · ctx 4096 · 4 分片 · 需 QAIRT 2.45+",
+            "sizeBytes": 3184834343,
+            "kind": "repo",
+            "localPath": "qwen3_4b_instruct",
+            "markerFile": "genie_config.json",
+            "sources": {
+                "HuggingFace": "pisces312-hf/Qwen3-4B-Instruct-2507-QNN-Genie",
+            },
+            "tags": ["NPU", "QNN", "Genie", "w4a16"],
+        },
     ]
     extra.extend(litert_entry(row) for row in LITERT_MODELS)
     extra.extend(gguf_entry(row) for row in GGUF_MODELS)

@@ -98,6 +98,18 @@
 | 字段 | `id/name/engine/vendor/sizeBytes/kind=repo\|mnn_repo\|file/localPath/fileInRepo/markerFile/sources/tags` |
 | 匹配 | `matchImported` / `findModelDir`；解析一次即可，扫描侧应少做盲探测（见 `ModelAutoImporter`） |
 
+**唯一一条 `GENIE` 条目是自发布的**（`genie-qwen3-4b-instruct-2507-qnn`）：指向本项目自己的 HF 空间
+`pisces312-hf/Qwen3-4B-Instruct-2507-QNN-Genie`（Qwen3-4B-Instruct-2507 的 QNN/Genie w4a16 构建，
+4 分片约 3.2 GB）。它**不在** MnnLlmChat 的 `model_market.json` 里，由 `gen_model_catalog.py` 的
+`extra` 列表硬编码维护 —— 重跑生成脚本不会丢。字段取值与理由：
+
+| 字段 | 值 | 理由 |
+|------|----|------|
+| `kind` | `repo` | Genie 吃的是**整个目录**，不是单文件 |
+| `markerFile` | `genie_config.json` | 与 `GenieConfigResolver.validateModelDir` 同一条判据，`findModelDir` 靠它判定「已下载」 |
+| `localPath` | `qwen3_4b_instruct` | 取设备上实际目录名，使**手工拷进来**的同一份模型被 `matchesName` 认出并归位到市场布局 |
+| `sources` | 仅 `HuggingFace` | 无 ModelScope 镜像；UI 在 ModelScope 标签页会提示「暂无源，请切换服务器」 |
+
 ## 6. 权限与浏览器
 
 | 机制 | 说明 |
