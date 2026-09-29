@@ -68,9 +68,9 @@ class ApiForegroundService : Service() {
             apiServer = server
             val config = prefs.current()
             val text = if (ok) {
-                "运行中 · ${config.bindAddress}:${config.port}"
+                getString(R.string.api_notification_running, config.bindAddress, config.port)
             } else {
-                "启动失败 · ${server.lastError ?: "unknown"}"
+                getString(R.string.api_notification_failed, server.lastError ?: "unknown")
             }
             val nm = getSystemService(NotificationManager::class.java)
             nm.notify(NOTIFICATION_ID, buildNotification(running = ok, content = text))

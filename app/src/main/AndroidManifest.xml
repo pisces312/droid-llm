@@ -57,6 +57,20 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Required by AppCompatDelegate.setApplicationLocales (设置 → 语言).
+             autoStoreLocales=false: the three-state choice (system/zh/en) is ours and
+             lives in DataStore, and it is re-applied from DroidLlmApp.onCreate on every
+             process start. Letting AppCompat store its own copy would add a second
+             source of truth that cannot represent "system". -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="false" />
+        </service>
+
         <!-- Shares the diagnostic log .txt via ACTION_SEND (设置 → 诊断 → 分享日志).
              grantUriPermissions is what lets the receiving app read the file
              without any storage permission. -->

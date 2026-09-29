@@ -1,5 +1,8 @@
 package io.github.pisces312.droidllm.engineapi
 
+import android.content.Context
+import io.github.pisces312.droidllm.engineapi.R
+
 /**
  * Which [InferenceConfig] knobs a given engine actually honors.
  * UI greys out inapplicable fields with a short note (UI_DESIGN §5.1 / DESIGN §1.2).
@@ -26,18 +29,18 @@ object ConfigApplicability {
         EngineId.LLAMACPP -> true
     }
 
-    /** Short Chinese note shown at 12sp under a greyed field. */
-    fun note(engineId: EngineId, field: ConfigField): String? {
+    /** Short note shown at 12sp under a greyed field. */
+    fun note(context: Context, engineId: EngineId, field: ConfigField): String? {
         if (isApplicable(engineId, field)) return null
         return when (field) {
             ConfigField.THREADS -> when (engineId) {
-                EngineId.LITERT -> "LiteRT 自管线程池，此参数不生效"
-                EngineId.GENIE -> "Genie 走 HTP，线程数不适用"
-                else -> "此引擎不支持线程数"
+                EngineId.LITERT -> context.getString(R.string.applicability_threads_litert)
+                EngineId.GENIE -> context.getString(R.string.applicability_threads_genie)
+                else -> context.getString(R.string.applicability_threads_other)
             }
-            ConfigField.SEED -> "此引擎不支持固定随机种子"
-            ConfigField.THINKING -> "此引擎不支持 Thinking 开关"
-            else -> "此引擎不支持该参数"
+            ConfigField.SEED -> context.getString(R.string.applicability_seed)
+            ConfigField.THINKING -> context.getString(R.string.applicability_thinking)
+            else -> context.getString(R.string.applicability_generic)
         }
     }
 
@@ -50,9 +53,9 @@ object ConfigApplicability {
         EngineId.LLAMACPP -> listOf(Backend.CPU, Backend.GPU, Backend.OPENCL, Backend.NPU_HTP, Backend.AUTO)
     }
 
-    fun backendNote(engineId: EngineId): String? = when (engineId) {
-        EngineId.GENIE -> "Genie 仅支持 NPU/HTP"
-        EngineId.LITERT -> "LiteRT 不支持 OPENCL"
+    fun backendNote(context: Context, engineId: EngineId): String? = when (engineId) {
+        EngineId.GENIE -> context.getString(R.string.applicability_backend_genie)
+        EngineId.LITERT -> context.getString(R.string.applicability_backend_litert)
         else -> null
     }
 }

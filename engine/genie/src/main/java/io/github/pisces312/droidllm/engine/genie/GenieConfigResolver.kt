@@ -57,15 +57,15 @@ class GenieConfigResolver @Inject constructor(
      * @return null when valid, otherwise a user-readable reason.
      */
     fun validateModelDir(dir: File): String? {
-        if (!dir.isDirectory) return "模型目录不存在: ${dir.absolutePath}"
+        if (!dir.isDirectory) return context.getString(R.string.genie_model_dir_missing, dir.absolutePath)
         if (!File(dir, "genie_config.json").isFile) {
-            return "缺少 genie_config.json"
+            return context.getString(R.string.genie_missing_config)
         }
         if (!File(dir, "tokenizer.json").isFile) {
-            return "缺少 tokenizer.json"
+            return context.getString(R.string.genie_missing_tokenizer)
         }
         val hasBin = dir.listFiles()?.any { it.isFile && it.name.endsWith(".bin") } == true
-        if (!hasBin) return "缺少 *.bin 上下文二进制"
+        if (!hasBin) return context.getString(R.string.genie_missing_bin)
         return null
     }
 

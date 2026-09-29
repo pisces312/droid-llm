@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English (fallback for every other locale). Genie engine module: user-facing
+     load / generate failure reasons surfaced by the Chat screen. -->
+<resources>
+    <string name="genie_native_missing">libgenie_chat_jni.so / libGenie.so not packaged (QAIRT not configured or droid.skipGenie=true)</string>
+    <string name="genie_unsupported_soc">Genie supports Snapdragon HTP only; current SoC=%1$s; supported: %2$s</string>
+    <string name="genie_htp_config_missing">HTP config missing or failed to copy</string>
+    <string name="genie_backend_unsupported">Genie supports HTP only; got %1$s</string>
+    <string name="genie_model_invalid">Invalid Genie model: %1$s</string>
+    <string name="genie_no_htp_config">No HTP config for this device (SoC=%1$s)</string>
+    <string name="genie_config_parse_failed">Failed to parse genie_config.json: %1$s</string>
+    <string name="genie_empty_reply">Genie returned an empty reply (reset + retried %1$d times)</string>
+    <string name="genie_query_failed">GenieDialog_query failed</string>
+    <string name="genie_no_token">Genie produced no tokens</string>
+    <string name="genie_stream_note">Genie streams text fragments; generatedTokens ≈ callback count</string>
+    <string name="genie_retry_note">reset + retry ×%1$d after empty reply</string>
+    <string name="genie_model_dir_missing">Model directory not found: %1$s</string>
+    <string name="genie_missing_config">Missing genie_config.json</string>
+    <string name="genie_missing_tokenizer">Missing tokenizer.json</string>
+    <string name="genie_missing_bin">Missing *.bin context binary</string>
+</resources>

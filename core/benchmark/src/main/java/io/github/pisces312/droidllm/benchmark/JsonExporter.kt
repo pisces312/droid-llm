@@ -48,7 +48,7 @@ object JsonExporter {
                                             put(
                                                 id.name,
                                                 JSONObject().apply {
-                                                    put("label", id.label)
+                                                    put("case", id.name)
                                                     put("loadMs", case.loadMs ?: JSONObject.NULL)
                                                     put("ttftMs", case.ttftMs ?: JSONObject.NULL)
                                                     put("prefillTps", case.prefillTps ?: JSONObject.NULL)

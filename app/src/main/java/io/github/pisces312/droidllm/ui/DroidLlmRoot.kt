@@ -1,5 +1,8 @@
 package io.github.pisces312.droidllm.ui
 
+import androidx.compose.ui.res.stringResource
+import io.github.pisces312.droidllm.R
+
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
@@ -25,13 +28,14 @@ import io.github.pisces312.droidllm.ui.diag.LogScreen
 import io.github.pisces312.droidllm.ui.models.ModelsScreen
 import io.github.pisces312.droidllm.ui.settings.SettingsScreen
 
-private data class Tab(val route: String, val label: String, val icon: ImageVector)
+/** `labelRes` rather than a literal: the tab bar is built at file scope. */
+private data class Tab(val route: String, val labelRes: Int, val icon: ImageVector)
 
 private val tabs = listOf(
-    Tab("chat", "聊天", Icons.Filled.Chat),
-    Tab("models", "模型", Icons.Filled.Folder),
-    Tab("benchmark", "评测", Icons.Filled.BarChart),
-    Tab("settings", "设置", Icons.Filled.Settings),
+    Tab("chat", R.string.nav_chat, Icons.Filled.Chat),
+    Tab("models", R.string.nav_models, Icons.Filled.Folder),
+    Tab("benchmark", R.string.nav_benchmark, Icons.Filled.BarChart),
+    Tab("settings", R.string.nav_settings, Icons.Filled.Settings),
 )
 
 @Composable
@@ -53,8 +57,10 @@ fun DroidLlmRoot() {
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
+                        icon = {
+                            Icon(tab.icon, contentDescription = stringResource(tab.labelRes))
+                        },
+                        label = { Text(stringResource(tab.labelRes)) },
                     )
                 }
             }

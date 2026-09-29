@@ -27,6 +27,40 @@ enum class ThemeMode {
 }
 
 /**
+ * In-app UI language (设置 → 语言).
+ *
+ * The app ships `values/` (English, the fallback for every other locale) and
+ * `values-zh/` (Chinese). [SYSTEM] means "no app-specific locale", which is what
+ * `AppCompatDelegate.setApplicationLocales` needs in order to follow the device:
+ * an empty `LocaleListCompat`, not a locale list built from `Locale.getDefault()`.
+ *
+ * The choice is mirrored into DataStore because the UI needs the three-state value
+ * back (`getApplicationLocales()` cannot distinguish "user picked English" from
+ * "device is English"), and because it is applied from [Application.onCreate] on
+ * every process start — AppCompat's own storage would not know the difference
+ * between SYSTEM and an explicit pick either.
+ */
+enum class AppLanguage {
+    SYSTEM,
+    ZH,
+    EN,
+    ;
+
+    /** BCP-47 tag applied through `AppCompatDelegate`, or null for [SYSTEM]. */
+    val tag: String?
+        get() = when (this) {
+            SYSTEM -> null
+            ZH -> "zh"
+            EN -> "en"
+        }
+
+    companion object {
+        fun from(raw: String?): AppLanguage =
+            entries.firstOrNull { it.name == raw } ?: SYSTEM
+    }
+}
+
+/**
  * Prepended to every request as a `system` message (设置 → 系统提示词).
  *
  * Engines format the conversation with the model's own chat template, and most
@@ -51,6 +85,8 @@ const val DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
  */
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** UI language. SYSTEM follows the device; see [AppLanguage]. */
+    val language: AppLanguage = AppLanguage.SYSTEM,
     /** false = single-model residency: switch unloads the previous session (DESIGN §3.3). */
     val multiModelResidency: Boolean = false,
     /**
@@ -80,6 +116,7 @@ interface AppSettingsStore {
     fun observe(): Flow<AppSettings>
     suspend fun current(): AppSettings
     suspend fun setThemeMode(mode: ThemeMode)
+    suspend fun setLanguage(language: AppLanguage)
     suspend fun setMultiModelResidency(enabled: Boolean)
     suspend fun setModelRoot(path: String?)
     suspend fun setStorageGuideSeen(seen: Boolean)
@@ -108,6 +145,7 @@ class DataStoreAppSettingsStore @Inject constructor(
 
     private object Keys {
         val themeMode = stringPreferencesKey("theme_mode")
+        val language = stringPreferencesKey("app_language")
         val multiResidency = booleanPreferencesKey("multi_model_residency")
         val modelRoot = stringPreferencesKey("model_root_path")
         val storageGuideSeen = booleanPreferencesKey("storage_guide_seen")
@@ -124,6 +162,7 @@ class DataStoreAppSettingsStore @Inject constructor(
     override fun observe(): Flow<AppSettings> = context.appSettingsDataStore.data.map { prefs ->
         AppSettings(
             themeMode = ThemeMode.from(prefs[Keys.themeMode]),
+            language = AppLanguage.from(prefs[Keys.language]),
             multiModelResidency = prefs[Keys.multiResidency] ?: false,
             modelRootPath = prefs[Keys.modelRoot]?.takeIf { it.isNotBlank() },
             storageGuideSeen = prefs[Keys.storageGuideSeen] ?: false,
@@ -137,6 +176,10 @@ class DataStoreAppSettingsStore @Inject constructor(
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         context.appSettingsDataStore.edit { it[Keys.themeMode] = mode.name }
+    }
+
+    override suspend fun setLanguage(language: AppLanguage) {
+        context.appSettingsDataStore.edit { it[Keys.language] = language.name }
     }
 
     override suspend fun setMultiModelResidency(enabled: Boolean) {
@@ -172,6 +215,8 @@ class DataStoreAppSettingsStore @Inject constructor(
             it[Keys.multiResidency] = imported.multiModelResidency
             it[Keys.hfUseMirror] = imported.hfUseMirror
             it[Keys.systemPrompt] = imported.systemPrompt
+            // language is device-local too — importing someone else's bundle must not
+            // switch the UI language on this device.
             // diagnosticLogging is a device-local preference (like modelRootPath):
             // BundledSettings never carries it, so writing `imported.diagnosticLogging`
             // here would force the default (true) over the user's local choice.

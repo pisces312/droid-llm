@@ -1,5 +1,8 @@
 package io.github.pisces312.droidllm.ui.benchmark
 
+import androidx.compose.ui.res.stringResource
+import io.github.pisces312.droidllm.R
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -110,11 +113,11 @@ fun BenchmarkScreen(
             // button, and the extra 20dp was what kept it off the first screen.
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("评测", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.nav_benchmark), style = MaterialTheme.typography.titleLarge)
 
             if (state.showCoolingBanner) {
                 WarningBanner(
-                    text = "建议插电、静置冷却；>42℃ 仅警告，不中断",
+                    text = stringResource(R.string.bench_cooling_banner),
                     onDismiss = vm::dismissCoolingBanner,
                 )
             }
@@ -131,7 +134,7 @@ fun BenchmarkScreen(
 
             if (!state.running) {
                 PrimaryButton(
-                    "开始评测",
+                    stringResource(R.string.bench_start),
                     onClick = vm::startRun,
                     enabled = state.engineRows.any { it.included },
                     modifier = Modifier.fillMaxWidth(),
@@ -154,7 +157,7 @@ fun BenchmarkScreen(
                     onAbandon = if (state.paused) vm::abandon else null,
                 )
                 state.lastDecodeTps?.let { tps ->
-                    MetricPill(label = "最近 decode", value = "%.1f tok/s".format(tps))
+                    MetricPill(label = stringResource(R.string.bench_last_decode), value = "%.1f tok/s".format(tps))
                 }
             }
 
@@ -162,7 +165,7 @@ fun BenchmarkScreen(
             if (report != null) {
                 ResultSection(report = report)
                 OutlinedToolButton(
-                    "导出 JSON",
+                    stringResource(R.string.bench_export_json),
                     onClick = vm::exportLatest,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -191,9 +194,9 @@ private fun EngineConfigSection(
     onGoToModels: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("引擎 × 模型", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.bench_section_targets), style = MaterialTheme.typography.titleMedium)
         if (state.engineRows.isEmpty()) {
-            Text("正在探测引擎…", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.bench_probing), style = MaterialTheme.typography.labelMedium)
             return@Column
         }
         DroidCard {
@@ -274,14 +277,14 @@ private fun EngineRow(
                 when {
                     row.included && selectable -> Icon(
                         Icons.Filled.ArrowDropDown,
-                        contentDescription = "选择模型",
+                        contentDescription = stringResource(R.string.bench_pick_model),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     // A TextButton here would drag the line to 63dp and push 开始评测
                     // back off the first screen; the padded click target keeps the line
                     // at 52dp without shrinking the tap area to the glyph.
                     row.available && row.models.isEmpty() -> Text(
-                        "去「模型」页",
+                        stringResource(R.string.action_go_models_page),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
@@ -309,7 +312,7 @@ private fun EngineRow(
                 }
                 HorizontalDivider()
                 DropdownMenuItem(
-                    text = { Text("去「模型」页添加更多") },
+                    text = { Text(stringResource(R.string.bench_add_more_models)) },
                     onClick = {
                         expanded = false
                         onGoToModels()
@@ -324,13 +327,13 @@ private fun EngineRow(
 @Composable
 private fun PromptSection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("提示词（单选）", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.bench_section_prompt), style = MaterialTheme.typography.titleMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BenchmarkPrompts.all.forEach { prompt ->
                 FilterChip(
                     selected = state.promptId == prompt.id,
                     onClick = { vm.selectPrompt(prompt.id) },
-                    label = { Text(prompt.label) },
+                    label = { Text(stringResource(prompt.labelRes)) },
                 )
             }
         }
@@ -341,14 +344,14 @@ private fun PromptSection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
 @Composable
 private fun CaseSection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("用例（默认 L/P/D）", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.bench_section_cases), style = MaterialTheme.typography.titleMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BenchCaseId.entries.forEach { case ->
                 val checked = state.cases.contains(case)
                 FilterChip(
                     selected = checked,
                     onClick = { vm.toggleCase(case, !checked) },
-                    label = { Text(case.label) },
+                    label = { Text(stringResource(case.labelRes)) },
                 )
             }
         }
@@ -364,9 +367,9 @@ private fun ParamsSection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("运行参数", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.bench_section_params), style = MaterialTheme.typography.titleMedium)
                 TextButton(onClick = vm::toggleParamsExpanded) {
-                    Text(if (state.paramsExpanded) "收起" else "展开")
+                    Text(if (state.paramsExpanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand))
                 }
             }
             if (state.paramsExpanded) {
@@ -389,7 +392,7 @@ private fun ParamsSection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
                 }
             } else {
                 Text(
-                    "warmup ${state.warmup} · runs ${state.runs} · tokens ${state.maxNewTokens}（共 ${state.warmup + state.runs} 次）",
+                    stringResource(R.string.bench_params_summary, state.warmup, state.runs, state.maxNewTokens, state.warmup + state.runs),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -413,16 +416,19 @@ private fun Stepper(label: String, value: Int, onMinus: () -> Unit, onPlus: () -
 @Composable
 private fun ResultSection(report: BenchmarkReport) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("结果表", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.bench_section_results), style = MaterialTheme.typography.titleMedium)
         ResultTable(
             headers = listOf(
-                "引擎", "模型", "Quant", "Load ms", "TTFT ms", "Prefill tok/s", "Decode tok/s",
-                "RSS peak MB", "温度 ℃",
+                stringResource(R.string.bench_col_engine),
+                stringResource(R.string.nav_models),
+                "Quant", "Load ms", "TTFT ms", "Prefill tok/s", "Decode tok/s",
+                "RSS peak MB",
+                stringResource(R.string.bench_col_temp),
             ),
             rows = report.targets.map { it.toRow() },
         )
         Text(
-            "跨模型/跨量化只作参考，不构成绝对快慢结论",
+            stringResource(R.string.bench_disclaimer),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -472,13 +478,13 @@ private fun HistorySection(state: BenchmarkUiState, vm: BenchmarkViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("历史记录", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.bench_section_history), style = MaterialTheme.typography.titleMedium)
             if (state.history.isNotEmpty()) {
-                TextButton(onClick = vm::clearHistory) { Text("清空") }
+                TextButton(onClick = vm::clearHistory) { Text(stringResource(R.string.action_clear)) }
             }
         }
         if (state.history.isEmpty()) {
-            Text("暂无历史", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.bench_no_history), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             state.history.take(8).forEach { item ->
                 // engineId is persisted as EngineId.name; resolve it for display.

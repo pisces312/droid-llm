@@ -1,5 +1,8 @@
 package io.github.pisces312.droidllm.ui.models
 
+import androidx.compose.ui.res.stringResource
+import io.github.pisces312.droidllm.R
+
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -83,12 +86,12 @@ object FileBrowserRules {
         }
     }
 
-    fun engineFilterHint(engineId: EngineId): String = when (engineId) {
-        EngineId.LITERT -> "选择 .litertlm / .task 文件或目录"
-        EngineId.LLAMACPP -> "选择 .gguf 文件或目录"
-        EngineId.MNN -> "选择模型目录（需含 config.json + llm.mnn）"
-        EngineId.GENIE -> "选择模型目录（需含 genie_config.json + tokenizer.json + *.bin）"
-        EngineId.FAKE -> "任意路径"
+    fun engineFilterHint(context: Context, engineId: EngineId): String = when (engineId) {
+        EngineId.LITERT -> context.getString(R.string.browser_hint_litert)
+        EngineId.LLAMACPP -> context.getString(R.string.browser_hint_llamacpp)
+        EngineId.MNN -> context.getString(R.string.browser_hint_mnn)
+        EngineId.GENIE -> context.getString(R.string.browser_hint_genie)
+        EngineId.FAKE -> context.getString(R.string.browser_hint_any)
     }
 
     fun rootDirs(context: Context): List<File> {
@@ -150,17 +153,17 @@ fun FileBrowserDialog(
     var authorized by remember { mutableStateOf(FileBrowserRules.hasAllFilesAccess()) }
 
     LaunchedEffect(current) {
-        entries = listEntries(current, engineId, context.packageName)
+        entries = listEntries(context, current, engineId, context.packageName)
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(12.dp),
-        title = { Text("选择模型路径") },
+        title = { Text(stringResource(R.string.browser_title)) },
         text = {
             Column(Modifier.fillMaxWidth().height(420.dp)) {
                 Text(
-                    FileBrowserRules.engineFilterHint(engineId),
+                    FileBrowserRules.engineFilterHint(context, engineId),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -172,13 +175,13 @@ fun FileBrowserDialog(
                 if (!authorized) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "未授予「所有文件访问」权限，仅可浏览 App 私有目录。",
+                        stringResource(R.string.browser_no_permission),
                         style = MaterialTheme.typography.bodySmall,
                         color = DroidTheme.extra.warn,
                     )
                     TextButton(onClick = {
                         FileBrowserRules.openAllFilesAccessSettings(context)
-                    }) { Text("去系统设置授权") }
+                    }) { Text(stringResource(R.string.browser_grant_permission)) }
                 }
                 Spacer(Modifier.height(8.dp))
                 LazyColumn(Modifier.weight(1f)) {
@@ -221,16 +224,16 @@ fun FileBrowserDialog(
                     TextButton(onClick = {
                         val parent = current.parentFile
                         if (parent != null) current = parent
-                    }) { Text("上级") }
+                    }) { Text(stringResource(R.string.browser_parent)) }
                     val shortcutRoot = modelRoot?.takeIf { it.isDirectory && it.canRead() }
                     if (shortcutRoot != null && shortcutRoot.absolutePath != current.absolutePath) {
-                        TextButton(onClick = { current = shortcutRoot }) { Text("模型根目录") }
+                        TextButton(onClick = { current = shortcutRoot }) { Text(stringResource(R.string.common_model_root)) }
                     }
                     if (FileBrowserRules.matchesEngine(engineId, current) &&
                         !FileBrowserRules.isBlocked(current.absolutePath, current.canRead(), context.packageName)
                     ) {
                         PrimaryButton(
-                            text = "选此目录",
+                            text = stringResource(R.string.browser_pick_dir),
                             onClick = { onPick(current) },
                             modifier = Modifier.weight(1f),
                         )
@@ -239,7 +242,7 @@ fun FileBrowserDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
         },
     )
 }
@@ -252,7 +255,12 @@ private data class FileEntry(
     val hint: String?,
 )
 
-private fun listEntries(dir: File, engineId: EngineId, ownPackage: String): List<FileEntry> {
+private fun listEntries(
+    context: Context,
+    dir: File,
+    engineId: EngineId,
+    ownPackage: String,
+): List<FileEntry> {
     val children = dir.listFiles()?.toList().orEmpty()
     return children
         .sortedWith(compareByDescending<File> { it.isDirectory }.thenBy { it.name.lowercase() })
@@ -262,10 +270,10 @@ private fun listEntries(dir: File, engineId: EngineId, ownPackage: String): List
             val matches = FileBrowserRules.matchesEngine(engineId, f)
             val hint = when {
                 blocked && FileBrowserRules.isOtherAppAndroidData(f.absolutePath, ownPackage) ->
-                    "其他 App 的 Android/data/ 不可访问"
-                !readable -> "无读取权限"
-                !matches && f.isFile -> "扩展名不匹配"
-                f.isDirectory -> "目录"
+                    context.getString(R.string.browser_hint_other_app)
+                !readable -> context.getString(R.string.browser_hint_no_read)
+                !matches && f.isFile -> context.getString(R.string.browser_hint_ext_mismatch)
+                f.isDirectory -> context.getString(R.string.browser_hint_dir)
                 else -> null
             }
             FileEntry(

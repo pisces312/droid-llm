@@ -1,8 +1,12 @@
 package io.github.pisces312.droidllm.ui.chat
 
+import io.github.pisces312.droidllm.R
+
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.pisces312.droidllm.common.model.ModelParamsOverride
 import io.github.pisces312.droidllm.common.model.ModelParamsStore
 import io.github.pisces312.droidllm.common.model.ModelPathStore
@@ -56,12 +60,12 @@ data class ModelChoice(
  * Shared by the chat status line and the engine chips in the scope sheet, so an
  * unusable engine reads the same in both places (UI_DESIGN.md §6).
  */
-fun EngineChoice.unavailableReason(): String? = when (val av = availability) {
+fun EngineChoice.unavailableReason(context: Context): String? = when (val av = availability) {
     is Availability.Available -> null
-    is Availability.MissingDependency -> "不可用：${av.detail}；用带该依赖的构建包重装"
-    is Availability.UnsupportedSoc -> "不支持的 SoC：${av.detail}；换骁龙 HTP 机型"
-    is Availability.ModelNotConfigured -> "未配置模型：${av.detail}；到「模型」页添加"
-    is Availability.InvalidModel -> "模型无效：${av.detail}；检查文件是否完整"
+    is Availability.MissingDependency -> context.getString(R.string.chat_unavailable_missing_dep, av.detail)
+    is Availability.UnsupportedSoc -> context.getString(R.string.chat_unavailable_soc, av.detail)
+    is Availability.ModelNotConfigured -> context.getString(R.string.chat_unavailable_no_model, av.detail)
+    is Availability.InvalidModel -> context.getString(R.string.chat_unavailable_invalid_model, av.detail)
 }
 
 /**
@@ -163,6 +167,7 @@ class ChatViewModel @Inject constructor(
     private val probe: io.github.pisces312.droidllm.common.device.DeviceProbe,
     private val sessionRegistry: io.github.pisces312.droidllm.common.bench.SessionRegistry,
     private val settingsStore: AppSettingsStore,
+    @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _engines = MutableStateFlow<List<EngineChoice>>(emptyList())
@@ -180,7 +185,7 @@ class ChatViewModel @Inject constructor(
     private val _messages = MutableStateFlow<List<ChatUiMessage>>(emptyList())
     val messages: StateFlow<List<ChatUiMessage>> = _messages.asStateFlow()
 
-    private val _status = MutableStateFlow("准备就绪")
+    private val _status = MutableStateFlow(appContext.getString(R.string.chat_status_ready))
     val status: StateFlow<String> = _status.asStateFlow()
 
     private val _availability = MutableStateFlow("")
@@ -363,7 +368,7 @@ class ChatViewModel @Inject constructor(
     fun startModel() {
         val model = _selectedModel.value
         if (model == null) {
-            _status.value = "先选择引擎和模型，再点「启动」"
+            _status.value = appContext.getString(R.string.chat_status_pick_first)
             return
         }
         if (_sessionState.value == SessionState.LOADING) return
@@ -391,9 +396,9 @@ class ChatViewModel @Inject constructor(
         _sessionState.value = SessionState.IDLE
         val name = _selectedModel.value?.displayName
         _status.value = if (name == null) {
-            "未启动：先选择引擎和模型"
+            appContext.getString(R.string.chat_status_idle_no_model)
         } else {
-            "未启动：点击「启动」加载 $name"
+            appContext.getString(R.string.chat_status_idle, name)
         }
     }
 
@@ -461,9 +466,9 @@ class ChatViewModel @Inject constructor(
             val engine = sessionEngine
             if (_sessionState.value == SessionState.READY && handle != null && engine != null) {
                 runCatching { withContext(Dispatchers.IO) { engine.reset(handle) } }
-                _status.value = "已新建会话（上下文已清空）"
+                _status.value = appContext.getString(R.string.chat_status_new_session)
             } else {
-                _status.value = "模型未启动，已清空聊天记录"
+                _status.value = appContext.getString(R.string.chat_status_cleared)
             }
             _messages.value = emptyList()
         }
@@ -476,12 +481,12 @@ class ChatViewModel @Inject constructor(
         activeJob = null
         _generating.value = false
         if (wasGenerating) {
-            _status.value = "已停止"
+            _status.value = appContext.getString(R.string.chat_status_stopped)
         }
     }
 
     private fun describeAvailability(choice: EngineChoice): String =
-        choice.unavailableReason() ?: "可用"
+        choice.unavailableReason(appContext) ?: appContext.getString(R.string.engine_available)
 
     private suspend fun loadModelsFor(engine: LlmEngine) {
         val all = modelStore.observeModels().first()
@@ -514,7 +519,7 @@ class ChatViewModel @Inject constructor(
         val engine = _selectedEngine.value?.engine ?: return
         if (_selectedEngine.value?.available != true) {
             _sessionState.value = SessionState.FAILED
-            _status.value = "引擎不可用，无法加载模型"
+            _status.value = appContext.getString(R.string.chat_status_engine_unavailable)
             return
         }
         val key = "${engine.id}:${model.id}"
@@ -523,12 +528,12 @@ class ChatViewModel @Inject constructor(
                 session = handle
                 sessionEngine = eng
                 _sessionState.value = SessionState.READY
-                _status.value = "已切换到驻留模型 ${model.displayName}"
+                _status.value = appContext.getString(R.string.chat_status_switched_resident, model.displayName)
                 return
             }
         }
         _sessionState.value = SessionState.LOADING
-        _status.value = "加载中…"
+        _status.value = appContext.getString(R.string.common_loading)
         runCatching {
             // Adapters call straight into native load()/unload(), which run for
             // seconds. Keep them off the main thread so the LOADING state can
@@ -541,13 +546,13 @@ class ChatViewModel @Inject constructor(
             sessionRegistry.register(engine, handle)
             if (multiResidency) resident[key] = engine to handle
             _sessionState.value = SessionState.READY
-            _status.value = "已加载 ${model.displayName}"
+            _status.value = appContext.getString(R.string.chat_status_loaded, model.displayName)
         }.onFailure {
             val err = it.message ?: it.javaClass.simpleName
             session = null
             sessionEngine = null
             _sessionState.value = SessionState.FAILED
-            _status.value = "加载失败：$err；检查路径与文件完整性"
+            _status.value = appContext.getString(R.string.chat_status_load_failed, err)
         }
     }
 
@@ -563,7 +568,7 @@ class ChatViewModel @Inject constructor(
 
     fun send(text: String) {
         if (_sessionState.value != SessionState.READY) {
-            _status.value = "模型未启动，点击「启动」后再发送"
+            _status.value = appContext.getString(R.string.chat_status_not_started)
             return
         }
         val engine = _selectedEngine.value?.engine ?: return
@@ -584,7 +589,7 @@ class ChatViewModel @Inject constructor(
             add(ChatMessage(ChatRole.USER, userText))
         }
         _messages.value = _messages.value + ChatUiMessage(ChatRole.USER, text)
-        _status.value = "生成中…"
+        _status.value = appContext.getString(R.string.chat_status_generating)
         _generating.value = true
         val seq = ++generateSeq
 
@@ -619,9 +624,9 @@ class ChatViewModel @Inject constructor(
                         ThinkingDisplay.forDisplay(sb.toString(), config.enableThinking).isBlank()
                     val hitTokenCap = m.generatedTokens >= config.maxNewTokens && !emptyReply
                     val content = buildString {
-                        append(if (emptyReply) "（空回复，可重试）" else sb.toString())
+                        append(if (emptyReply) appContext.getString(R.string.chat_empty_reply) else sb.toString())
                         if (hitTokenCap) {
-                            append("\n\n· 已达 maxNewTokens=${config.maxNewTokens} 上限，回答可能不完整；可在参数里调大")
+                            append(appContext.getString(R.string.chat_token_cap_note, config.maxNewTokens))
                         }
                     }
                     val bubble = ChatUiMessage(
@@ -644,8 +649,12 @@ class ChatViewModel @Inject constructor(
                         _messages.value = _messages.value + bubble
                     }
                     _status.value = buildString {
-                        append(if (emptyReply) "完成（无输出）" else "完成")
-                        if (hitTokenCap) append(" · 达 maxNewTokens 上限")
+                        append(
+                            appContext.getString(
+                                if (emptyReply) R.string.chat_done_no_output else R.string.common_done,
+                            )
+                        )
+                        if (hitTokenCap) append(appContext.getString(R.string.chat_done_token_cap))
                         ttft?.let { append(" · TTFT ${it}ms") }
                         m.prefillTps?.let { append(" · prefill %.1f tok/s".format(it)) }
                         m.decodeTps?.let { append(" · decode %.1f tok/s".format(it)) }
@@ -660,10 +669,13 @@ class ChatViewModel @Inject constructor(
                 is EngineEvent.Error -> {
                     val cause = event.cause
                     val msg = when (cause) {
-                        is EngineException.Cancelled -> "已停止"
+                        is EngineException.Cancelled -> appContext.getString(R.string.chat_status_stopped)
                         is EngineException.GenerateFailed ->
-                            "生成失败：${cause.message ?: "未知"}；可重试或减小 maxNewTokens"
-                        else -> "错误：${cause.message ?: cause.javaClass.simpleName}"
+                            appContext.getString(
+                                R.string.chat_error_generate_failed,
+                                cause.message ?: appContext.getString(R.string.common_unknown),
+                            )
+                        else -> appContext.getString(R.string.chat_error_generic, cause.message ?: cause.javaClass.simpleName)
                     }
                     val content = sb.toString()
                     val last = _messages.value.lastOrNull()

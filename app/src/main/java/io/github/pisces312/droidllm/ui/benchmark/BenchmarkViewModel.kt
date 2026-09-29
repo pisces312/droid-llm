@@ -1,5 +1,7 @@
 package io.github.pisces312.droidllm.ui.benchmark
 
+import io.github.pisces312.droidllm.R
+
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -172,7 +174,7 @@ class BenchmarkViewModel @Inject constructor(
 
     fun onAppBackground() {
         if (_state.value.running && !_state.value.paused) {
-            _state.value = _state.value.copy(paused = true, progressDetail = "已退后台，自动暂停")
+            _state.value = _state.value.copy(paused = true, progressDetail = appContext.getString(R.string.bench_paused_background))
         }
     }
 
@@ -198,14 +200,14 @@ class BenchmarkViewModel @Inject constructor(
             progressTitle = "",
             progressDetail = "",
             progressFraction = null,
-            statusMessage = "已取消本次评测",
+            statusMessage = appContext.getString(R.string.bench_cancelled),
         )
     }
 
     fun clearHistory() {
         viewModelScope.launch {
             dao.clear()
-            _state.value = _state.value.copy(snackbar = "已清空评测历史")
+            _state.value = _state.value.copy(snackbar = appContext.getString(R.string.bench_history_cleared))
         }
     }
 
@@ -215,10 +217,10 @@ class BenchmarkViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { JsonExporter.write(report, dir) }
                 .onSuccess { file ->
-                    _state.value = _state.value.copy(snackbar = "已导出 ${file.name}")
+                    _state.value = _state.value.copy(snackbar = appContext.getString(R.string.bench_exported, file.name))
                 }
                 .onFailure {
-                    _state.value = _state.value.copy(snackbar = "导出失败：${it.message}")
+                    _state.value = _state.value.copy(snackbar = appContext.getString(R.string.bench_export_failed, it.message))
                 }
         }
     }
@@ -227,7 +229,7 @@ class BenchmarkViewModel @Inject constructor(
         if (_state.value.running) return
         val targets = buildTargets()
         if (targets.isEmpty()) {
-            _state.value = _state.value.copy(statusMessage = "请先勾选引擎并选择模型")
+            _state.value = _state.value.copy(statusMessage = appContext.getString(R.string.bench_error_no_target))
             return
         }
         val prompt: BenchPrompt = BenchmarkPrompts.byId(_state.value.promptId)
@@ -248,7 +250,7 @@ class BenchmarkViewModel @Inject constructor(
             paused = false,
             report = null,
             statusMessage = null,
-            progressTitle = "准备中…",
+            progressTitle = appContext.getString(R.string.bench_preparing),
             progressDetail = "",
             progressFraction = 0f,
             lastDecodeTps = null,
@@ -268,10 +270,10 @@ class BenchmarkViewModel @Inject constructor(
                     running = false,
                     paused = false,
                     report = report,
-                    progressTitle = "评测完成",
+                    progressTitle = appContext.getString(R.string.bench_finished),
                     progressDetail = "",
                     progressFraction = 1f,
-                    statusMessage = "评测完成，共 ${report.targets.size} 个引擎",
+                    statusMessage = appContext.getString(R.string.bench_finished_count, report.targets.size),
                 )
             } catch (e: kotlinx.coroutines.CancellationException) {
                 // cancel()/abandon() already updated UI state.
@@ -281,7 +283,7 @@ class BenchmarkViewModel @Inject constructor(
                     running = false,
                     paused = false,
                     progressTitle = "",
-                    statusMessage = "评测失败：${t.message ?: t}",
+                    statusMessage = appContext.getString(R.string.bench_failed, t.message ?: t),
                 )
             }
         }
@@ -307,8 +309,8 @@ class BenchmarkViewModel @Inject constructor(
                 currentCaseId = null
                 casePos = 0
                 _state.value = _state.value.copy(
-                    progressTitle = "引擎 ${p.index}/${p.total} · ${p.modelName}",
-                    progressDetail = "加载中…",
+                    progressTitle = appContext.getString(R.string.bench_progress_target, p.index, p.total, p.modelName),
+                    progressDetail = appContext.getString(R.string.common_loading),
                     progressFraction = (p.index - 1f) / p.total,
                 )
             }
@@ -322,18 +324,23 @@ class BenchmarkViewModel @Inject constructor(
                 val inner = (casePos - 1 + caseFraction) / casesEstimate
                 val fraction = ((targetIndex - 1) + inner) / targetTotal.coerceAtLeast(1)
                 _state.value = _state.value.copy(
-                    progressTitle = "引擎 $targetIndex/$targetTotal · ${p.caseId.label}",
-                    progressDetail = "样本 ${p.sampleIndex}/${p.sampleTotal}（含 warmup=${_state.value.warmup}）",
+                    progressTitle = appContext.getString(
+                        R.string.bench_progress_case,
+                        targetIndex,
+                        targetTotal,
+                        appContext.getString(p.caseId.labelRes),
+                    ),
+                    progressDetail = appContext.getString(R.string.bench_progress_sample, p.sampleIndex, p.sampleTotal, _state.value.warmup),
                     progressFraction = fraction,
                     lastDecodeTps = p.tpsHint ?: _state.value.lastDecodeTps,
                 )
             }
             is BenchProgress.TargetFinished -> {
-                val msg = p.error?.let { "${p.engineId.displayName} 失败：$it" }
+                val msg = p.error?.let { appContext.getString(R.string.bench_target_failed, p.engineId.displayName, it) }
                 _state.value = _state.value.copy(statusMessage = msg ?: _state.value.statusMessage)
             }
             is BenchProgress.Finished -> {
-                _state.value = _state.value.copy(progressTitle = "评测完成", progressFraction = 1f)
+                _state.value = _state.value.copy(progressTitle = appContext.getString(R.string.bench_finished), progressFraction = 1f)
             }
             is BenchProgress.Failed -> {
                 _state.value = _state.value.copy(
@@ -354,10 +361,10 @@ class BenchmarkViewModel @Inject constructor(
     }
 
     private fun availabilityLabel(av: Availability): String = when (av) {
-        is Availability.Available -> "可用"
-        is Availability.MissingDependency -> "不可用：${av.detail}"
-        is Availability.UnsupportedSoc -> "不支持：${av.detail}"
-        is Availability.ModelNotConfigured -> "未配置模型"
-        is Availability.InvalidModel -> "模型无效：${av.detail}"
+        is Availability.Available -> appContext.getString(R.string.engine_available)
+        is Availability.MissingDependency -> appContext.getString(R.string.engine_unavailable, av.detail)
+        is Availability.UnsupportedSoc -> appContext.getString(R.string.engine_unsupported, av.detail)
+        is Availability.ModelNotConfigured -> appContext.getString(R.string.engine_no_model)
+        is Availability.InvalidModel -> appContext.getString(R.string.engine_invalid_model, av.detail)
     }
 }

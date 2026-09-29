@@ -1,5 +1,8 @@
 package io.github.pisces312.droidllm.ui.diag
 
+import androidx.compose.ui.res.stringResource
+import io.github.pisces312.droidllm.R
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -128,7 +131,7 @@ class LogViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _crashText.value = CrashReporter.latestReport()
                 ?.let { file -> runCatching { file.readText() }.getOrNull() }
-                ?: "没有崩溃报告文件"
+                ?: context.getString(R.string.log_no_crash_file)
         }
     }
 
@@ -138,8 +141,8 @@ class LogViewModel @Inject constructor(
 
     fun shareCrashReport() {
         viewModelScope.launch(Dispatchers.IO) {
-            val file = CrashReporter.latestReport() ?: return@launch fail("没有崩溃报告文件")
-            shareFile(file, subject = "DroidLLM crash report", chooserTitle = "分享崩溃报告")
+            val file = CrashReporter.latestReport() ?: return@launch fail(context.getString(R.string.log_no_crash_file))
+            shareFile(file, subject = "DroidLLM crash report", chooserTitle = context.getString(R.string.log_share_crash))
         }
     }
 
@@ -180,7 +183,7 @@ class LogViewModel @Inject constructor(
                 DiagLogger.i(TAG, "engine logcat captured chars=${text.length} lines=${text.count { it == '\n' }}")
             }
             withContext(Dispatchers.Main) {
-                toast(if (text == null) "未取到引擎日志，请先复现再试" else "已抓取引擎日志（${text.length / 1024} KB）")
+                toast(if (text == null) context.getString(R.string.log_capture_missing) else context.getString(R.string.log_captured, text.length / 1024))
             }
         }
     }
@@ -199,8 +202,8 @@ class LogViewModel @Inject constructor(
             val engineLog = _engineLog.value
                 ?: EngineLogcatCapture.capture()?.also { _engineLog.value = it }
             val file = DiagLogger.flushToFile(header = deviceHeader(), engineLog = engineLog)
-                ?: return@launch fail("无法写入日志文件")
-            shareFile(file, subject = "DroidLLM log", chooserTitle = "分享日志")
+                ?: return@launch fail(context.getString(R.string.log_write_failed))
+            shareFile(file, subject = "DroidLLM log", chooserTitle = context.getString(R.string.log_share))
         }
     }
 
@@ -208,7 +211,7 @@ class LogViewModel @Inject constructor(
     private fun shareFile(file: File, subject: String, chooserTitle: String) {
         val uri = runCatching {
             FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        }.getOrNull() ?: return fail("无法生成分享链接")
+        }.getOrNull() ?: return fail(context.getString(R.string.log_share_uri_failed))
 
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -220,7 +223,7 @@ class LogViewModel @Inject constructor(
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         runCatching { context.startActivity(chooser) }
-            .onFailure { fail("没有可用的分享目标") }
+            .onFailure { fail(context.getString(R.string.log_no_share_target)) }
     }
 
     fun copyToClipboard() {
@@ -228,7 +231,7 @@ class LogViewModel @Inject constructor(
         // rather than exec'ing logcat here -- this runs on the main thread.
         val text = DiagLogger.reportText(deviceHeader(), _engineLog.value)
         clipboard().setPrimaryClip(ClipData.newPlainText("DroidLLM log", text))
-        toast("日志已复制（${DiagLogger.entries.value.size} 条）")
+        toast(context.getString(R.string.log_copied, DiagLogger.entries.value.size))
     }
 
     /** File path shown on screen so the user can also pull it with adb. */
@@ -307,10 +310,10 @@ fun LogScreen(onBack: () -> Unit, vm: LogViewModel = hiltViewModel()) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("运行日志") },
+                title = { Text(stringResource(R.string.log_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
             )
@@ -377,7 +380,7 @@ fun LogScreen(onBack: () -> Unit, vm: LogViewModel = hiltViewModel()) {
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        "暂无日志。复现问题后回到这里即可看到记录。",
+                        stringResource(R.string.log_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -390,7 +393,7 @@ fun LogScreen(onBack: () -> Unit, vm: LogViewModel = hiltViewModel()) {
 
     if (showDetail) {
         MonospaceTextDialog(
-            title = "运行日志（${entries.size} 条）",
+            title = stringResource(R.string.log_detail_title, entries.size),
             text = renderEntries(entries),
             onDismiss = { showDetail = false },
         )
@@ -398,15 +401,15 @@ fun LogScreen(onBack: () -> Unit, vm: LogViewModel = hiltViewModel()) {
 
     if (showEngineLog) {
         MonospaceTextDialog(
-            title = "引擎内部日志",
-            text = engineLog ?: "尚未抓取。返回上一页点「抓取引擎日志」。",
+            title = stringResource(R.string.log_engine_log_title),
+            text = engineLog ?: stringResource(R.string.log_engine_log_empty),
             onDismiss = { showEngineLog = false },
         )
     }
 
     crashText?.let { text ->
         MonospaceTextDialog(
-            title = "崩溃报告",
+            title = stringResource(R.string.log_crash_title),
             text = text,
             onDismiss = vm::closeCrashReport,
         )
@@ -422,10 +425,10 @@ private fun CrashCard(
 ) {
     DroidCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Text("崩溃报告", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.log_crash_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
             Text(
-                "崩溃时自动写入，含异常堆栈与本进程 logcat。",
+                stringResource(R.string.log_crash_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -442,9 +445,9 @@ private fun CrashCard(
             )
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedToolButton("查看", onOpen, Modifier.weight(1f), height = 44.dp)
-                OutlinedToolButton("分享", onShare, Modifier.weight(1f), height = 44.dp)
-                OutlinedToolButton("删除全部", onDelete, Modifier.weight(1f), height = 44.dp)
+                OutlinedToolButton(stringResource(R.string.action_view), onOpen, Modifier.weight(1f), height = 44.dp)
+                OutlinedToolButton(stringResource(R.string.action_share), onShare, Modifier.weight(1f), height = 44.dp)
+                OutlinedToolButton(stringResource(R.string.log_delete_all), onDelete, Modifier.weight(1f), height = 44.dp)
             }
         }
     }
@@ -467,11 +470,10 @@ private fun ControlCard(
 ) {
     DroidCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Text("诊断日志", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.log_control_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
             Text(
-                "记录引擎加载、提示词长度、首 token 延迟、生成 token 数与异常堆栈。" +
-                    "捕获最近 2000 条，超出后自动丢弃最旧的记录。",
+                stringResource(R.string.log_control_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -481,17 +483,17 @@ private fun ControlCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("开启记录", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.log_enable), style = MaterialTheme.typography.bodyMedium)
                 androidx.compose.material3.Switch(checked = enabled, onCheckedChange = onToggle)
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Text(
-                "已捕获 $count 条",
+                stringResource(R.string.log_captured_count, count),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "复现步骤：开启记录 → 回到聊天页复现 → 返回这里点「分享日志」",
+                stringResource(R.string.log_steps),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -506,17 +508,17 @@ private fun ControlCard(
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedToolButton("分享日志", onShare, Modifier.weight(1f), enabled = count > 0, height = 44.dp)
-                OutlinedToolButton("复制", onCopy, Modifier.weight(1f), enabled = count > 0, height = 44.dp)
+                OutlinedToolButton(stringResource(R.string.log_share), onShare, Modifier.weight(1f), enabled = count > 0, height = 44.dp)
+                OutlinedToolButton(stringResource(R.string.action_copy), onCopy, Modifier.weight(1f), enabled = count > 0, height = 44.dp)
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedToolButton("全屏查看", onOpenDetail, Modifier.weight(1f), enabled = count > 0, height = 44.dp)
-                OutlinedToolButton("清空", onClear, Modifier.weight(1f), enabled = count > 0, height = 44.dp)
+                OutlinedToolButton(stringResource(R.string.log_fullscreen), onOpenDetail, Modifier.weight(1f), enabled = count > 0, height = 44.dp)
+                OutlinedToolButton(stringResource(R.string.action_clear), onClear, Modifier.weight(1f), enabled = count > 0, height = 44.dp)
             }
             Spacer(Modifier.height(8.dp))
             OutlinedToolButton(
-                if (capturing) "抓取中…" else "抓取引擎日志",
+                if (capturing) stringResource(R.string.log_capturing) else stringResource(R.string.log_capture),
                 onCaptureEngine,
                 Modifier.fillMaxWidth(),
                 enabled = !capturing,
@@ -524,15 +526,14 @@ private fun ControlCard(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "读取本进程 logcat，取到引擎 native 内部输出（MNN / llama.cpp / Genie / LiteRT）。" +
-                    "分享时会自动附带最近一次结果。",
+                stringResource(R.string.log_capture_desc),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (engineLog != null) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "引擎日志已抓取（${engineLog.length / 1024} KB）· 点击查看",
+                    stringResource(R.string.log_engine_captured, engineLog.length / 1024),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
@@ -594,7 +595,7 @@ private fun MonospaceTextDialog(title: String, text: String, onDismiss: () -> Un
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) { Text("关闭") }
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
         },
         title = { Text(title) },
         text = {

@@ -1,5 +1,7 @@
 package io.github.pisces312.droidllm.benchmark
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.pisces312.droidllm.common.bench.BenchmarkDao
 import io.github.pisces312.droidllm.common.bench.BenchmarkRunEntity
 import io.github.pisces312.droidllm.common.bench.SessionRegistry
@@ -46,6 +48,7 @@ class BenchmarkRunner @Inject constructor(
     private val deviceProbe: DeviceProbe,
     private val sessionRegistry: SessionRegistry,
     private val dao: BenchmarkDao,
+    @param:ApplicationContext private val appContext: Context,
 ) {
 
     suspend fun run(
@@ -56,7 +59,7 @@ class BenchmarkRunner @Inject constructor(
         val probe = deviceProbe.probe()
         val timestampMs = System.currentTimeMillis()
         val runId = UUID.randomUUID().toString()
-        onProgress(BenchProgress.Starting("准备中：卸载已有模型…"))
+        onProgress(BenchProgress.Starting(appContext.getString(R.string.bench_runner_preparing)))
 
         awaitIfPaused()
         sessionRegistry.unloadAll()

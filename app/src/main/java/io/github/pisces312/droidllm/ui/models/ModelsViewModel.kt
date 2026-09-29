@@ -1,5 +1,7 @@
 package io.github.pisces312.droidllm.ui.models
 
+import io.github.pisces312.droidllm.R
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -65,13 +67,28 @@ class ModelsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
-    private val downloader = ModelDownloader()
+    private val downloader = ModelDownloader(context)
 
     val models: StateFlow<List<LocalModel>> = modelStore.observeModels()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _message = MutableStateFlow("")
     val message: StateFlow<String> = _message.asStateFlow()
+
+    /**
+     * Whether [message] is a failure rather than a confirmation.
+     *
+     * Replaces the old `message.startsWith("校验失败")` test in the UI, which
+     * silently stopped matching the moment the messages became translatable.
+     */
+    private val _messageIsError = MutableStateFlow(false)
+    val messageIsError: StateFlow<Boolean> = _messageIsError.asStateFlow()
+
+    /** The one writer: every banner on this page goes through it. */
+    private fun show(text: String, isError: Boolean = false) {
+        _message.value = text
+        _messageIsError.value = isError
+    }
 
     /** Set after a scan that added or removed registrations; cleared on dismiss. */
     private val _scanChanges = MutableStateFlow<ScanChanges?>(null)
@@ -158,9 +175,9 @@ class ModelsViewModel @Inject constructor(
             val changes = ScanChanges(added = added, removed = removed)
             if (!changes.isEmpty) {
                 _scanChanges.value = changes
-                _message.value = "扫描完成：+${added.size} / -${removed.size}"
+                _message.value = context.getString(R.string.models_scan_done, added.size, removed.size)
             } else if (!quiet) {
-                _message.value = "扫描完成，没有变化"
+                _message.value = context.getString(R.string.models_scan_no_change)
             }
         }
     }
@@ -209,7 +226,7 @@ class ModelsViewModel @Inject constructor(
         val source = _source.value
         if (model.repoPath(source) == null) {
             val family = if (source.isHuggingFace) "HuggingFace" else "ModelScope"
-            _message.value = "「${model.name}」暂无 $family 源，请切换服务器"
+            show(context.getString(R.string.models_no_source, model.name, family), isError = true)
             return
         }
         val hfHost = _hfHost.value
@@ -222,12 +239,12 @@ class ModelsViewModel @Inject constructor(
                 val chatable = model.tags.none { it == "ImageGen" || it == "AudioGen" }
                 if (chatable) {
                     registerDownloaded(model)
-                    _message.value = "已下载并注册到模型列表：${model.name}\n$out"
+                    _message.value = context.getString(R.string.models_download_registered, model.name, out)
                 } else {
-                    _message.value = "已下载：${model.name}（非对话模型，未自动加入列表）\n$out"
+                    _message.value = context.getString(R.string.models_downloaded_non_chat, model.name, out)
                 }
             }.onFailure {
-                _message.value = "下载失败：${it.message}"
+                show(context.getString(R.string.models_download_failed, it.message), isError = true)
             }
         }
     }
@@ -242,11 +259,11 @@ class ModelsViewModel @Inject constructor(
      * when the root does not already hold that entry (see `docs/MODEL_PATHS.md`).
      */
     fun engineFormatHint(engineId: EngineId): String = when (engineId) {
-        EngineId.LITERT -> "单文件 *.task / *.litertlm（任意路径均可注册）"
-        EngineId.MNN -> "模型目录（config.json + *.mnn）（任意路径均可注册）"
-        EngineId.GENIE -> "模型目录（genie_config.json + *.bin + tokenizer.json）（任意路径均可注册）"
-        EngineId.LLAMACPP -> "单文件 *.gguf（任意路径均可注册）"
-        EngineId.FAKE -> "任意"
+        EngineId.LITERT -> context.getString(R.string.models_format_litert)
+        EngineId.MNN -> context.getString(R.string.models_format_mnn)
+        EngineId.GENIE -> context.getString(R.string.models_format_genie)
+        EngineId.LLAMACPP -> context.getString(R.string.models_format_llamacpp)
+        EngineId.FAKE -> context.getString(R.string.common_any)
     }
 
     /**
@@ -261,30 +278,30 @@ class ModelsViewModel @Inject constructor(
         val name = displayName.trim()
         val raw = path.trim()
         if (name.isEmpty() || raw.isEmpty()) {
-            _message.value = "显示名和路径不能为空"
+            show(context.getString(R.string.models_error_name_path_empty), isError = true)
             return false
         }
         val file = File(raw)
         if (!file.exists()) {
-            _message.value = "路径不存在：$raw；检查是否已授权存储或路径拼写"
+            show(context.getString(R.string.models_error_path_missing, raw), isError = true)
             return false
         }
         val result = FileFormatValidator.validatePath(engineId, file)
         if (result is ValidationResult.Failed) {
-            _message.value = "格式校验失败：${result.reason}"
+            show(context.getString(R.string.models_error_format, result.reason), isError = true)
             return false
         }
         val existing = models.value.firstOrNull { m ->
             (m.location as? ModelLocation.FilePath)?.path == file.absolutePath
         }
         if (existing != null) {
-            _message.value = "该路径已在模型列表中：${existing.displayName}"
+            show(context.getString(R.string.models_error_path_registered, existing.displayName), isError = true)
             return false
         }
         viewModelScope.launch {
             val (finalPath, note) = relocateCatalogMatch(engineId, file)
             upsertModel(engineId, name, finalPath)
-            _message.value = "已注册：$name（$note）"
+            _message.value = context.getString(R.string.models_registered, name, note)
             _pendingPath.value = ""
         }
         return true
@@ -299,28 +316,28 @@ class ModelsViewModel @Inject constructor(
         val abs = file.absolutePath
         val root = File(modelRoot())
         if (ModelRootMigrator.isSameOrNested(file, root)) {
-            return abs to "原路径 $abs"
+            return abs to context.getString(R.string.models_note_original_path, abs)
         }
         val catalog = matchImported(
             models = _catalog.value.models,
             engineName = engineId.name,
             name = file.name,
-        ) ?: return abs to "原路径 $abs"
+        ) ?: return abs to context.getString(R.string.models_note_original_path, abs)
         // Root already holds a copy → leave the import alone, register as-is.
         if (findModelDir(catalog, root) != null) {
-            return abs to "原路径 $abs（根目录已有市场副本，未移动）"
+            return abs to context.getString(R.string.models_note_root_has_copy, abs)
         }
         val dest = File(root, catalog.canonicalRelPath())
         if (dest.exists()) {
-            return abs to "原路径 $abs（目标已存在，未移动）"
+            return abs to context.getString(R.string.models_note_target_exists, abs)
         }
         val ok = withContext(Dispatchers.IO) {
             ModelRootMigrator.moveItem(file, dest)
         }
         return if (ok) {
-            dest.absolutePath to "已移入 ${catalog.canonicalRelPath()}"
+            dest.absolutePath to context.getString(R.string.models_note_moved, catalog.canonicalRelPath())
         } else {
-            abs to "原路径 $abs（移入模型根目录失败）"
+            abs to context.getString(R.string.models_note_move_failed, abs)
         }
     }
 
@@ -343,7 +360,7 @@ class ModelsViewModel @Inject constructor(
             val file = _localPaths.value[model.id]?.let(::File)?.takeIf { it.exists() }
                 ?: findModelDir(model, File(modelRoot()))
             if (file == null || !file.exists()) {
-                _message.value = "本地不存在：${model.name}"
+                show(context.getString(R.string.models_error_local_missing, model.name), isError = true)
                 return@launch
             }
             val path = file.absolutePath
@@ -351,7 +368,7 @@ class ModelsViewModel @Inject constructor(
                 (m.location as? ModelLocation.FilePath)?.path == path
             }
             if (existing != null) {
-                _message.value = "已在模型列表中：${existing.displayName}"
+                show(context.getString(R.string.models_error_already_in_list, existing.displayName), isError = true)
                 return@launch
             }
             register(
@@ -365,18 +382,23 @@ class ModelsViewModel @Inject constructor(
     fun validate(modelId: String) {
         viewModelScope.launch {
             val model = models.value.firstOrNull { it.id == modelId } ?: return@launch
-            _message.value = when (val r = FileFormatValidator.validate(model.engineId, model.location)) {
-                is ValidationResult.Ok -> "校验通过：${model.displayName}"
-                is ValidationResult.Failed -> "校验失败：${r.reason}"
-                ValidationResult.Unknown -> "无法校验（SAF/私有路径）：${model.displayName}"
-            }
+            val r = FileFormatValidator.validate(model.engineId, model.location)
+            show(
+                text = when (r) {
+                    is ValidationResult.Ok -> context.getString(R.string.models_validate_ok, model.displayName)
+                    is ValidationResult.Failed -> context.getString(R.string.models_validate_failed, r.reason)
+                    ValidationResult.Unknown ->
+                        context.getString(R.string.models_validate_unknown, model.displayName)
+                },
+                isError = r is ValidationResult.Failed,
+            )
         }
     }
 
     fun delete(modelId: String) {
         viewModelScope.launch {
             modelStore.delete(modelId)
-            _message.value = "已删除"
+            _message.value = context.getString(R.string.models_deleted)
         }
     }
 
@@ -384,22 +406,22 @@ class ModelsViewModel @Inject constructor(
         val name = displayName.trim()
         val newPath = path.trim()
         if (name.isEmpty() || newPath.isEmpty()) {
-            _message.value = "显示名和路径不能为空"
+            show(context.getString(R.string.models_error_name_path_empty), isError = true)
             return
         }
         val current = models.value.firstOrNull { it.id == modelId }
         if (current == null) {
-            _message.value = "模型不存在"
+            show(context.getString(R.string.models_error_not_found), isError = true)
             return
         }
         val file = File(newPath)
         if (!file.exists()) {
-            _message.value = "路径不存在：$newPath；检查是否已授权存储或路径拼写"
+            show(context.getString(R.string.models_error_path_missing, newPath), isError = true)
             return
         }
         val result = FileFormatValidator.validatePath(current.engineId, file)
         if (result is ValidationResult.Failed) {
-            _message.value = "格式校验失败：${result.reason}"
+            show(context.getString(R.string.models_error_format, result.reason), isError = true)
             return
         }
         viewModelScope.launch {
@@ -410,7 +432,7 @@ class ModelsViewModel @Inject constructor(
                     fileSizeBytes = if (file.isFile) file.length() else current.fileSizeBytes,
                 ),
             )
-            _message.value = "已更新：$name"
+            _message.value = context.getString(R.string.models_updated, name)
         }
     }
 

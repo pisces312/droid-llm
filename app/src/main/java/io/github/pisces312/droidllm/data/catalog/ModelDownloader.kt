@@ -1,5 +1,8 @@
 package io.github.pisces312.droidllm.data.catalog
 
+import io.github.pisces312.droidllm.R
+
+import android.content.Context
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -29,7 +32,7 @@ data class DownloadState(
  * Minimal HF / ModelScope downloader (no hub cache layout).
  * Files land directly under the shared model root, matching [CatalogModel.localPath].
  */
-class ModelDownloader {
+class ModelDownloader(private val context: Context) {
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -56,21 +59,21 @@ class ModelDownloader {
     ): Result<File> = withContext(Dispatchers.IO) {
         val key = model.id
         if (activeId != null) {
-            return@withContext Result.failure(IllegalStateException("已有下载任务进行中"))
+            return@withContext Result.failure(IllegalStateException(context.getString(R.string.downloader_busy)))
         }
         activeId = key
-        update(key, DownloadStatus.DOWNLOADING, 0f, "准备中")
+        update(key, DownloadStatus.DOWNLOADING, 0f, context.getString(R.string.downloader_preparing))
         try {
             val repo = model.repoPath(source)
-                ?: return@withContext fail(key, "当前源无此模型").let { Result.failure(it) }
+                ?: return@withContext fail(key, context.getString(R.string.downloader_no_source)).let { Result.failure(it) }
             val out = when (model.kind) {
                 "repo", "mnn_repo" -> downloadRepo(model, source, repo, root, hfHost)
                 else -> downloadSingle(model, source, repo, root, hfHost)
             }
-            update(key, DownloadStatus.SUCCESS, 1f, "完成")
+            update(key, DownloadStatus.SUCCESS, 1f, context.getString(R.string.common_done))
             Result.success(out)
         } catch (e: Exception) {
-            update(key, DownloadStatus.FAILED, 0f, e.message ?: "下载失败")
+            update(key, DownloadStatus.FAILED, 0f, e.message ?: context.getString(R.string.downloader_failed))
             Result.failure(e)
         } finally {
             activeId = null
@@ -107,13 +110,13 @@ class ModelDownloader {
         val dir = File(root, model.downloadRelPath(source))
         dir.mkdirs()
         val files = listRepoFiles(source, repo, hfHost)
-        if (files.isEmpty()) throw IllegalStateException("仓库文件列表为空")
+        if (files.isEmpty()) throw IllegalStateException(context.getString(R.string.downloader_empty_repo))
         files.forEachIndexed { index, path ->
             val out = File(dir, path)
             out.parentFile?.mkdirs()
             fetchToFile(resolveFileUrl(source, repo, path, hfHost), out, model.id)
             val progress = (index + 1).toFloat() / files.size
-            update(model.id, DownloadStatus.DOWNLOADING, progress, "下载 ${index + 1}/${files.size}")
+            update(model.id, DownloadStatus.DOWNLOADING, progress, context.getString(R.string.downloader_progress, index + 1, files.size))
         }
         return dir
     }
@@ -187,7 +190,7 @@ class ModelDownloader {
                             if (now - lastUpdateMs >= 200 || saved == total) {
                                 lastUpdateMs = now
                                 val p = (saved.toFloat() / total).coerceIn(0f, 1f)
-                                update(id, DownloadStatus.DOWNLOADING, p, "下载 ${out.name}")
+                                update(id, DownloadStatus.DOWNLOADING, p, context.getString(R.string.downloader_file, out.name))
                             }
                         }
                     }

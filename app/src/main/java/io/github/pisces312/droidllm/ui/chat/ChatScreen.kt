@@ -1,5 +1,8 @@
 package io.github.pisces312.droidllm.ui.chat
 
+import androidx.compose.ui.res.stringResource
+import io.github.pisces312.droidllm.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -64,6 +67,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextAlign
@@ -198,8 +202,8 @@ fun ChatScreen(
                 if (messages.isEmpty()) {
                     EmptyState(
                         icon = Icons.Filled.Folder,
-                        text = "先在「模型」页添加模型，再回到这里启动它",
-                        actionLabel = "去「模型」页",
+                        text = stringResource(R.string.chat_empty_text),
+                        actionLabel = stringResource(R.string.action_go_models_page),
                         onAction = onGoToModels,
                         modifier = Modifier.align(Alignment.Center),
                     )
@@ -220,7 +224,7 @@ fun ChatScreen(
                                 .align(Alignment.BottomEnd)
                                 .padding(8.dp),
                         ) {
-                            Icon(Icons.Filled.ArrowDownward, contentDescription = "回到底部")
+                            Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.chat_scroll_bottom))
                         }
                     }
                 }
@@ -295,7 +299,7 @@ private fun ScopeBar(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(DroidTheme.extra.surfaceHigh)
-            .clickable(onClickLabel = "选择引擎与模型", onClick = onClick)
+            .clickable(onClickLabel = stringResource(R.string.chat_pick_scope), onClick = onClick)
             .padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -303,7 +307,7 @@ private fun ScopeBar(
         // Filled dot = this model is loaded; ring = usable but idle (UI_DESIGN §7.2).
         StatusDot(dot, solid = inUse)
         Text(
-            engine?.displayName ?: "选择引擎",
+            engine?.displayName ?: stringResource(R.string.chat_pick_engine),
             style = MaterialTheme.typography.titleSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -314,7 +318,7 @@ private fun ScopeBar(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            model?.displayName ?: "未选择模型",
+            model?.displayName ?: stringResource(R.string.chat_no_model),
             style = MaterialTheme.typography.bodyMedium,
             color = if (model == null) {
                 MaterialTheme.colorScheme.onSurfaceVariant
@@ -357,6 +361,7 @@ private fun ScopeDropdown(
     onDismiss: () -> Unit,
 ) {
     val density = LocalDensity.current
+    val context = LocalContext.current
     Popup(
         alignment = Alignment.TopStart,
         offset = IntOffset(0, anchorHeightPx),
@@ -377,8 +382,8 @@ private fun ScopeDropdown(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 SheetTitle(
-                    text = "选择引擎与模型",
-                    subtitle = "切换会释放当前已加载的模型；加载仍由「启动」触发。",
+                    text = stringResource(R.string.chat_pick_scope),
+                    subtitle = stringResource(R.string.chat_pick_scope_subtitle),
                 )
                 Spacer(Modifier.height(12.dp))
                 ChoiceChipRow(
@@ -394,7 +399,7 @@ private fun ScopeDropdown(
                     },
                     onSelected = onEngine,
                 )
-                selectedEngine?.unavailableReason()?.let { reason ->
+                selectedEngine?.unavailableReason(context)?.let { reason ->
                     Spacer(Modifier.height(6.dp))
                     Text(
                         reason,
@@ -406,14 +411,14 @@ private fun ScopeDropdown(
                 HorizontalDivider()
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    selectedEngine?.let { "${it.displayName} 的已配置模型" } ?: "先选择一个引擎",
+                    selectedEngine?.let { stringResource(R.string.chat_configured_models_of, it.displayName) } ?: stringResource(R.string.chat_pick_engine_first),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(4.dp))
                 if (models.isEmpty()) {
                     Text(
-                        "该引擎还没有模型，先到「模型」页添加或下载。",
+                        stringResource(R.string.chat_engine_no_models),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 12.dp),
@@ -472,7 +477,7 @@ private fun ScopeModelRow(model: ModelChoice, selected: Boolean, onClick: () -> 
         if (selected) {
             Icon(
                 Icons.Filled.Check,
-                contentDescription = "当前使用",
+                contentDescription = stringResource(R.string.chat_current_model),
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
@@ -500,7 +505,7 @@ private fun StatusLine(
             onStop = onStop,
         )
         IconButton(onClick = onNewSession) {
-            Icon(Icons.Filled.Add, contentDescription = "新建会话（清空上下文）")
+            Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.chat_new_session))
         }
     }
 }
@@ -539,7 +544,7 @@ private fun LoadingOverlay(modelName: String?) {
                     strokeWidth = 3.dp,
                 )
                 Text(
-                    "正在加载模型…",
+                    stringResource(R.string.chat_loading_model),
                     style = MaterialTheme.typography.titleSmall,
                 )
                 modelName?.let {
@@ -551,7 +556,7 @@ private fun LoadingOverlay(modelName: String?) {
                     )
                 }
                 Text(
-                    "首次加载需数十秒，请勿离开此页",
+                    stringResource(R.string.chat_loading_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -577,15 +582,15 @@ private fun SessionToggleButton(
     onStop: () -> Unit,
 ) {
     when (state) {
-        SessionState.READY -> OutlinedToolButton("停止", onClick = onStop, height = 40.dp)
+        SessionState.READY -> OutlinedToolButton(stringResource(R.string.action_stop), onClick = onStop, height = 40.dp)
         SessionState.LOADING -> PrimaryButton(
-            text = "加载中",
+            text = stringResource(R.string.chat_loading),
             onClick = {},
             enabled = false,
             height = 40.dp,
         )
         SessionState.IDLE, SessionState.FAILED -> PrimaryButton(
-            text = if (state == SessionState.FAILED) "重试" else "启动",
+            text = if (state == SessionState.FAILED) stringResource(R.string.action_retry) else stringResource(R.string.chat_start),
             onClick = onStart,
             enabled = canStart,
             height = 40.dp,
@@ -612,7 +617,7 @@ private fun MessageBubble(msg: ChatUiMessage) {
                 .padding(12.dp),
         ) {
             Text(
-                if (isUser) "你" else "助手",
+                if (isUser) stringResource(R.string.chat_role_user) else stringResource(R.string.chat_role_assistant),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -686,6 +691,7 @@ private fun SamplingSheet(
     onClearOverrides: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -697,12 +703,11 @@ private fun SamplingSheet(
                 .padding(horizontal = 16.dp),
         ) {
             SheetTitle(
-                text = "采样参数",
+                text = stringResource(R.string.chat_sampling_title),
                 subtitle = if (modelName == null) {
-                    "默认值来自本引擎的出厂设置（可见「设置」页）；灰显字段当前引擎不生效。"
+                    stringResource(R.string.chat_sampling_subtitle_no_model)
                 } else {
-                    "默认值来自本引擎的出厂设置（可见「设置」页）。点「仅本模型」让 $modelName 单独" +
-                        "覆盖并保存；不点的改动只在本次会话内生效。"
+                    stringResource(R.string.chat_sampling_subtitle_model, modelName)
                 },
             )
             Spacer(Modifier.height(12.dp))
@@ -715,7 +720,7 @@ private fun SamplingSheet(
                 value = sampling.temperature.toString(),
                 decimal = true,
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TEMPERATURE),
-                note = id?.let { ConfigApplicability.note(it, ConfigField.TEMPERATURE) },
+                note = id?.let { ConfigApplicability.note(context, it, ConfigField.TEMPERATURE) },
                 pinned = ParamsField.TEMPERATURE in pinned,
                 pinEnabled = pinEnabled,
                 onTogglePin = { on ->
@@ -738,7 +743,7 @@ private fun SamplingSheet(
                 label = "top_k",
                 value = sampling.topK.toString(),
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TOP_K),
-                note = id?.let { ConfigApplicability.note(it, ConfigField.TOP_K) },
+                note = id?.let { ConfigApplicability.note(context, it, ConfigField.TOP_K) },
                 pinned = ParamsField.TOP_K in pinned,
                 pinEnabled = pinEnabled,
                 onTogglePin = { on ->
@@ -762,7 +767,7 @@ private fun SamplingSheet(
                 value = sampling.topP.toString(),
                 decimal = true,
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.TOP_P),
-                note = id?.let { ConfigApplicability.note(it, ConfigField.TOP_P) },
+                note = id?.let { ConfigApplicability.note(context, it, ConfigField.TOP_P) },
                 pinned = ParamsField.TOP_P in pinned,
                 pinEnabled = pinEnabled,
                 onTogglePin = { on ->
@@ -785,7 +790,7 @@ private fun SamplingSheet(
                 label = "threads",
                 value = sampling.threads.toString(),
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.THREADS),
-                note = id?.let { ConfigApplicability.note(it, ConfigField.THREADS) },
+                note = id?.let { ConfigApplicability.note(context, it, ConfigField.THREADS) },
                 pinned = ParamsField.THREADS in pinned,
                 pinEnabled = pinEnabled,
                 onTogglePin = { on ->
@@ -808,7 +813,7 @@ private fun SamplingSheet(
                 label = "maxNewTokens",
                 value = sampling.maxNewTokens.toString(),
                 enabled = id == null || ConfigApplicability.isApplicable(id, ConfigField.MAX_NEW_TOKENS),
-                note = id?.let { ConfigApplicability.note(it, ConfigField.MAX_NEW_TOKENS) },
+                note = id?.let { ConfigApplicability.note(context, it, ConfigField.MAX_NEW_TOKENS) },
                 pinned = ParamsField.MAX_NEW_TOKENS in pinned,
                 pinEnabled = pinEnabled,
                 onTogglePin = { on ->
@@ -849,14 +854,14 @@ private fun SamplingSheet(
             if (sampling.hasOverrides && modelName != null) {
                 Spacer(Modifier.height(12.dp))
                 OutlinedToolButton(
-                    "清除 $modelName 的全部单项覆盖",
+                    stringResource(R.string.chat_clear_overrides, modelName),
                     onClick = onClearOverrides,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
             Spacer(Modifier.height(16.dp))
             PrimaryButton(
-                text = "完成",
+                text = stringResource(R.string.common_done),
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -900,14 +905,14 @@ private fun PinRow(pinned: Boolean, enabled: Boolean, onToggle: (Boolean) -> Uni
     ) {
         if (pinned) {
             Text(
-                "已覆盖引擎默认",
+                stringResource(R.string.chat_override_pinned),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
         }
         Spacer(Modifier.weight(1f))
         OutlinedToolButton(
-            text = if (pinned) "取消覆盖" else "仅本模型",
+            text = if (pinned) stringResource(R.string.chat_unpin) else stringResource(R.string.chat_pin_this_model),
             onClick = { onToggle(!pinned) },
         )
     }
@@ -922,8 +927,9 @@ private fun BackendField(
     onTogglePin: (Boolean) -> Unit = {},
     onSelect: (Backend) -> Unit,
 ) {
+    val context = LocalContext.current
     val supported = engineId?.let { ConfigApplicability.supportedBackends(it) } ?: Backend.entries
-    val note = engineId?.let { ConfigApplicability.backendNote(it) }
+    val note = engineId?.let { ConfigApplicability.backendNote(context, it) }
     Column {
         Spacer(Modifier.height(8.dp))
         LabeledDropdown(
@@ -1017,7 +1023,7 @@ private fun Composer(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text(if (canSend || generating) "输入消息…" else "启动模型后可发送消息") },
+                placeholder = { Text(if (canSend || generating) stringResource(R.string.chat_input_placeholder) else stringResource(R.string.chat_input_placeholder_disabled)) },
                 maxLines = 4,
             )
             if (generating) {
@@ -1025,7 +1031,7 @@ private fun Composer(
                     onClick = onStop,
                     modifier = Modifier.size(44.dp),
                 ) {
-                    Icon(Icons.Filled.Stop, contentDescription = "停止生成")
+                    Icon(Icons.Filled.Stop, contentDescription = stringResource(R.string.chat_stop_generating))
                 }
             } else {
                 FilledIconButton(
@@ -1039,7 +1045,7 @@ private fun Composer(
                     enabled = canSend,
                     modifier = Modifier.size(44.dp),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "发送")
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.chat_send))
                 }
             }
         }

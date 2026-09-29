@@ -1,20 +1,31 @@
 package io.github.pisces312.droidllm.benchmark
 
 import io.github.pisces312.droidllm.common.settings.DEFAULT_SYSTEM_PROMPT
+import io.github.pisces312.droidllm.benchmark.R
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.engineapi.LocalModel
 
-/** Built-in benchmark case ids (DESIGN.md §2.2). */
-enum class BenchCaseId(val label: String) {
-    LOAD("L 加载"),
-    PREFILL("P Prefill"),
-    DECODE("D Decode"),
-    SUSTAIN("T 持续TPS"),
+/**
+ * Built-in benchmark case ids (DESIGN.md §2.2).
+ *
+ * [labelRes] is a string resource rather than a literal: the ids are stable
+ * (they are persisted with every run), the chip label is not.
+ */
+enum class BenchCaseId(val labelRes: Int) {
+    LOAD(R.string.bench_case_load),
+    PREFILL(R.string.bench_case_prefill),
+    DECODE(R.string.bench_case_decode),
+    SUSTAIN(R.string.bench_case_sustain),
 }
 
 data class BenchPrompt(
     val id: String,
-    val label: String,
+    /** Chip label; a resource so the prompt text itself stays language-fixed. */
+    val labelRes: Int,
+    /**
+     * The text actually sent to the model. Deliberately **not** translated: a
+     * benchmark is only comparable if every run feeds the same prompt.
+     */
     val text: String,
 )
 

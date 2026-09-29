@@ -1,5 +1,8 @@
 package io.github.pisces312.droidllm.ui.models
 
+import androidx.compose.ui.res.stringResource
+import io.github.pisces312.droidllm.R
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -78,13 +81,13 @@ private fun CopyPathButton(text: String) {
         onClick = {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.setPrimaryClip(ClipData.newPlainText("path", text))
-            Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.common_copied), Toast.LENGTH_SHORT).show()
         },
         modifier = Modifier.size(32.dp),
     ) {
         Icon(
             Icons.Filled.ContentCopy,
-            contentDescription = "复制路径",
+            contentDescription = stringResource(R.string.models_copy_path),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(16.dp),
         )
@@ -95,6 +98,7 @@ private fun CopyPathButton(text: String) {
 fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
     val models by vm.models.collectAsState()
     val message by vm.message.collectAsState()
+    val messageIsError by vm.messageIsError.collectAsState()
     val pendingPath by vm.pendingPath.collectAsState()
     val modelRoot by vm.root.collectAsState()
     val scanChanges by vm.scanChanges.collectAsState()
@@ -114,12 +118,12 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "模型管理",
+                stringResource(R.string.models_title),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f),
             )
             IconButton(onClick = { showRegisterSheet = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "注册外部模型")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.models_register_external))
             }
             IconButton(
                 onClick = {
@@ -128,14 +132,14 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
             ) {
                 Icon(
                     Icons.Filled.Refresh,
-                    contentDescription = if (tab == 0) "扫描模型根目录" else "刷新下载状态",
+                    contentDescription = if (tab == 0) stringResource(R.string.models_scan_root) else stringResource(R.string.models_refresh_downloads),
                 )
             }
         }
         val rootPath = modelRoot.ifEmpty { vm.modelRoot() }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "共享模型根目录：$rootPath",
+                stringResource(R.string.models_shared_root, rootPath),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
@@ -145,8 +149,8 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
         Spacer(Modifier.height(8.dp))
 
         TabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("已注册") })
-            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("模型市场") })
+            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.models_tab_registered)) })
+            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.models_tab_market)) })
         }
         Spacer(Modifier.height(8.dp))
 
@@ -154,10 +158,7 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
             Text(
                 message,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (message.startsWith("校验失败") || message.startsWith("格式") ||
-                    message.startsWith("路径") || message.startsWith("显示名") ||
-                    message.startsWith("下载失败")
-                ) {
+                color = if (messageIsError) {
                     MaterialTheme.colorScheme.error
                 } else {
                     MaterialTheme.colorScheme.onSurface
@@ -247,7 +248,7 @@ private fun ScanChangesDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(12.dp),
-        title = { Text("模型列表已更新") },
+        title = { Text(stringResource(R.string.models_scan_title)) },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
@@ -255,7 +256,7 @@ private fun ScanChangesDialog(
             ) {
                 if (changes.added.isNotEmpty()) {
                     Text(
-                        "新注册 ${changes.added.size} 个：",
+                        stringResource(R.string.models_scan_added, changes.added.size),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -265,7 +266,7 @@ private fun ScanChangesDialog(
                 }
                 if (changes.removed.isNotEmpty()) {
                     Text(
-                        "移除失效 ${changes.removed.size} 个：",
+                        stringResource(R.string.models_scan_removed, changes.removed.size),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -274,14 +275,14 @@ private fun ScanChangesDialog(
                     }
                 }
                 Text(
-                    "「移除失效」= 原路径下文件已不存在，仅从列表注销，不删磁盘文件。",
+                    stringResource(R.string.models_scan_note),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("知道了") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_got_it)) }
         },
     )
 }
@@ -314,7 +315,7 @@ private fun LocalModelsTab(
             selected = engineFilter,
             label = { id ->
                 val count = if (id == null) models.size else models.count { it.engineId == id }
-                if (id == null) "全部 · $count" else "${id.displayName} · $count"
+                if (id == null) stringResource(R.string.models_filter_all_count, count) else "${id.displayName} · $count"
             },
             onSelected = onEngineFilter,
         )
@@ -323,8 +324,8 @@ private fun LocalModelsTab(
         if (models.isEmpty()) {
             EmptyState(
                 icon = Icons.Filled.Folder,
-                text = "还没有模型。可从模型市场下载，或点右上角 ＋ 注册本地文件（保留原路径）。",
-                actionLabel = "浏览模型市场",
+                text = stringResource(R.string.models_empty_text),
+                actionLabel = stringResource(R.string.models_browse_market),
                 onAction = onGoToMarket,
             )
             return@Column
@@ -332,8 +333,11 @@ private fun LocalModelsTab(
         if (filtered.isEmpty()) {
             EmptyState(
                 icon = Icons.Filled.Folder,
-                text = "「${engineFilter?.displayName ?: ""}」下暂无已注册模型。",
-                actionLabel = "显示全部",
+                text = stringResource(
+                    R.string.models_empty_filtered,
+                    engineFilter?.displayName.orEmpty(),
+                ),
+                actionLabel = stringResource(R.string.action_show_all),
                 onAction = { onEngineFilter(null) },
             )
             return@Column
@@ -368,12 +372,12 @@ private fun LocalModelsTab(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedToolButton(
-                                "校验",
+                                stringResource(R.string.models_validate),
                                 onClick = { onValidate(model.id) },
                                 modifier = Modifier.weight(1f),
                             )
                             OutlinedToolButton(
-                                "删除",
+                                stringResource(R.string.action_delete),
                                 onClick = { onDelete(model.id) },
                                 modifier = Modifier.weight(1f),
                             )
@@ -416,8 +420,8 @@ private fun RegisterModelSheet(
                 .padding(bottom = 24.dp),
         ) {
             SheetTitle(
-                text = "注册外部模型",
-                subtitle = "只登记、不搬文件；市场下载的模型才放在模型根目录下。",
+                text = stringResource(R.string.models_register_external),
+                subtitle = stringResource(R.string.models_register_subtitle),
             )
             Spacer(Modifier.height(12.dp))
             ChoiceChipRow(
@@ -428,7 +432,7 @@ private fun RegisterModelSheet(
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "格式：$formatHint",
+                stringResource(R.string.models_format_line, formatHint),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -436,30 +440,29 @@ private fun RegisterModelSheet(
             OutlinedTextField(
                 value = displayName,
                 onValueChange = onDisplayName,
-                label = { Text("显示名") },
+                label = { Text(stringResource(R.string.models_display_name)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = pendingPath,
                 onValueChange = onPendingPath,
-                label = { Text("模型文件或目录绝对路径") },
+                label = { Text(stringResource(R.string.models_path_label)) },
                 trailingIcon = {
                     IconButton(onClick = onBrowse) {
-                        Icon(Icons.Filled.Folder, contentDescription = "浏览…")
+                        Icon(Icons.Filled.Folder, contentDescription = stringResource(R.string.models_browse))
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
             PrimaryButton(
-                text = "注册模型（保留原路径）",
+                text = stringResource(R.string.models_register_action),
                 onClick = onAdd,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "市场下载（HF/魔塔）统一放在「$modelRoot」下 `{hf|modelscope}/models--org--repo/snapshots/`。" +
-                    "四种引擎格式互不通用。",
+                stringResource(R.string.models_register_note, modelRoot),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -500,7 +503,7 @@ private fun MarketTab(vm: ModelsViewModel) {
             selected = engineFilter,
             label = { id ->
                 if (id == null) {
-                    "全部引擎"
+                    stringResource(R.string.models_all_engines)
                 } else {
                     val count = catalog.models.count { engineIdFromStorage(it.engine) == id }
                     "${id.displayName} · $count"
@@ -514,18 +517,16 @@ private fun MarketTab(vm: ModelsViewModel) {
             selected = downloadFilter,
             label = { f ->
                 when (f) {
-                    DownloadFilter.ALL -> "全部"
-                    DownloadFilter.DOWNLOADED -> "已下载"
-                    DownloadFilter.NOT_DOWNLOADED -> "未下载"
+                    DownloadFilter.ALL -> stringResource(R.string.models_filter_all)
+                    DownloadFilter.DOWNLOADED -> stringResource(R.string.models_filter_downloaded)
+                    DownloadFilter.NOT_DOWNLOADED -> stringResource(R.string.models_filter_not_downloaded)
                 }
             },
             onSelected = { vm.setDownloadFilter(it) },
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "HF 下载地址取自设置（当前 $hfHost，默认镜像 hf-mirror.com），ModelScope = modelscope.cn。" +
-                "下载统一存 `{hf|modelscope}/models--org--repo/snapshots/`（MnnLlmChat 同款）。" +
-                "刷新下载状态见右上角。",
+            stringResource(R.string.models_market_note, hfHost),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -588,13 +589,13 @@ private fun MarketTab(vm: ModelsViewModel) {
                             // "wall of purple" UI_DESIGN 4.4 forbids.
                             if (row.downloaded) {
                                 OutlinedToolButton(
-                                    "已下载 · 注册",
+                                    stringResource(R.string.models_action_register_downloaded),
                                     onClick = { vm.registerDownloaded(row.model) },
                                     modifier = Modifier.weight(1f),
                                 )
                             } else {
                                 OutlinedToolButton(
-                                    "下载",
+                                    stringResource(R.string.action_download),
                                     onClick = { vm.download(row.model) },
                                     modifier = Modifier.weight(1f),
                                 )

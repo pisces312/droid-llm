@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="applicability_backend_genie">Genie 仅支持 NPU/HTP</string>
+    <string name="applicability_backend_litert">LiteRT 不支持 OPENCL</string>
+    <string name="applicability_generic">此引擎不支持该参数</string>
+    <string name="applicability_seed">此引擎不支持固定随机种子</string>
+    <string name="applicability_thinking">此引擎不支持 Thinking 开关</string>
+    <string name="applicability_threads_genie">Genie 走 HTP，线程数不适用</string>
+    <string name="applicability_threads_litert">LiteRT 自管线程池，此参数不生效</string>
+    <string name="applicability_threads_other">此引擎不支持线程数</string>
+</resources>

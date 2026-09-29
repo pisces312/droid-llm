@@ -151,17 +151,21 @@ class GenieEngine @Inject constructor(
     override suspend fun probe(probeContext: ProbeContext): Availability {
         if (!ensureNative()) {
             return Availability.MissingDependency(
-                "libgenie_chat_jni.so / libGenie.so 未打包（QAIRT 未配置或 droid.skipGenie=true）",
+                context.getString(R.string.genie_native_missing),
             )
         }
         val soc = probeContext.socModel ?: "unknown"
         if (soc !in GenieConfigResolver.SOC_TO_HTP) {
             return Availability.UnsupportedSoc(
-                "Genie 仅支持骁龙 HTP，当前 SoC=$soc；支持: ${configResolver.supportedSocs().joinToString()}",
+                context.getString(
+                    R.string.genie_unsupported_soc,
+                    soc,
+                    configResolver.supportedSocs().joinToString(),
+                ),
             )
         }
         if (configResolver.resolveHtpConfigPath() == null) {
-            return Availability.MissingDependency("HTP config 缺失或复制失败")
+            return Availability.MissingDependency(context.getString(R.string.genie_htp_config_missing))
         }
         return Availability.Available
     }
@@ -174,18 +178,18 @@ class GenieEngine @Inject constructor(
         when (config.backend) {
             Backend.NPU_HTP, Backend.AUTO -> Unit
             else -> throw EngineException.UnsupportedBackend(
-                "Genie 仅支持 HTP；got ${config.backend}",
+                context.getString(R.string.genie_backend_unsupported, config.backend),
             )
         }
 
         val path = resolveModelPath(model)
         val dir = File(path)
         configResolver.validateModelDir(dir)?.let { reason ->
-            throw EngineException.LoadFailed("Genie 模型无效: $reason")
+            throw EngineException.LoadFailed(context.getString(R.string.genie_model_invalid, reason))
         }
         val htpConfig = configResolver.resolveHtpConfigPath()
             ?: throw EngineException.LoadFailed(
-                "当前设备无 HTP 配置（SoC=${configResolver.supportedSocs()}）",
+                context.getString(R.string.genie_no_htp_config, configResolver.supportedSocs()),
             )
 
         val overrides = GenieConfigResolver.ConfigOverrides(
@@ -198,7 +202,10 @@ class GenieEngine @Inject constructor(
         val configJson = try {
             configResolver.buildResolvedConfig(dir, htpConfig, overrides)
         } catch (t: Throwable) {
-            throw EngineException.LoadFailed("genie_config.json 解析失败: ${t.message}", t)
+            throw EngineException.LoadFailed(
+                context.getString(R.string.genie_config_parse_failed, t.message),
+                t,
+            )
         }
 
         val start = System.nanoTime()
@@ -295,9 +302,9 @@ class GenieEngine @Inject constructor(
                 if (!produced) {
                     val status = metricsOut[1].toInt()
                     val reason = when (status) {
-                        1 -> "Genie 返回空回复（已 reset+重试 $attempts 次）"
-                        2 -> "GenieDialog_query 失败"
-                        else -> "Genie 未产生任何 token"
+                        1 -> context.getString(R.string.genie_empty_reply, attempts)
+                        2 -> context.getString(R.string.genie_query_failed)
+                        else -> context.getString(R.string.genie_no_token)
                     }
                     throw EngineException.GenerateFailed(reason)
                 }
@@ -312,8 +319,12 @@ class GenieEngine @Inject constructor(
                     rssMbPeak = rssPeakRef[0],
                     effectiveConfig = request.config,
                     warnings = warningsFor(request.config) +
-                        "Genie 流式回调为文本片段，generatedTokens≈回调次数" +
-                        if (attempts > 1) "空回复后 reset+重试×${attempts - 1}" else "",
+                        context.getString(R.string.genie_stream_note) +
+                        if (attempts > 1) {
+                            context.getString(R.string.genie_retry_note, attempts - 1)
+                        } else {
+                            ""
+                        },
                 )
                 session.metrics = metrics
                 session.fedMessages = request.messages

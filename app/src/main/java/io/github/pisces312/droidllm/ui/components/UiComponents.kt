@@ -1,5 +1,8 @@
 package io.github.pisces312.droidllm.ui.components
 
+import androidx.compose.ui.res.stringResource
+import io.github.pisces312.droidllm.R
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -112,7 +115,8 @@ fun StatusDot(
 fun <T> ChoiceChipRow(
     options: List<T>,
     selected: T?,
-    label: (T) -> String,
+    /** Runs inside the chip's composable scope, so it may call `stringResource`. */
+    label: @Composable (T) -> String,
     onSelected: (T) -> Unit,
     modifier: Modifier = Modifier,
     dimmed: (T) -> Boolean = { false },
@@ -218,7 +222,7 @@ fun LabeledDropdown(
     onSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    emptyText: String = "暂无模型，先到「模型」页添加",
+    emptyText: String = stringResource(R.string.picker_empty_no_model),
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selectedLabel = options.firstOrNull { it.first == selectedKey }?.second
@@ -508,7 +512,7 @@ fun ProgressHeader(
             if (paused) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "已暂停（暂停区间不计时）",
+                    stringResource(R.string.common_paused_note),
                     style = MaterialTheme.typography.labelMedium,
                     color = extra.warn,
                 )
@@ -516,10 +520,10 @@ fun ProgressHeader(
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (paused) {
-                    PrimaryButton("继续", onClick = { onResume?.invoke() }, modifier = Modifier.weight(1f))
-                    OutlinedToolButton("放弃本次评测", onClick = { onAbandon?.invoke() }, modifier = Modifier.weight(1f))
+                    PrimaryButton(stringResource(R.string.action_resume), onClick = { onResume?.invoke() }, modifier = Modifier.weight(1f))
+                    OutlinedToolButton(stringResource(R.string.bench_abandon), onClick = { onAbandon?.invoke() }, modifier = Modifier.weight(1f))
                 } else if (onCancel != null) {
-                    OutlinedToolButton("取消", onClick = onCancel, modifier = Modifier.weight(1f))
+                    OutlinedToolButton(stringResource(R.string.action_cancel), onClick = onCancel, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -644,7 +648,7 @@ fun WarningBanner(
         )
         if (onDismiss != null) {
             TextButton(onClick = onDismiss) {
-                Text("关闭", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.action_close), style = MaterialTheme.typography.labelMedium)
             }
         }
     }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="applicability_backend_genie">Genie supports NPU/HTP only</string>
+    <string name="applicability_backend_litert">LiteRT does not support OPENCL</string>
+    <string name="applicability_generic">This engine ignores this parameter</string>
+    <string name="applicability_seed">This engine has no fixed random seed</string>
+    <string name="applicability_thinking">This engine has no Thinking switch</string>
+    <string name="applicability_threads_genie">Genie runs on HTP; thread count does not apply</string>
+    <string name="applicability_threads_litert">LiteRT manages its own thread pool; this has no effect</string>
+    <string name="applicability_threads_other">This engine does not expose a thread count</string>
+</resources>

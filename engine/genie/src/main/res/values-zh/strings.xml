@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chinese. Genie engine module. -->
+<resources>
+    <string name="genie_native_missing">libgenie_chat_jni.so / libGenie.so 未打包（QAIRT 未配置或 droid.skipGenie=true）</string>
+    <string name="genie_unsupported_soc">Genie 仅支持骁龙 HTP，当前 SoC=%1$s；支持: %2$s</string>
+    <string name="genie_htp_config_missing">HTP config 缺失或复制失败</string>
+    <string name="genie_backend_unsupported">Genie 仅支持 HTP；got %1$s</string>
+    <string name="genie_model_invalid">Genie 模型无效: %1$s</string>
+    <string name="genie_no_htp_config">当前设备无 HTP 配置（SoC=%1$s）</string>
+    <string name="genie_config_parse_failed">genie_config.json 解析失败: %1$s</string>
+    <string name="genie_empty_reply">Genie 返回空回复（已 reset+重试 %1$d 次）</string>
+    <string name="genie_query_failed">GenieDialog_query 失败</string>
+    <string name="genie_no_token">Genie 未产生任何 token</string>
+    <string name="genie_stream_note">Genie 流式回调为文本片段，generatedTokens≈回调次数</string>
+    <string name="genie_retry_note">空回复后 reset+重试×%1$d</string>
+    <string name="genie_model_dir_missing">模型目录不存在: %1$s</string>
+    <string name="genie_missing_config">缺少 genie_config.json</string>
+    <string name="genie_missing_tokenizer">缺少 tokenizer.json</string>
+    <string name="genie_missing_bin">缺少 *.bin 上下文二进制</string>
+</resources>

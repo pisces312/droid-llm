@@ -1012,7 +1012,30 @@ R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑
 
 ---
 
-## 9. 执行者注意事项（坑位速查）
+## 9. P8：中英双语（i18n）与首个正式版（2026-09-30，✅ 构建/单测通过；真机切换待测）
+
+### 需求
+1. 界面支持中英文双语，设置里加语言选项
+2. 出正式版 APK，用环境变量签名，不泄露口令
+
+### 交付
+- 语言三态（跟随系统 / 简体中文 / English）落 DataStore，设置页新增「语言」分组
+- 全量抽取：413 处硬编码中文 → 376 条唯一文案，分布见 [`docs/I18N.md`](docs/I18N.md)
+  （`app` 359 / `core:benchmark` 9 / `core:engine-api` 8 / `engine:genie` 16）
+- `values/` = 英文兜底，`values-zh/` = 简体中文；库模块各带一份 `res/`（看不到 app 的 `R`）
+- 顺带修掉一处脆弱判定：`message.startsWith("校验失败")` → ViewModel 显式下发 `messageIsError`
+- 正式版签名：`dist/droidllm-0.1.0-P0-release.apk`（versionCode 1 / `0.1.0-P0`），
+  `apksigner verify` 通过，证书 `CN=pisces312`
+
+### 验收
+- `:app:assembleDebug` ✅ / `:app:assembleRelease` ✅（2m）
+- `:core:engine-api:testDebugUnitTest` + `:core:common:testDebugUnitTest` + `:core:benchmark:testDebugUnitTest` ✅
+- `aapt2 dump configurations` 含 `zh` ✅
+- **真机切换待测**：本次 `adb devices` 为空（无线 adb 未连），未做界面验证
+
+---
+
+## 10. 执行者注意事项（坑位速查）
 
 1. **GitHub 直连不稳**：submodule/大文件优先 `gh-proxy.com` 镜像；失败重试前先 `rm -rf` 残留目录
 2. **符号冲突是头号风险**：每接入一个引擎立刻跑共存 smoke test，不要攒到 P3
