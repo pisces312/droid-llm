@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.pisces312.droidllm.engineapi.EngineId
 import io.github.pisces312.droidllm.ui.components.OutlinedToolButton
 import io.github.pisces312.droidllm.ui.components.PrimaryButton
@@ -126,6 +127,11 @@ object FileBrowserRules {
  * Built-in path browser (UI_DESIGN §5.2 / DESIGN §1.3).
  * java.io.File semantics; MANAGE_EXTERNAL_STORAGE for broad access.
  * Unauthorized → app-private only + guide. Other apps' Android/data/ greyed out.
+ *
+ * @param startDir first directory to open; falls back to [FileBrowserRules.rootDirs]
+ *   when missing. Callers should pass the configured model root so registration
+ *   browsing starts where the user keeps models.
+ * @param modelRoot when set and readable, shows a shortcut that jumps back here.
  */
 @Composable
 fun FileBrowserDialog(
@@ -133,6 +139,7 @@ fun FileBrowserDialog(
     onPick: (File) -> Unit,
     onDismiss: () -> Unit,
     startDir: File? = null,
+    modelRoot: File? = null,
 ) {
     val context = LocalContext.current
     var current by remember {
@@ -154,19 +161,19 @@ fun FileBrowserDialog(
             Column(Modifier.fillMaxWidth().height(420.dp)) {
                 Text(
                     FileBrowserRules.engineFilterHint(engineId),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     current.absolutePath,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                 )
                 if (!authorized) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "未授予「所有文件访问」权限，仅可浏览 App 私有目录。",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = DroidTheme.extra.warn,
                     )
                     TextButton(onClick = {
@@ -196,14 +203,14 @@ fun FileBrowserDialog(
                         ) {
                             Text(
                                 entry.label,
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
                                 color = if (blocked) DroidTheme.extra.textDisabled
                                 else MaterialTheme.colorScheme.onSurface,
                             )
                             if (entry.hint != null) {
                                 Text(
                                     entry.hint,
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = DroidTheme.extra.textDisabled,
                                 )
                             }
@@ -215,6 +222,10 @@ fun FileBrowserDialog(
                         val parent = current.parentFile
                         if (parent != null) current = parent
                     }) { Text("上级") }
+                    val shortcutRoot = modelRoot?.takeIf { it.isDirectory && it.canRead() }
+                    if (shortcutRoot != null && shortcutRoot.absolutePath != current.absolutePath) {
+                        TextButton(onClick = { current = shortcutRoot }) { Text("模型根目录") }
+                    }
                     if (FileBrowserRules.matchesEngine(engineId, current) &&
                         !FileBrowserRules.isBlocked(current.absolutePath, current.canRead(), context.packageName)
                     ) {

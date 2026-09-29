@@ -209,11 +209,15 @@ fun ModelsScreen(vm: ModelsViewModel = hiltViewModel()) {
     }
 
     if (showBrowser) {
+        // Registration keeps the file in place (原路径注册), but models live under
+        // the shared root — open there instead of engineDir, which may not exist yet.
+        val modelRootDir = remember(modelRoot) {
+            java.io.File(modelRoot.ifEmpty { vm.modelRoot() })
+        }
         FileBrowserDialog(
             engineId = engineId,
-            startDir = runCatching {
-                java.io.File(vm.engineDir(engineId))
-            }.getOrNull()?.takeIf { it.isDirectory },
+            startDir = modelRootDir,
+            modelRoot = modelRootDir,
             onPick = { file ->
                 vm.setPendingPath(file.absolutePath)
                 if (displayName.isBlank()) displayName = file.nameWithoutExtension

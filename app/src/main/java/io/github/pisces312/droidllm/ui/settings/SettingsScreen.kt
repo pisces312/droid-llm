@@ -1002,9 +1002,11 @@ fun SettingsScreen(
     }
 
     if (showBrowser) {
+        val modelRootDir = File(vm.modelRoot())
         FileBrowserDialog(
             engineId = EngineId.FAKE,
-            startDir = File(vm.modelRoot()),
+            startDir = modelRootDir,
+            modelRoot = modelRootDir,
             onPick = { file ->
                 showBrowser = false
                 if (file.isDirectory) {
