@@ -1,7 +1,7 @@
 # 模型下载与存放设计（MODEL_PATHS）
 
 > 本文是**模型下载、目录布局、导入迁移**的权威说明。路径契约摘要见 `DESIGN.md` §1.3（仅入口）。
-> 引擎格式与导出见 `docs/ENGINE_INTEGRATION.md`。App **不要求**「同一基座 × 四份导出」：每个引擎独立配置自己的模型文件/目录。
+> 引擎格式与导出见 `docs/ENGINE_INTEGRATION.md`（Genie 目录细节与 skel 排障见 `docs/genie.md`）。App **不要求**「同一基座 × 四份导出」：每个引擎独立配置自己的模型文件/目录。
 
 ## 1. 模型根目录
 

@@ -1,8 +1,10 @@
 package io.github.pisces312.droidllm.engine.genie
 
+import android.content.Context
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import io.github.pisces312.droidllm.chattemplate.ChatTemplate
@@ -52,6 +54,7 @@ import kotlinx.coroutines.launch
  */
 @Singleton
 class GenieEngine @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val configResolver: GenieConfigResolver,
 ) : LlmEngine {
 
@@ -127,9 +130,15 @@ class GenieEngine @Inject constructor(
     @Volatile
     private var nativeReady: Boolean? = null
 
+    /**
+     * Also installs the QNN/adsprpc library search path — must happen before
+     * `libgenie_chat_jni.so` (and with it libGenie / libQnnHtp) is loaded, hence
+     * ahead of the first [GenieNative] touch. See [QnnEnv].
+     */
     private fun ensureNative(): Boolean {
         nativeReady?.let { return it }
         return try {
+            QnnEnv.ensure(context.applicationInfo.nativeLibraryDir)
             GenieNative.nativeVersion()
             nativeReady = true
             true

@@ -134,6 +134,10 @@ val copyQnnJniLibs = tasks.register<Copy>("copyQnnJniLibs") {
             "libQnnHtpPrepare.so",
             "libQnnSystem.so",
             "libQnnSaver.so",
+            // Required: without it Genie logs "Failure in initializing backend extensions",
+            // then null-derefs inside GenieDialog_create. Verified on BKQ-AN80 / SM8850 /
+            // Android 17 with QAIRT 2.50.0.260828 (genie-t2t-run: SIGSEGV without, EXIT=0 with).
+            "libQnnHtpNetRunExtensions.so",
             "libQnnHtpV*Stub.so",
         )
         exclude("libQnnHtpV*CalculatorStub.so")

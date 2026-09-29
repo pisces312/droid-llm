@@ -9,7 +9,7 @@
 | `DESIGN.md` | 设计决策唯一权威。与实施计划冲突时以 DESIGN.md 为准 |
 | `UI_DESIGN.md` | 界面与交互权威（StreamClip + PixelPlayerOSS token） |
 | `IMPLEMENTATION.md` | 可执行实施计划、阶段进度、DoD 清单。每阶段完成后更新 |
-| `docs/<engine>.md` | **单引擎笔记**（现有 `docs/mnn.md`、`docs/llamacpp.md`、`docs/litert.md`）：该引擎专属的坑、实测结论、计时字段、调试手法 |
+| `docs/<engine>.md` | **单引擎笔记**（现有 `docs/mnn.md`、`docs/llamacpp.md`、`docs/litert.md`、`docs/genie.md`）：该引擎专属的坑、实测结论、计时字段、调试手法 |
 | `docs/mnn-pc-regression.md` | MNN PC 端回归：共享 core + `mnn_host_test`、模型落盘、Windows MNN host 构建、日常回归环 |
 | `docs/llamacpp-decode-repro.md` | llama.cpp arm64 独立 decode 回归 CLI（`tools/llama_decode_repro`），native 重构后先跑 |
 | `docs/DIAGNOSTICS.md` | 诊断日志与崩溃收集：用户侧流程、模块地图、设计决策、10 条实测坑、回归清单。**改诊断日志前必读** |
@@ -86,7 +86,7 @@ cmd /c "set JAVA_HOME=D:\dev\AndroidStudio\jbr&& set ANDROID_HOME=D:\dev\android
 ```
 
 - **QNN HTP arch 默认裁剪**：非 release variant **只打 v81**（dev 机 SM8850，见
-  `docs/ENGINE_INTEGRATION.md` Genie 小节的 SoC→dsp_arch 表），release variant 保留 SDK 全部
+  `docs/genie.md` §3 的 SoC→dsp_arch 表），release variant 保留 SDK 全部
   arch（GitHub Release 用）。覆盖：`-Pdroid.qnnHtpVersions=all` 或 `-Pdroid.qnnHtpVersions=79,81`。
 - 目标 ABI 仅 `arm64-v8a`，单 APK 全打，不做 Dynamic Feature。
 - debug：`io.github.pisces312.droidllm.debug` / 名称 `droid-llm debug`；release：`io.github.pisces312.droidllm` / 名称 `droid-llm`，可同机安装。
@@ -158,3 +158,13 @@ third_party/llama.cpp    vendored 源码树
   中心约为 x = 135 / 405 / 675 / 945、y ≈ 2093。
 - UI 断言用 `uiautomator dump` + `adb shell cat //sdcard/x.xml`（**不要 `adb pull`**，
   Git Bash 会把路径解析成 `D:/dev/git/sdcard/...`）。
+- **改 `packaging.jniLibs.useLegacyPackaging` 会静默弄坏 Genie**：它必须是 `true`（⇒ manifest
+  `extractNativeLibs=true`），HTP 的 skel 才会落成 `nativeLibraryDir` 下的真实文件；
+  改成 `false` 后 `GenieDialog_create` 会在 ~300 ms 后失败，**日志里只有一句 `GenieDialog_create failed`**。
+  详见 `docs/genie.md` §4.4（硬约束 2）。
+- **`libQnnHtpNetRunExtensions.so` 必须打进 APK**（QAIRT `lib/aarch64-android/`）：缺它时 Genie 只 warn
+  （`Failure in initializing backend extensions`）然后**段错误** —— `GenieDialog_create` 内 null deref，
+  线程是 QNN 自己的 `DefaultDispatch`，而且**早于模型加载**、app 日志里没有任何线索。
+  从 `engine/genie/build.gradle.kts` 的 `copyQnnJniLibs` include 列表里删掉它会立刻复发。
+  排查这类问题用 `$QAIRT_PATH/bin/aarch64-android/{qnn-platform-validator,genie-t2t-run}`
+  （**完整配方见 `docs/genie.md` §9**；先跑它再看 app 日志，顺序反了查不出来）。

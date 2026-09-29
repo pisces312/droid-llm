@@ -57,7 +57,7 @@ $env:ANDROID_HOME = "D:\dev\android_sdk"
 
 - arm64-v8a only，单 APK，无 Dynamic Feature
 - debug：`io.github.pisces312.droidllm.debug` / 名称 `droid-llm debug`；release：`io.github.pisces312.droidllm` / 名称 `droid-llm`，可同机安装
-- QAIRT：`QAIRT_PATH=D:\dev\qairt\2.50.0.260828`（见 `docs/ENGINE_INTEGRATION.md`）
+- QAIRT：`QAIRT_PATH=D:\dev\qairt\2.50.0.260828`（见 `docs/genie.md`）
 - 工具链：AGP 8.13.2 / Kotlin 2.2.21 + KSP 2.3.6 / Compose BOM 2025.05.00
 
 ## 文档

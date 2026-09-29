@@ -1,6 +1,8 @@
 # 引擎集成说明（ENGINE_INTEGRATION）
 
-> 本文说明四个端侧引擎的**依赖获取、编译开关、模型导出格式**。架构契约见 `DESIGN.md`，模型目录见 `MODEL_PATHS.md`。
+> 本文说明四个端侧引擎的**依赖获取、编译开关、模型导出格式**，并作为跨引擎通用信息（Backend 契约、符号冲突、计时口径、采样层次、诊断日志、许可）的归口。
+> **逐引擎的坑与实测结论在 `docs/<engine>.md`**：`docs/mnn.md`、`docs/llamacpp.md`、`docs/litert.md`、`docs/genie.md`。
+> 架构契约见 `DESIGN.md`，模型目录见 `MODEL_PATHS.md`。
 
 ## 总览
 
@@ -84,34 +86,9 @@ MnnLlmChat 之所以不空，是因为它**无条件注入**了一条 system。�
 
 ## 3. Genie / QNN（Qualcomm）
 
-- **依赖**：QAIRT SDK **2.50.0.260828**（与 local-dream 一致）。路径解析顺序：
-  1. Gradle `-Pdroid.qairtSdkRoot=...`
-  2. env `QAIRT_PATH`
-  3. env `QAIRT_SDK_ROOT`
-  4. 默认 `D:/dev/qairt/2.50.0.260828`
-- **编译开关**：
-  - `-Pdroid.skipGenie=true` 或 `-PskipGenie=true`：跳过 so 打包；Kotlin 仍编译，`probe()` → `MissingDependency`，UI 灰显
-  - QAIRT 路径无效时自动跳过并 warn
-- **模型导出**（目录型）：
-  ```
-  qwen1.5b-genie/
-  ├── genie_config.json
-  ├── tokenizer.json
-  ├── *.bin            # HTP context binary（一个或多个）
-  └── metadata.json    # 可选：genie.chat_template 角色前后缀
-  ```
-  导出工具：Qualcomm AI Hub / `qnn-*` 转换脚本（见 `D:\3rd-party-projects\ai-hub-apps\chatapp_android`）。
-- **SoC 限制**：仅骁龙 HTP。非骁龙 `probe()` → `UnsupportedSoc`，UI 灰显不崩
-- **SoC → dsp_arch**（QAIRT SDK 支持表，非 chatapp 表 —— 两者对 SM8850 不一致）：
-  | SoC | soc_id | HTP arch | htp_config asset |
-  |-----|--------|----------|------------------|
-  | SM8850 (8 Elite Gen 5) | 87 | V81 | `qualcomm-snapdragon-8-elite-gen5.json` |
-  | SM8750 (8 Elite) | 69 | V79 | `qualcomm-snapdragon-8-elite.json` |
-  | SM8650 (8 Gen 3) | 57 | V75 | `qualcomm-snapdragon-8-gen3.json` |
-  | SM8550 (8 Gen 2) | 43 | V73 | `qualcomm-snapdragon-8-gen2.json` |
-- **APK 只打一个 arch**：非 release variant 默认只保留 `libQnnHtpV81{Skel,Stub}.so`（dev 机 SM8850）；release variant 保留 SDK 全部 arch 供 GitHub Release。覆盖：`-Pdroid.qnnHtpVersions=all|79,81`
-- **已知偏差**：`threads` / `seed` 不适用；`backend` 仅 `NPU_HTP` / `AUTO`
-- **Jinja/minja**：未做 JNI。走 `metadata.json` 角色标签 + `ChatTemplate.format` fallback（与 chatapp 一致）
+> **完整版见 `docs/genie.md`** —— QAIRT 路径解析与编译开关、jniLibs 布局、模型目录格式、
+> SoC→dsp_arch 表与 arch 裁剪、**HTP skel / `ADSP_LIBRARY_PATH` 排障**（`GenieDialog_create failed` 的根因）、
+> 已知偏差、模板与诊断日志都在那里。本节只保留入口。
 
 ## 4. llama.cpp
 
