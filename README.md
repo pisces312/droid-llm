@@ -60,6 +60,21 @@ $env:ANDROID_HOME = "D:\dev\android_sdk"
 - QAIRT：`QAIRT_PATH=D:\dev\qairt\2.50.0.260828`（见 `docs/genie.md`）
 - 工具链：AGP 8.13.2 / Kotlin 2.2.21 + KSP 2.3.6 / Compose BOM 2025.05.00
 
+## 参考项目（上游）
+
+四个引擎各自的原项目与参考实现：
+
+| 引擎 | 上游项目 | GitHub | 参考内容 |
+|------|----------|--------|----------|
+| LiteRT | LiteRT-LM | https://github.com/google-ai-edge/LiteRT-LM | 推理框架本体（`litertlm-android` AAR 闭源） |
+| LiteRT | Google AI Edge Gallery | https://github.com/google-ai-edge/gallery | LiteRT-LM 接入、模型 allowlist / HF 下载 URL、`LlmChatModelHelper` |
+| MNN | MNN | https://github.com/alibaba/MNN | 引擎本体（预编译 `libMNN.so`，`MNN_BUILD_LLM=ON`）；参考实现 `apps/Android/MnnLlmChat`（模型市场、HF/ModelScope 双源、目录扫描） |
+| Genie (QNN) | AI Hub Apps | https://github.com/qualcomm/ai-hub-apps | `chatapp_android`：`genie_config.json` 解析、prompt tags、QAIRT 打包布局（Genie SDK 本体闭源，需遵守 Qualcomm 条款） |
+| llama.cpp | llama.cpp | https://github.com/ggml-org/llama.cpp | 已 **vendored** 到 `third_party/llama.cpp/`（非 submodule） |
+| llama.cpp | ChatterUI | https://github.com/Vali-98/ChatterUI | Android 端集成方式与 GGUF 模型管理 |
+
+引擎专属结论与踩坑见 `docs/<engine>.md`；依赖获取、编译开关、许可摘要见 `docs/ENGINE_INTEGRATION.md`。
+
 ## 文档
 
 | 文档 | 内容 |
