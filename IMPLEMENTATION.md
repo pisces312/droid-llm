@@ -1012,7 +1012,7 @@ R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑
 
 ---
 
-## 9. P8：中英双语（i18n）与首个正式版（2026-09-30，✅ 构建/单测通过；真机切换待测）
+## 9. P8：中英双语（i18n）与首个正式版（2026-09-30，✅ 构建/单测/真机手测均通过）
 
 ### 需求
 1. 界面支持中英文双语，设置里加语言选项
@@ -1031,7 +1031,8 @@ R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑
 - `:app:assembleDebug` ✅ / `:app:assembleRelease` ✅（2m）
 - `:core:engine-api:testDebugUnitTest` + `:core:common:testDebugUnitTest` + `:core:benchmark:testDebugUnitTest` ✅
 - `aapt2 dump configurations` 含 `zh` ✅
-- **真机切换待测**：本次 `adb devices` 为空（无线 adb 未连），未做界面验证
+- **真机切换**：当时 `adb devices` 为空（无线 adb 未连），该阶段未做界面验证；
+  最终结论见本节末尾「机制推翻 + 导航死循环修复」的验收清单
 
 ### 审阅后修复（2026-09-30）
 - `AppLocale`：`SYSTEM` 时恢复设备 `LocaleList`（原先 `LocaleList.setDefault` 会卡在 EN/ZH）
@@ -1073,7 +1074,10 @@ PSS 239MB→287MB 涨到 OOM 被杀。次生伤害：起点被改后 `popUpTo("c
 - 构建/测试：`:app:assembleDebug` ✅、`:app:assembleDebugAndroidTest` ✅、
   `:app:connectedDebugAndroidTest`（NavigationRecreateTest 2/2 ✅）、
   `:core:engine-api` / `:core:common` 单测 ✅
-- **未做**：真机验收（`adb devices` 无真机）；`ChatUiPersist` 的存在理由存疑但未实测（见 `docs/I18N.md` 已知残留）
+- **真机验收 ✅**：用户手测确认切语言 + 标签往返无异常（收尾时真机已从 adb 断开，
+  未采集机型/系统版本）
+- **仍开放**：`ChatUiPersist` 的存在理由存疑但未实测（见 `docs/I18N.md` 已知残留）；
+  `AppLanguageController.migrateLegacy` 的迁移路径未实测（需构造旧 DataStore 值）
 
 ---
 
