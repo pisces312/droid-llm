@@ -23,7 +23,7 @@ MnnLlmChat 的对照给出一个高价值结论：**"引擎+模型合并成一�
 
 ## 1. 审查范围与方法
 
-- 通读 `UI_DESIGN.md`、全部 UI 源码（5 个 Screen + `FileBrowser` + `UiComponents` + `theme`）、`docs/screenshots/` 四张真机截图。
+- 通读 `UI_DESIGN.md`、全部 UI 源码（5 个 Screen + `FileBrowser` + `UiComponents` + `theme`）、以及当时 `docs/screenshots/` 下的 4 张截图（模拟器 FakeEngine 占位图，已在 0.1.0 发布时清出仓库）。
 - 交叉核对引擎契约（`core/engine-api/.../LlmEngine.kt`），确认 UI 建议不破坏 `DESIGN.md` §1.2。
 - 对照阅读本机 MnnLlmChat 源码（`D:\3rd-party-projects\MNN\apps\Android\MnnLlmChat`），逐条给出"可借鉴 / 不可借鉴"。
 
