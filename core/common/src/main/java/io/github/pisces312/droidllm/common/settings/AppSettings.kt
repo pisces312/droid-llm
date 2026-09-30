@@ -30,15 +30,16 @@ enum class ThemeMode {
  * In-app UI language (设置 → 语言).
  *
  * The app ships `values/` (English, the fallback for every other locale) and
- * `values-zh/` (Chinese). [SYSTEM] means "no app-specific locale", which is what
- * `AppCompatDelegate.setApplicationLocales` needs in order to follow the device:
- * an empty `LocaleListCompat`, not a locale list built from `Locale.getDefault()`.
+ * `values-zh/` (Chinese). [SYSTEM] means "no app-specific locale": the app locale list
+ * is left **empty**, so the device language wins (including later changes to it). An
+ * empty list is deliberately not built from `Locale.getDefault()` — that would freeze
+ * whatever the device happened to be at first launch.
  *
- * The choice is mirrored into DataStore because the UI needs the three-state value
- * back (`getApplicationLocales()` cannot distinguish "user picked English" from
- * "device is English"), and because it is applied from [Application.onCreate] on
- * every process start — AppCompat's own storage would not know the difference
- * between SYSTEM and an explicit pick either.
+ * The applied value is not stored in this module: it belongs to `AppCompatDelegate`
+ * (see `app/AppLanguageController`), which persists it, reapplies it before the first
+ * frame on cold start and, on Android 13+, exposes it as a real system setting. What
+ * lives here is only the three-state shape the settings UI needs — an applied locale
+ * alone cannot distinguish "user picked English" from "device is English".
  */
 enum class AppLanguage {
     SYSTEM,
@@ -46,7 +47,7 @@ enum class AppLanguage {
     EN,
     ;
 
-    /** BCP-47 tag applied through `AppCompatDelegate`, or null for [SYSTEM]. */
+    /** BCP-47 tag; null for [SYSTEM], which is applied as an *empty* locale list. */
     val tag: String?
         get() = when (this) {
             SYSTEM -> null
@@ -85,8 +86,15 @@ const val DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
  */
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    /** UI language. SYSTEM follows the device; see [AppLanguage]. */
-    val language: AppLanguage = AppLanguage.SYSTEM,
+    /**
+     * Legacy slot for the UI language: **no longer applied and no longer written.**
+     *
+     * The language moved to `AppCompatDelegate` (`app/AppLanguageController`), which
+     * owns it end to end. This key is still read — exactly once — by that controller's
+     * migration, so a selection made before the move carries over to the new mechanism.
+     * Remove the field, the DataStore key and the migration after one release.
+     */
+    val legacyLanguage: AppLanguage = AppLanguage.SYSTEM,
     /** false = single-model residency: switch unloads the previous session (DESIGN §3.3). */
     val multiModelResidency: Boolean = false,
     /**
@@ -116,7 +124,6 @@ interface AppSettingsStore {
     fun observe(): Flow<AppSettings>
     suspend fun current(): AppSettings
     suspend fun setThemeMode(mode: ThemeMode)
-    suspend fun setLanguage(language: AppLanguage)
     suspend fun setMultiModelResidency(enabled: Boolean)
     suspend fun setModelRoot(path: String?)
     suspend fun setStorageGuideSeen(seen: Boolean)
@@ -145,7 +152,9 @@ class DataStoreAppSettingsStore @Inject constructor(
 
     private object Keys {
         val themeMode = stringPreferencesKey("theme_mode")
-        val language = stringPreferencesKey("app_language")
+        // Read-only as of the AppCompat app-locale move: the key is still read into
+        // AppSettings.legacyLanguage for the one-time migration, never written.
+        val legacyLanguage = stringPreferencesKey("app_language")
         val multiResidency = booleanPreferencesKey("multi_model_residency")
         val modelRoot = stringPreferencesKey("model_root_path")
         val storageGuideSeen = booleanPreferencesKey("storage_guide_seen")
@@ -162,7 +171,7 @@ class DataStoreAppSettingsStore @Inject constructor(
     override fun observe(): Flow<AppSettings> = context.appSettingsDataStore.data.map { prefs ->
         AppSettings(
             themeMode = ThemeMode.from(prefs[Keys.themeMode]),
-            language = AppLanguage.from(prefs[Keys.language]),
+            legacyLanguage = AppLanguage.from(prefs[Keys.legacyLanguage]),
             multiModelResidency = prefs[Keys.multiResidency] ?: false,
             modelRootPath = prefs[Keys.modelRoot]?.takeIf { it.isNotBlank() },
             storageGuideSeen = prefs[Keys.storageGuideSeen] ?: false,
@@ -176,10 +185,6 @@ class DataStoreAppSettingsStore @Inject constructor(
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         context.appSettingsDataStore.edit { it[Keys.themeMode] = mode.name }
-    }
-
-    override suspend fun setLanguage(language: AppLanguage) {
-        context.appSettingsDataStore.edit { it[Keys.language] = language.name }
     }
 
     override suspend fun setMultiModelResidency(enabled: Boolean) {

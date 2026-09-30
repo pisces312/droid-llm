@@ -1033,6 +1033,48 @@ R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑
 - `aapt2 dump configurations` 含 `zh` ✅
 - **真机切换待测**：本次 `adb devices` 为空（无线 adb 未连），未做界面验证
 
+### 审阅后修复（2026-09-30）
+- `AppLocale`：`SYSTEM` 时恢复设备 `LocaleList`（原先 `LocaleList.setDefault` 会卡在 EN/ZH）
+- 新增 `ChatUiPersist`：`recreate()` 换语言不再丢聊天记录/会话句柄
+- `docs/I18N.md` §2 机制描述改回与代码一致（Application **不** wrap；切换走 `recreate()` 而非重指 `LocalContext`）
+- 中文占位符 `%s`→`%d` 与英文对齐（25 条）；英文 UI「Chinese」→「Chinese (Simplified)」
+- 补 `AppLanguageTest`
+
+### 机制推翻 + 导航死循环修复（2026-09-30，本条推翻了上一节）
+上一节给 `AppLocale` 打的补丁整体作废 —— 语言改回官方 AppCompat app-locale 机制。
+
+**故障**：UI 为英文时点「模型」标签，画面持续闪烁，来回切几次应用退出。
+**根因**：为「跨 `recreate()` 记住当前 tab」引入的 `object UiRoute`，被当作
+`NavHost(startDestination = UiRoute.current)` 传入。该参数是 NavHost 内部
+`remember(route, startDestination, builder)` 的 key，而实现体里直接 `navController.graph = graph`
+→ 值一变就重建 NavGraph、拆掉回退栈、重启过渡动画，重启又触发下一轮重组：
+**每帧循环、永不收敛**。实测空闲 4s 内 +26 帧（健康态 0）、每 4s 5~7 次 ~25MB GC、
+PSS 239MB→287MB 涨到 OOM 被杀。次生伤害：起点被改后 `popUpTo("chat")` **静默失效**。
+
+**改动**：
+- 导航层：删 `UiRoute`；`startDestination` 恢复常量；`popUpTo` 改
+  `graph.findStartDestination().id`；路由集中到 `ui/DroidLlmRoot.kt` 的 `AppRoutes`，
+  切 tab 统一走 `NavHostController.switchTab`。
+- i18n：`locale_config.xml` + manifest `android:localeConfig` +
+  `AppLocalesMetadataHolderService{autoStoreLocales=true}`（API ≤32）+ `app/AppLanguageController`；
+  `MainActivity` → `AppCompatActivity`，主题父级 → `Theme.AppCompat.DayNight.NoActionBar`；
+  删除 `AppLocale` / `AppLanguageStore` / 两处 `attachBaseContext` / app 侧 `recreate()`。
+  `AppSettings.language` → `legacyLanguage`（只读，仅供 `migrateLegacy` 一次性迁移）。
+- 护栏：新增 `app/src/androidTest/.../NavigationRecreateTest.kt` —— recreate 后静置 3s 统计窗口
+  实际重绘次数（`OnDrawListener`，非 vsync）≤ 10，另有一条阳性对照证明计数器不是瞎的。
+- 文档：`docs/I18N.md` §1/§2 重写（含两条硬规则）、`AGENTS.md` 文档表与「关键契约」补导航不变量。
+
+**验收（模拟器 pixel6 / API 34 / 应用英文）**：
+- 复现序列 ×3（Chat→模型→设置后静置 4s）：**frames +0、GC 0**，全部通过（故障期为 +26 帧 / 5~7 次 GC）
+- `uiautomator dump` 不再出现两个页面的文案叠在同一屏
+- 三态语言：`简体中文 → [zh]`、`English → [en]`、`跟随系统 → []`，每次**都停在设置页**，
+  且 `cmd locale get-app-locales` 证实走的是系统 `LocaleManager`（Android 13+ 系统设置入口成立）
+- 杀进程冷启：仍为所选语言；0 崩溃
+- 构建/测试：`:app:assembleDebug` ✅、`:app:assembleDebugAndroidTest` ✅、
+  `:app:connectedDebugAndroidTest`（NavigationRecreateTest 2/2 ✅）、
+  `:core:engine-api` / `:core:common` 单测 ✅
+- **未做**：真机验收（`adb devices` 无真机）；`ChatUiPersist` 的存在理由存疑但未实测（见 `docs/I18N.md` 已知残留）
+
 ---
 
 ## 10. 执行者注意事项（坑位速查）

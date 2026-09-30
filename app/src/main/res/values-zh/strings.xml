@@ -26,7 +26,7 @@
     <string name="action_stop">停止</string>
     <string name="action_view">查看</string>
     <string name="api_notification_failed">启动失败 · %1$s</string>
-    <string name="api_notification_running">运行中 · %1$s:%2$s</string>
+    <string name="api_notification_running">运行中 · %1$s:%2$d</string>
     <string name="api_server_channel">API 服务器</string>
     <string name="api_server_notification_text">本地 API 服务器运行中</string>
     <string name="api_server_notification_title">OpenAI 兼容 API</string>
@@ -44,7 +44,7 @@
     <string name="bench_exported">已导出 %1$s</string>
     <string name="bench_failed">评测失败：%1$s</string>
     <string name="bench_finished">评测完成</string>
-    <string name="bench_finished_count">评测完成，共 %1$s 个引擎</string>
+    <string name="bench_finished_count">评测完成，共 %1$d 个引擎</string>
     <string name="bench_history_cleared">已清空评测历史</string>
     <string name="bench_last_decode">最近 decode</string>
     <string name="bench_no_history">暂无历史</string>
@@ -53,9 +53,9 @@
     <string name="bench_pick_model">选择模型</string>
     <string name="bench_preparing">准备中…</string>
     <string name="bench_probing">正在探测引擎…</string>
-    <string name="bench_progress_case">引擎 %1$s/%2$s · %3$s</string>
-    <string name="bench_progress_sample">样本 %1$s/%2$s（含 warmup=%3$s）</string>
-    <string name="bench_progress_target">引擎 %1$s/%2$s · %3$s</string>
+    <string name="bench_progress_case">引擎 %1$d/%2$d · %3$s</string>
+    <string name="bench_progress_sample">样本 %1$d/%2$d（含 warmup=%3$d）</string>
+    <string name="bench_progress_target">引擎 %1$d/%2$d · %3$s</string>
     <string name="bench_section_cases">用例（默认 L/P/D）</string>
     <string name="bench_section_history">历史记录</string>
     <string name="bench_section_params">运行参数</string>
@@ -126,7 +126,7 @@
     <string name="chat_stop_generating">停止生成</string>
     <string name="chat_token_cap_note">
 
-· 已达 maxNewTokens=%1$s 上限，回答可能不完整；可在参数里调大</string>
+· 已达 maxNewTokens=%1$d 上限，回答可能不完整；可在参数里调大</string>
     <string name="chat_unavailable_invalid_model">模型无效：%1$s；检查文件是否完整</string>
     <string name="chat_unavailable_missing_dep">不可用：%1$s；用带该依赖的构建包重装</string>
     <string name="chat_unavailable_no_model">未配置模型：%1$s；到「模型」页添加</string>
@@ -146,7 +146,7 @@
     <string name="downloader_file">下载 %1$s</string>
     <string name="downloader_no_source">当前源无此模型</string>
     <string name="downloader_preparing">准备中</string>
-    <string name="downloader_progress">下载 %1$s/%2$s</string>
+    <string name="downloader_progress">下载 %1$d/%2$d</string>
     <string name="engine_available">可用</string>
     <string name="engine_invalid_model">模型无效：%1$s</string>
     <string name="engine_no_model">未配置模型</string>
@@ -155,19 +155,19 @@
     <string name="log_capture">抓取引擎日志</string>
     <string name="log_capture_desc">读取本进程 logcat，取到引擎 native 内部输出（MNN / llama.cpp / Genie / LiteRT）。分享时会自动附带最近一次结果。</string>
     <string name="log_capture_missing">未取到引擎日志，请先复现再试</string>
-    <string name="log_captured">已抓取引擎日志（%1$s KB）</string>
-    <string name="log_captured_count">已捕获 %1$s 条</string>
+    <string name="log_captured">已抓取引擎日志（%1$d KB）</string>
+    <string name="log_captured_count">已捕获 %1$d 条</string>
     <string name="log_capturing">抓取中…</string>
     <string name="log_control_desc">记录引擎加载、提示词长度、首 token 延迟、生成 token 数与异常堆栈。捕获最近 2000 条，超出后自动丢弃最旧的记录。</string>
     <string name="log_control_title">诊断日志</string>
-    <string name="log_copied">日志已复制（%1$s 条）</string>
+    <string name="log_copied">日志已复制（%1$d 条）</string>
     <string name="log_crash_desc">崩溃时自动写入，含异常堆栈与本进程 logcat。</string>
     <string name="log_crash_title">崩溃报告</string>
     <string name="log_delete_all">删除全部</string>
-    <string name="log_detail_title">运行日志（%1$s 条）</string>
+    <string name="log_detail_title">运行日志（%1$d 条）</string>
     <string name="log_empty">暂无日志。复现问题后回到这里即可看到记录。</string>
     <string name="log_enable">开启记录</string>
-    <string name="log_engine_captured">引擎日志已抓取（%1$s KB）· 点击查看</string>
+    <string name="log_engine_captured">引擎日志已抓取（%1$d KB）· 点击查看</string>
     <string name="log_engine_log_empty">尚未抓取。返回上一页点「抓取引擎日志」。</string>
     <string name="log_engine_log_title">引擎内部日志</string>
     <string name="log_fullscreen">全屏查看</string>
@@ -213,7 +213,7 @@
     <string name="models_error_path_missing">路径不存在：%1$s；检查是否已授权存储或路径拼写</string>
     <string name="models_error_path_registered">该路径已在模型列表中：%1$s</string>
     <string name="models_filter_all">全部</string>
-    <string name="models_filter_all_count">全部 · %1$s</string>
+    <string name="models_filter_all_count">全部 · %1$d</string>
     <string name="models_filter_downloaded">已下载</string>
     <string name="models_filter_not_downloaded">未下载</string>
     <string name="models_format_genie">模型目录（genie_config.json + *.bin + tokenizer.json）（任意路径均可注册）</string>
@@ -235,11 +235,11 @@
     <string name="models_register_note">市场下载（HF/魔塔）统一放在「%1$s」下 `{hf|modelscope}/models--org--repo/snapshots/`。四种引擎格式互不通用。</string>
     <string name="models_register_subtitle">只登记、不搬文件；市场下载的模型才放在模型根目录下。</string>
     <string name="models_registered">已注册：%1$s（%2$s）</string>
-    <string name="models_scan_added">新注册 %1$s 个：</string>
-    <string name="models_scan_done">扫描完成：+%1$s / -%2$s</string>
+    <string name="models_scan_added">新注册 %1$d 个：</string>
+    <string name="models_scan_done">扫描完成：+%1$d / -%2$d</string>
     <string name="models_scan_no_change">扫描完成，没有变化</string>
     <string name="models_scan_note">「移除失效」= 原路径下文件已不存在，仅从列表注销，不删磁盘文件。</string>
-    <string name="models_scan_removed">移除失效 %1$s 个：</string>
+    <string name="models_scan_removed">移除失效 %1$d 个：</string>
     <string name="models_scan_root">扫描模型根目录</string>
     <string name="models_scan_title">模型列表已更新</string>
     <string name="models_shared_root">共享模型根目录：%1$s</string>
@@ -276,7 +276,7 @@
     <string name="settings_api_port">端口</string>
     <string name="settings_api_starting">API 服务器启动中…</string>
     <string name="settings_api_stopped">API 服务器已停止</string>
-    <string name="settings_auto_registered">；已自动注册 %1$s 个已下载模型</string>
+    <string name="settings_auto_registered">；已自动注册 %1$d 个已下载模型</string>
     <string name="settings_backup">设置备份</string>
     <string name="settings_backup_desc">导出设置参数、已注册模型和每个模型的参数覆盖为一份 JSON，换机或重装后导入即可恢复。不含模型文件本身、模型根目录和 API Key。</string>
     <string name="settings_bench_cleared">已清空 benchmark 库</string>
@@ -289,10 +289,10 @@
     <string name="settings_conflict_skip">跳过重名并迁移</string>
     <string name="settings_conflict_title">目标路径存在重名</string>
     <string name="settings_device_opencl">OpenCL: %1$s  cdsp: %2$s</string>
-    <string name="settings_device_ram">RAM: %1$s MB</string>
-    <string name="settings_device_sdk">SDK: %1$s</string>
+    <string name="settings_device_ram">RAM: %1$d MB</string>
+    <string name="settings_device_sdk">SDK: %1$d</string>
     <string name="settings_device_soc">SoC: %1$s</string>
-    <string name="settings_device_storage">可用存储: %1$s MB</string>
+    <string name="settings_device_storage">可用存储: %1$d MB</string>
     <string name="settings_diag_desc">引擎加载 / 生成的关键节点、提示词长度与首 token 延迟都会写进运行日志，用于在真机上复现问题后把日志导出给开发者。</string>
     <string name="settings_diag_open">查看运行日志</string>
     <string name="settings_engine_defaults_desc">采样参数跟着引擎走：每个引擎在自己代码里声明一套默认值，单个模型可以在聊天页按「引擎 + 模型」钉住自己的值（采样面板里标「仅本模型」）。此处只读 —— 没有全局采样设置，要调请去聊天页。</string>
@@ -315,13 +315,13 @@
     <string name="settings_import_empty">导入失败：文件为空</string>
     <string name="settings_import_failed">导入失败：%1$s</string>
     <string name="settings_import_malformed">导入失败：不是有效的设置文件（%1$s）</string>
-    <string name="settings_import_models">· 注册模型：新增 %1$s 个，覆盖 %2$s 个</string>
+    <string name="settings_import_models">· 注册模型：新增 %1$d 个，覆盖 %2$d 个</string>
     <string name="settings_import_note">本机独有、文件中没有的模型与参数会保留；模型文件本身不会被改动，若文件不在本机会显示为路径无效。</string>
-    <string name="settings_import_params">· 单模型参数：写入 %1$s 组</string>
+    <string name="settings_import_params">· 单模型参数：写入 %1$d 组</string>
     <string name="settings_import_settings">· 设置参数：覆盖当前值</string>
     <string name="settings_import_title">导入设置</string>
     <string name="settings_import_version">导入失败：文件版本 %1$s 高于本应用支持的 %2$s</string>
-    <string name="settings_imported">已导入：%1$s 新增 / %2$s 覆盖模型，%3$s 组参数</string>
+    <string name="settings_imported">已导入：%1$d 新增 / %2$d 覆盖模型，%3$d 组参数</string>
     <string name="settings_ip_placeholder">&lt;手机IP&gt;</string>
     <string name="settings_language">语言</string>
     <string name="settings_language_desc">默认跟随系统语言；非中英文环境下回落到英文。</string>
@@ -332,7 +332,7 @@
     <string name="settings_metrics_title">指标定义</string>
     <string name="settings_metrics_view">查看指标定义</string>
     <string name="settings_migrate_failed">迁移失败：%1$s</string>
-    <string name="settings_migrated">已迁移 %1$s 项</string>
+    <string name="settings_migrated">已迁移 %1$d 项</string>
     <string name="settings_mkdir_failed">无法创建目标目录：%1$s</string>
     <string name="settings_model_root_desc">所有引擎共享同一根目录（其下按引擎分子目录）。改路径时不删目标文件，重名跳过，可不迁移原数据。</string>
     <string name="settings_multi_residency">多模型驻留</string>
@@ -342,7 +342,7 @@
     <string name="settings_root_change_current">当前：</string>
     <string name="settings_root_change_empty">原目录为空，将直接切换。</string>
     <string name="settings_root_change_migrate_note">迁移只移动，不删除目标已有文件；重名会再询问。</string>
-    <string name="settings_root_change_migrate_prompt">原目录有 %1$s 项数据，是否一并迁移到新路径？</string>
+    <string name="settings_root_change_migrate_prompt">原目录有 %1$d 项数据，是否一并迁移到新路径？</string>
     <string name="settings_root_change_target">目标：</string>
     <string name="settings_root_change_title">修改模型根目录</string>
     <string name="settings_root_changed">已改模型根目录（未迁移原数据）</string>

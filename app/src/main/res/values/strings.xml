@@ -328,7 +328,7 @@ Nothing there is deleted or overwritten. Continuing skips those items (they stay
     <string name="settings_language">Language</string>
     <string name="settings_language_desc">Follows the device by default; any other locale falls back to English.</string>
     <string name="settings_language_en">English</string>
-    <string name="settings_language_zh">Chinese</string>
+    <string name="settings_language_zh">Chinese (Simplified)</string>
     <string name="settings_last_export">Last export: %1$s</string>
     <string name="settings_metrics_desc">Every reply on the Chat page shows the metrics the engine reported. This is what they mean and how they are measured.</string>
     <string name="settings_metrics_title">Metric definitions</string>

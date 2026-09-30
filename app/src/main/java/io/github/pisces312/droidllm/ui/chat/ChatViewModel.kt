@@ -182,11 +182,10 @@ class ChatViewModel @Inject constructor(
     private val _selectedModel = MutableStateFlow<ModelChoice?>(null)
     val selectedModel: StateFlow<ModelChoice?> = _selectedModel.asStateFlow()
 
-    private val _messages = MutableStateFlow<List<ChatUiMessage>>(emptyList())
-    val messages: StateFlow<List<ChatUiMessage>> = _messages.asStateFlow()
+    /** Backed by [ChatUiPersist] so a language-switch `recreate()` keeps the transcript. */
+    val messages: StateFlow<List<ChatUiMessage>> = ChatUiPersist.messages.asStateFlow()
 
-    private val _status = MutableStateFlow(appContext.getString(R.string.chat_status_ready))
-    val status: StateFlow<String> = _status.asStateFlow()
+    val status: StateFlow<String> = ChatUiPersist.status.asStateFlow()
 
     private val _availability = MutableStateFlow("")
     val availability: StateFlow<String> = _availability.asStateFlow()
@@ -194,11 +193,9 @@ class ChatViewModel @Inject constructor(
     private val _sampling = MutableStateFlow(SamplingUiState())
     val sampling: StateFlow<SamplingUiState> = _sampling.asStateFlow()
 
-    private val _generating = MutableStateFlow(false)
-    val generating: StateFlow<Boolean> = _generating.asStateFlow()
+    val generating: StateFlow<Boolean> = ChatUiPersist.generating.asStateFlow()
 
-    private val _sessionState = MutableStateFlow(SessionState.IDLE)
-    val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+    val sessionState: StateFlow<SessionState> = ChatUiPersist.sessionState.asStateFlow()
 
     /**
      * Whether the current engine+model can flip Thinking. Resolved after model
@@ -207,24 +204,42 @@ class ChatViewModel @Inject constructor(
     private val _thinkingSupported = MutableStateFlow(false)
     val thinkingSupported: StateFlow<Boolean> = _thinkingSupported.asStateFlow()
 
-    private var session: SessionHandle? = null
-    private var sessionEngine: LlmEngine? = null
-    private var activeJob: GenerateJob? = null
+    private var session: SessionHandle?
+        get() = ChatUiPersist.session
+        set(value) {
+            ChatUiPersist.session = value
+        }
+    private var sessionEngine: LlmEngine?
+        get() = ChatUiPersist.sessionEngine
+        set(value) {
+            ChatUiPersist.sessionEngine = value
+        }
+    private var activeJob: GenerateJob?
+        get() = ChatUiPersist.activeJob
+        set(value) {
+            ChatUiPersist.activeJob = value
+        }
     /**
      * Monotonic id for the in-flight generate turn. Bumped on every send and
      * every stop so late engine callbacks (tokens that were already in flight
      * when Stop was tapped) are dropped instead of appending to the bubble.
      */
-    @Volatile
-    private var generateSeq = 0
+    private var generateSeq: Int
+        get() = ChatUiPersist.generateSeq
+        set(value) {
+            ChatUiPersist.generateSeq = value
+        }
     private var multiResidency = false
-    /** Kept sessions when multi-model residency is on (DESIGN §3.3). */
-    private val resident = LinkedHashMap<String, Pair<LlmEngine, SessionHandle>>()
+    private val resident: LinkedHashMap<String, Pair<LlmEngine, SessionHandle>>
+        get() = ChatUiPersist.resident
 
     /** Latest `AppSettings` snapshot (systemPrompt / residency / theme). Holds no sampling knobs. */
     private var globalSettings = AppSettings()
 
     init {
+        if (ChatUiPersist.status.value.isEmpty()) {
+            ChatUiPersist.status.value = appContext.getString(R.string.chat_status_ready)
+        }
         viewModelScope.launch {
             globalSettings = settingsStore.current()
             multiResidency = globalSettings.multiModelResidency
@@ -232,14 +247,14 @@ class ChatViewModel @Inject constructor(
             settingsStore.observe().collect { s ->
                 globalSettings = s
                 multiResidency = s.multiModelResidency
-                if (!_generating.value) refreshSampling()
+                if (!ChatUiPersist.generating.value) refreshSampling()
             }
         }
         // A settings import rewrites the overlay for the selected model too.
         viewModelScope.launch {
             modelParamsStore.observe().collect { map ->
                 overridesByKey = map
-                if (!_generating.value) refreshSampling()
+                if (!ChatUiPersist.generating.value) refreshSampling()
             }
         }
         viewModelScope.launch {
@@ -255,9 +270,21 @@ class ChatViewModel @Inject constructor(
                 )
             }.sortedBy { it.displayName }
             _engines.value = choices
+            val persistEngineId = ChatUiPersist.engineId
+            val restoredEngine = persistEngineId?.let { id ->
+                choices.firstOrNull { it.engine.id.name == id }
+            }
             val preferred = choices.firstOrNull { it.available }
                 ?: choices.firstOrNull()
-            preferred?.let { selectEngine(it) }
+            val target = restoredEngine ?: preferred
+            if (target == null) return@launch
+            if (restoredEngine != null) {
+                // Language-switch recreate: keep selection and any live session
+                // instead of releasing and re-picking the default engine.
+                restoreChat(target)
+            } else {
+                selectEngine(target)
+            }
         }
         // Keep the picker in sync with the model store (e.g. after market download).
         viewModelScope.launch {
@@ -313,10 +340,45 @@ class ChatViewModel @Inject constructor(
         _sampling.value = if (next == _sampling.value) _sampling.value else next
     }
 
+    /**
+     * Re-attach to state saved in [ChatUiPersist] after `recreate()`. Does not
+     * call [selectEngine] — that would unload the session the user already has.
+     */
+    private suspend fun restoreChat(engineChoice: EngineChoice) {
+        _selectedEngine.value = engineChoice
+        _availability.value = describeAvailability(engineChoice)
+        loadModelsFor(engineChoice.engine)
+        val model = _models.value.firstOrNull { it.model.id == ChatUiPersist.modelId }
+            ?: _models.value.firstOrNull()
+        _selectedModel.value = model
+        if (model != null) ChatUiPersist.modelId = model.model.id
+        model?.let { refreshThinkingSupport(it) }
+        refreshSampling()
+        val live = ChatUiPersist.session
+        val liveEngine = ChatUiPersist.sessionEngine
+        if (live != null && liveEngine != null) {
+            session = live
+            sessionEngine = liveEngine
+            ChatUiPersist.sessionState.value = SessionState.READY
+            // Status text is language-tagged at write time; re-localize for the new UI language.
+            ChatUiPersist.status.value = if (ChatUiPersist.generating.value) {
+                appContext.getString(R.string.chat_status_generating)
+            } else {
+                appContext.getString(
+                    R.string.chat_status_loaded,
+                    model?.displayName ?: engineChoice.displayName,
+                )
+            }
+        } else {
+            markIdle()
+        }
+    }
+
     /** Picking an engine releases any running model; the new one waits for [startModel]. */
     fun selectEngine(choice: EngineChoice) {
         viewModelScope.launch {
             releaseSession()
+            ChatUiPersist.engineId = choice.engine.id.name
             _selectedEngine.value = choice
             _availability.value = describeAvailability(choice)
             loadModelsFor(choice.engine)
@@ -327,6 +389,7 @@ class ChatViewModel @Inject constructor(
     fun selectModel(choice: ModelChoice) {
         viewModelScope.launch {
             releaseSession()
+            ChatUiPersist.modelId = choice.model.id
             _selectedModel.value = choice
             markIdle()
             refreshThinkingSupport(choice)
@@ -368,10 +431,10 @@ class ChatViewModel @Inject constructor(
     fun startModel() {
         val model = _selectedModel.value
         if (model == null) {
-            _status.value = appContext.getString(R.string.chat_status_pick_first)
+            ChatUiPersist.status.value = appContext.getString(R.string.chat_status_pick_first)
             return
         }
-        if (_sessionState.value == SessionState.LOADING) return
+        if (ChatUiPersist.sessionState.value == SessionState.LOADING) return
         viewModelScope.launch {
             stopGenerate()
             unloadSession()
@@ -393,9 +456,9 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun markIdle() {
-        _sessionState.value = SessionState.IDLE
+        ChatUiPersist.sessionState.value = SessionState.IDLE
         val name = _selectedModel.value?.displayName
-        _status.value = if (name == null) {
+        ChatUiPersist.status.value = if (name == null) {
             appContext.getString(R.string.chat_status_idle_no_model)
         } else {
             appContext.getString(R.string.chat_status_idle, name)
@@ -464,24 +527,24 @@ class ChatViewModel @Inject constructor(
             stopGenerate()
             val handle = session
             val engine = sessionEngine
-            if (_sessionState.value == SessionState.READY && handle != null && engine != null) {
+            if (ChatUiPersist.sessionState.value == SessionState.READY && handle != null && engine != null) {
                 runCatching { withContext(Dispatchers.IO) { engine.reset(handle) } }
-                _status.value = appContext.getString(R.string.chat_status_new_session)
+                ChatUiPersist.status.value = appContext.getString(R.string.chat_status_new_session)
             } else {
-                _status.value = appContext.getString(R.string.chat_status_cleared)
+                ChatUiPersist.status.value = appContext.getString(R.string.chat_status_cleared)
             }
-            _messages.value = emptyList()
+            ChatUiPersist.clearConversation()
         }
     }
 
     fun stopGenerate() {
-        val wasGenerating = _generating.value
+        val wasGenerating = ChatUiPersist.generating.value
         generateSeq++
         activeJob?.cancel()
         activeJob = null
-        _generating.value = false
+        ChatUiPersist.generating.value = false
         if (wasGenerating) {
-            _status.value = appContext.getString(R.string.chat_status_stopped)
+            ChatUiPersist.status.value = appContext.getString(R.string.chat_status_stopped)
         }
     }
 
@@ -518,8 +581,8 @@ class ChatViewModel @Inject constructor(
     private suspend fun openSession(model: LocalModel) {
         val engine = _selectedEngine.value?.engine ?: return
         if (_selectedEngine.value?.available != true) {
-            _sessionState.value = SessionState.FAILED
-            _status.value = appContext.getString(R.string.chat_status_engine_unavailable)
+            ChatUiPersist.sessionState.value = SessionState.FAILED
+            ChatUiPersist.status.value = appContext.getString(R.string.chat_status_engine_unavailable)
             return
         }
         val key = "${engine.id}:${model.id}"
@@ -527,13 +590,13 @@ class ChatViewModel @Inject constructor(
             resident[key]?.let { (eng, handle) ->
                 session = handle
                 sessionEngine = eng
-                _sessionState.value = SessionState.READY
-                _status.value = appContext.getString(R.string.chat_status_switched_resident, model.displayName)
+                ChatUiPersist.sessionState.value = SessionState.READY
+                ChatUiPersist.status.value = appContext.getString(R.string.chat_status_switched_resident, model.displayName)
                 return
             }
         }
-        _sessionState.value = SessionState.LOADING
-        _status.value = appContext.getString(R.string.common_loading)
+        ChatUiPersist.sessionState.value = SessionState.LOADING
+        ChatUiPersist.status.value = appContext.getString(R.string.common_loading)
         runCatching {
             // Adapters call straight into native load()/unload(), which run for
             // seconds. Keep them off the main thread so the LOADING state can
@@ -545,14 +608,14 @@ class ChatViewModel @Inject constructor(
             sessionEngine = engine
             sessionRegistry.register(engine, handle)
             if (multiResidency) resident[key] = engine to handle
-            _sessionState.value = SessionState.READY
-            _status.value = appContext.getString(R.string.chat_status_loaded, model.displayName)
+            ChatUiPersist.sessionState.value = SessionState.READY
+            ChatUiPersist.status.value = appContext.getString(R.string.chat_status_loaded, model.displayName)
         }.onFailure {
             val err = it.message ?: it.javaClass.simpleName
             session = null
             sessionEngine = null
-            _sessionState.value = SessionState.FAILED
-            _status.value = appContext.getString(R.string.chat_status_load_failed, err)
+            ChatUiPersist.sessionState.value = SessionState.FAILED
+            ChatUiPersist.status.value = appContext.getString(R.string.chat_status_load_failed, err)
         }
     }
 
@@ -564,20 +627,21 @@ class ChatViewModel @Inject constructor(
         sessionRegistry.unregister(handle)
         session = null
         sessionEngine = null
+        ChatUiPersist.clearSession()
     }
 
     fun send(text: String) {
-        if (_sessionState.value != SessionState.READY) {
-            _status.value = appContext.getString(R.string.chat_status_not_started)
+        if (ChatUiPersist.sessionState.value != SessionState.READY) {
+            ChatUiPersist.status.value = appContext.getString(R.string.chat_status_not_started)
             return
         }
         val engine = _selectedEngine.value?.engine ?: return
         val handle = session ?: run {
-            _sessionState.value = SessionState.IDLE
+            ChatUiPersist.sessionState.value = SessionState.IDLE
             markIdle()
             return
         }
-        if (_generating.value) return
+        if (ChatUiPersist.generating.value) return
         val config = _sampling.value.toConfig()
         // The system turn is materialised here instead of being stored in the
         // transcript: chat templates read the system instruction from
@@ -585,12 +649,12 @@ class ChatViewModel @Inject constructor(
         val userText = applyThinkingTurn(text, config, engine)
         val history = buildList {
             config.systemPrompt?.let { add(ChatMessage(ChatRole.SYSTEM, it)) }
-            addAll(_messages.value.map { ChatMessage(it.role, it.content) })
+            addAll(ChatUiPersist.messages.value.map { ChatMessage(it.role, it.content) })
             add(ChatMessage(ChatRole.USER, userText))
         }
-        _messages.value = _messages.value + ChatUiMessage(ChatRole.USER, text)
-        _status.value = appContext.getString(R.string.chat_status_generating)
-        _generating.value = true
+        ChatUiPersist.messages.value = ChatUiPersist.messages.value + ChatUiMessage(ChatRole.USER, text)
+        ChatUiPersist.status.value = appContext.getString(R.string.chat_status_generating)
+        ChatUiPersist.generating.value = true
         val seq = ++generateSeq
 
         val sb = StringBuilder()
@@ -605,12 +669,12 @@ class ChatViewModel @Inject constructor(
                     if (tokenCount == 0) firstTokenNs = System.nanoTime()
                     tokenCount++
                     sb.append(event.text)
-                    val last = _messages.value.lastOrNull()
+                    val last = ChatUiPersist.messages.value.lastOrNull()
                     if (last?.role == ChatRole.ASSISTANT && last.error == null) {
-                        _messages.value = _messages.value.dropLast(1) +
+                        ChatUiPersist.messages.value = ChatUiPersist.messages.value.dropLast(1) +
                             ChatUiMessage(ChatRole.ASSISTANT, sb.toString(), config.enableThinking)
                     } else {
-                        _messages.value = _messages.value +
+                        ChatUiPersist.messages.value = ChatUiPersist.messages.value +
                             ChatUiMessage(ChatRole.ASSISTANT, sb.toString(), config.enableThinking)
                     }
                 }
@@ -640,15 +704,15 @@ class ChatViewModel @Inject constructor(
                         generatedTokens = m.generatedTokens,
                         perTokenMsP50 = m.perTokenMsP50,
                     )
-                    val last = _messages.value.lastOrNull()
+                    val last = ChatUiPersist.messages.value.lastOrNull()
                     if (last?.role == ChatRole.ASSISTANT) {
-                        _messages.value = _messages.value.dropLast(1) + bubble
+                        ChatUiPersist.messages.value = ChatUiPersist.messages.value.dropLast(1) + bubble
                     } else if (emptyReply) {
                         // Nothing was streamed (the model stopped before emitting
                         // any text). Add a bubble so the turn is not silently blank.
-                        _messages.value = _messages.value + bubble
+                        ChatUiPersist.messages.value = ChatUiPersist.messages.value + bubble
                     }
-                    _status.value = buildString {
+                    ChatUiPersist.status.value = buildString {
                         append(
                             appContext.getString(
                                 if (emptyReply) R.string.chat_done_no_output else R.string.common_done,
@@ -663,7 +727,7 @@ class ChatViewModel @Inject constructor(
                         }
                         if (m.warnings.isNotEmpty()) append(" · ").append(m.warnings.joinToString("；"))
                     }
-                    _generating.value = false
+                    ChatUiPersist.generating.value = false
                     activeJob = null
                 }
                 is EngineEvent.Error -> {
@@ -678,16 +742,16 @@ class ChatViewModel @Inject constructor(
                         else -> appContext.getString(R.string.chat_error_generic, cause.message ?: cause.javaClass.simpleName)
                     }
                     val content = sb.toString()
-                    val last = _messages.value.lastOrNull()
+                    val last = ChatUiPersist.messages.value.lastOrNull()
                     if (last?.role == ChatRole.ASSISTANT) {
-                        _messages.value = _messages.value.dropLast(1) +
+                        ChatUiPersist.messages.value = ChatUiPersist.messages.value.dropLast(1) +
                             ChatUiMessage(ChatRole.ASSISTANT, content, config.enableThinking, error = msg)
                     } else {
-                        _messages.value = _messages.value +
+                        ChatUiPersist.messages.value = ChatUiPersist.messages.value +
                             ChatUiMessage(ChatRole.ASSISTANT, content, config.enableThinking, error = msg)
                     }
-                    _status.value = msg
-                    _generating.value = false
+                    ChatUiPersist.status.value = msg
+                    ChatUiPersist.generating.value = false
                     activeJob = null
                 }
             }

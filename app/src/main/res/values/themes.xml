@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.DroidLlm" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      The parent must stay an AppCompat theme: MainActivity extends AppCompatActivity
+      so that AppCompatDelegate.setApplicationLocales (the per-app language mechanism)
+      has a delegate to work with — see docs/I18N.md §2. DayNight rather than the
+      previous fixed Light parent, so the window background follows the system instead
+      of flashing white while a language change recreates the Activity.
+    -->
+    <style name="Theme.DroidLlm" parent="Theme.AppCompat.DayNight.NoActionBar" />
 </resources>

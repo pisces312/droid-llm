@@ -6,7 +6,6 @@ import dagger.hilt.android.HiltAndroidApp
 import io.github.pisces312.droidllm.common.diag.CrashReporter
 import io.github.pisces312.droidllm.common.diag.DiagEngineLogSink
 import io.github.pisces312.droidllm.common.diag.DiagLogger
-import io.github.pisces312.droidllm.common.settings.AppLanguage
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
 import io.github.pisces312.droidllm.engineapi.EngineLogging
 import javax.inject.Inject
@@ -24,6 +23,12 @@ class DroidLlmApp : Application() {
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    /**
+     * No `attachBaseContext` override here any more. The UI language used to be applied
+     * by wrapping Contexts, in this class and in the Activity; it is owned by AppCompat
+     * now (`AppLanguageController`), which reapplies it before the first frame itself.
+     * See docs/I18N.md §2.
+     */
     override fun onCreate() {
         super.onCreate()
         // Diagnostic plumbing is wired before Hilt builds any engine so that a
@@ -40,22 +45,8 @@ class DroidLlmApp : Application() {
         // opened. Without this, a user who turned logging off would still be
         // recorded for the whole session until they visited 设置 → 诊断.
         appScope.launch {
-            val settings = runCatching { settingsStore.current() }.getOrNull()
-            settings?.let {
-                runCatching { DiagLogger.setEnabled(it.diagnosticLogging) }
-                applyLanguage(it.language)
-            }
+            runCatching { DiagLogger.setEnabled(settingsStore.current().diagnosticLogging) }
         }
-    }
-
-    /**
-     * Push the persisted language into AppCompat's per-app locale list.
-     *
-     * Main thread because `setApplicationLocales` touches the Activity's
-     * configuration; see [AppLocale].
-     */
-    private suspend fun applyLanguage(language: AppLanguage) {
-        withContext(Dispatchers.Main) { AppLocale.apply(language) }
     }
 
     private companion object {

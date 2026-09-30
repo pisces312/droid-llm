@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The languages 设置 → 语言 offers, and the source of the system entry
+  "Settings → Apps → droid-llm → Language" on Android 13+.
+
+  Both tags are listed because the app ships exactly two: `values-zh/` (zh) and,
+  as the unqualified fallback for everything else, `values/` written in English.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="zh" />
+</locale-config>

@@ -45,6 +45,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.pisces312.droidllm.AppLanguageController
 import io.github.pisces312.droidllm.common.bench.BenchmarkDao
 import io.github.pisces312.droidllm.common.device.DeviceProbe
 import io.github.pisces312.droidllm.api.ApiServerPreferences
@@ -126,6 +127,7 @@ class SettingsViewModel @Inject constructor(
     private val modelParamsStore: ModelParamsStore,
     private val autoImporter: ModelAutoImporter,
     private val apiPrefs: ApiServerPreferences,
+    private val languageController: AppLanguageController,
     private val engines: Set<@JvmSuppressWildcards LlmEngine>,
 ) : ViewModel() {
 
@@ -211,12 +213,21 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Persist the UI language. `MainActivity` observes the store and pushes the
-     * value into AppCompat's app-locale list, which is what switches strings.
+     * Apply the UI language. `AppCompatDelegate` persists it and recreates the Activity,
+     * so the new locale reaches strings that were already inflated; nothing is written to
+     * DataStore any more (see `AppLanguageController`).
      */
     fun setLanguage(language: AppLanguage) {
-        viewModelScope.launch { settingsStore.setLanguage(language) }
+        languageController.set(language)
     }
+
+    /**
+     * The applied language. Not a `StateFlow`: this is read once per composition, and the
+     * only way it can change is AppCompat recreating the Activity, which restarts the
+     * composition anyway. (On Android 12 the read touches shared storage, so it must not
+     * happen on every recomposition.)
+     */
+    fun currentLanguage(): AppLanguage = languageController.current()
 
     fun setMultiResidency(enabled: Boolean) {
         viewModelScope.launch { settingsStore.setMultiModelResidency(enabled) }
@@ -570,8 +581,10 @@ fun SettingsScreen(
         }
 
         SectionCard(stringResource(R.string.settings_language)) {
+            // Read once per composition — see SettingsViewModel.currentLanguage.
+            val language = remember { vm.currentLanguage() }
             AppLanguageRow(
-                selected = settings.language,
+                selected = language,
                 onSelect = vm::setLanguage,
             )
             Spacer(Modifier.height(6.dp))
