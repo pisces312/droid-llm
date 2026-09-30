@@ -36,10 +36,15 @@ enum class ThemeMode {
  * whatever the device happened to be at first launch.
  *
  * The applied value is not stored in this module: it belongs to `AppCompatDelegate`
- * (see `app/AppLanguageController`), which persists it, reapplies it before the first
- * frame on cold start and, on Android 13+, exposes it as a real system setting. What
- * lives here is only the three-state shape the settings UI needs — an applied locale
- * alone cannot distinguish "user picked English" from "device is English".
+ * (see `app/AppLanguageController`), which persists it, and, on Android 13+, exposes it
+ * as a real system setting. What lives here is only the three-state shape the settings
+ * UI needs — an applied locale alone cannot distinguish "user picked English" from
+ * "device is English".
+ *
+ * **Do not add an app-side copy of the choice.** A stored language that gets pushed back
+ * on every process start is a revert loop: the picker writes the new value, the next cold
+ * start re-applies the old one. That is exactly the 2026-09-30 incident on a real device
+ * (stale DataStore value re-stamped `en` over the system's `zh`), see `docs/I18N.md` §2.
  */
 enum class AppLanguage {
     SYSTEM,
@@ -54,11 +59,6 @@ enum class AppLanguage {
             ZH -> "zh"
             EN -> "en"
         }
-
-    companion object {
-        fun from(raw: String?): AppLanguage =
-            entries.firstOrNull { it.name == raw } ?: SYSTEM
-    }
 }
 
 /**
@@ -86,15 +86,6 @@ const val DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
  */
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    /**
-     * Legacy slot for the UI language: **no longer applied and no longer written.**
-     *
-     * The language moved to `AppCompatDelegate` (`app/AppLanguageController`), which
-     * owns it end to end. This key is still read — exactly once — by that controller's
-     * migration, so a selection made before the move carries over to the new mechanism.
-     * Remove the field, the DataStore key and the migration after one release.
-     */
-    val legacyLanguage: AppLanguage = AppLanguage.SYSTEM,
     /** false = single-model residency: switch unloads the previous session (DESIGN §3.3). */
     val multiModelResidency: Boolean = false,
     /**
@@ -152,9 +143,6 @@ class DataStoreAppSettingsStore @Inject constructor(
 
     private object Keys {
         val themeMode = stringPreferencesKey("theme_mode")
-        // Read-only as of the AppCompat app-locale move: the key is still read into
-        // AppSettings.legacyLanguage for the one-time migration, never written.
-        val legacyLanguage = stringPreferencesKey("app_language")
         val multiResidency = booleanPreferencesKey("multi_model_residency")
         val modelRoot = stringPreferencesKey("model_root_path")
         val storageGuideSeen = booleanPreferencesKey("storage_guide_seen")
@@ -171,7 +159,6 @@ class DataStoreAppSettingsStore @Inject constructor(
     override fun observe(): Flow<AppSettings> = context.appSettingsDataStore.data.map { prefs ->
         AppSettings(
             themeMode = ThemeMode.from(prefs[Keys.themeMode]),
-            legacyLanguage = AppLanguage.from(prefs[Keys.legacyLanguage]),
             multiModelResidency = prefs[Keys.multiResidency] ?: false,
             modelRootPath = prefs[Keys.modelRoot]?.takeIf { it.isNotBlank() },
             storageGuideSeen = prefs[Keys.storageGuideSeen] ?: false,
