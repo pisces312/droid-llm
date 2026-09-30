@@ -1060,7 +1060,8 @@ PSS 239MB→287MB 涨到 OOM 被杀。次生伤害：起点被改后 `popUpTo("c
   `AppLocalesMetadataHolderService{autoStoreLocales=true}`（API ≤32）+ `app/AppLanguageController`；
   `MainActivity` → `AppCompatActivity`，主题父级 → `Theme.AppCompat.DayNight.NoActionBar`；
   删除 `AppLocale` / `AppLanguageStore` / 两处 `attachBaseContext` / app 侧 `recreate()`。
-  `AppSettings.language` → `legacyLanguage`（只读，仅供 `migrateLegacy` 一次性迁移）。
+  `AppSettings.language` 一度降级为只读的 `legacyLanguage`（仅供 `migrateLegacy` 一次性迁移），
+  当晚真机复验后与该迁移一起整体删除。
 - 护栏：新增 `app/src/androidTest/.../NavigationRecreateTest.kt` —— recreate 后静置 3s 统计窗口
   实际重绘次数（`OnDrawListener`，非 vsync）≤ 10，另有一条阳性对照证明计数器不是瞎的。
 - 文档：`docs/I18N.md` §1/§2 重写（含两条硬规则）、`AGENTS.md` 文档表与「关键契约」补导航不变量。
@@ -1075,9 +1076,48 @@ PSS 239MB→287MB 涨到 OOM 被杀。次生伤害：起点被改后 `popUpTo("c
   `:app:connectedDebugAndroidTest`（NavigationRecreateTest 2/2 ✅）、
   `:core:engine-api` / `:core:common` 单测 ✅
 - **真机验收 ✅**：用户手测确认切语言 + 标签往返无异常（收尾时真机已从 adb 断开，
-  未采集机型/系统版本）
-- **仍开放**：`ChatUiPersist` 的存在理由存疑但未实测（见 `docs/I18N.md` 已知残留）；
-  `AppLanguageController.migrateLegacy` 的迁移路径未实测（需构造旧 DataStore 值）
+  未采集机型/系统版本）。⚠️ 事后查明这次手测用的是 `ea11f59` **提交前的中间构建**，
+  「冷启动保持」当时并未验过 —— 已在下一节换两台真机补验完毕。
+- **仍开放**：`ChatUiPersist` 的存在理由存疑但未实测（见 `docs/I18N.md` 已知残留）
+
+### 真机复盘：删除旧值迁移（2026-09-30 晚）
+
+**故障**：release 包在 app 内选中文有效，重启后回到英文；设置 → 语言 那行显示 English。
+
+**定位（真机 HONOR BKQ-AN80 / Android 17 / API 37 / 系统语言 zh-Hans-CN）**：
+- 系统侧 `cmd locale get-app-locales` = `[en]`（debug 包 = `[]`）；设备上装的是
+  `0.1.0-P0`（`lastUpdateTime` 09:30:16，早于 09:33 的 `ea11f59`）。
+- 用 shell 强设 `[zh]` 后**只冷启动该包**，0.3 s 内被写回 `[en]`（2/2 复现）。
+- `run-as` 读 debug 包 DataStore：旧的 `app_language = EN` 仍在。
+- 根因：中间构建保留了首版机制的「每次进程启动把 DataStore 的语言推给 `AppCompatDelegate`」，
+  而选语言的写入已经只写系统、不再写 DataStore → DataStore 冻在 EN → 每次冷启动覆写系统值。
+  当前 HEAD 的 `migrateLegacy` 有「系统非空即早退」守卫，理论上不会这样，但守卫的输入正是
+  那个陈旧死键，且「本地存一份 + 启动回填」这一形状本身必然会在某条路径上覆写系统值。
+
+**改动**（真机验收通过后落地）：
+- 删 `AppLanguageController.migrateLegacy`、`MainActivity` 的调用与 `languageController` 注入、
+  `AppSettings.legacyLanguage` 与 DataStore 键 `app_language`、`AppLanguage.from` 及其单测。
+- `docs/I18N.md` §2 新增「API 33+ 应用与持久化都在系统」三条源码结论 + 事故复盘 + 诊断配方，
+  并把「不留副本、不回填」写成硬规则。
+
+**验收（真机 / 当前构建 versionCode 2 / 0.1.0）**：
+
+第一轮（**删除迁移之前**的 versionCode 2 构建，即已发布的 `v0.1.0` 产物）——
+HONOR BKQ-AN80 / Android 17 / API 37 / 系统语言 zh-Hans-CN：
+- shell 设 `[zh]` + 冷启动 ×12 次采样：全程保持 `[zh]`（被控旧中间包同条件 0.3 s 内被写回 en）
+- app 内 中文 → English：系统值 `[en]`、界面英文；杀进程冷启后仍 `[en]` / 英文
+- app 内 English → 中文：系统值 `[zh]`、界面中文；杀进程冷启后仍 `[zh]` / 中文
+
+第二轮（**删除迁移之后**重建的 versionCode 2）——
+SM-G9810 / Android 13 / **API 33** / 系统语言 zh-Hans-CN，**全新安装**（无残留 DataStore）：
+- 基线 `[]`（跟随系统）→ 点 English：`[en]` + 界面即时英文；杀进程冷启后仍 `[en]` / 英文
+- `[en]` → 点 简体中文：`[zh]` + 界面中文；冷启动 **6/6** 保持 `[zh]`
+- **回归护栏**：app 内所选为 `[zh]`，在 app 停止时用 shell 强设 `[en]` 再冷启动 —— `[en]` 在
+  t+0.4 / 1 / 2 / 4 s 四次采样全部原样保留，界面跟随 `[en]`，证明确无 app 侧回填
+- 点 跟随系统：系统值回到 `[]`，界面回落设备语言
+
+两次都用 `uiautomator dump` 校文案与 chip 选中态（`checked=true` 的那个与 `get-app-locales` 一致），
+无崩溃。断言手法与两个筛选坑见 `docs/I18N.md` §2。
 
 ---
 

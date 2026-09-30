@@ -14,7 +14,7 @@
 | `docs/llamacpp-decode-repro.md` | llama.cpp arm64 独立 decode 回归 CLI（`tools/llama_decode_repro`），native 重构后先跑 |
 | `docs/DIAGNOSTICS.md` | 诊断日志与崩溃收集：用户侧流程、模块地图、设计决策、10 条实测坑、回归清单。**改诊断日志前必读** |
 | `docs/MODEL_PARAMS.md` | 采样 / 执行参数的层次与键空间：两层结构（逐模型覆盖 → 引擎 `EngineDefaults`）、`"ENGINE:modelId"` 键、UI 语义、上游四项目对照调研、生效路径、验收清单。**改采样、设置存储、模型参数 UI 前必读** |
-| `docs/I18N.md` | 中英双语：`values/`=英文兜底 + `values-zh/`、三态语言走 **AppCompat app-locale**（`locale_config.xml` + manifest `autoStoreLocales`；`MainActivity` 必须 `AppCompatActivity`，主题父级必须 AppCompat 后代）、**两条硬规则**（`NavHost.startDestination` 必须编译期常量、`popUpTo` 用 `findStartDestination()`）、各模块资源分布、占位符约定、**故意未抽取的白名单**。**新增/改 UI 文案前必读** |
+| `docs/I18N.md` | 中英双语：`values/`=英文兜底 + `values-zh/`、三态语言走 **AppCompat app-locale**（`locale_config.xml` + manifest `autoStoreLocales`；`MainActivity` 必须 `AppCompatActivity`，主题父级必须 AppCompat 后代）、**三条硬规则**（`NavHost.startDestination` 必须编译期常量、`popUpTo` 用 `findStartDestination()`、**语言不许存第二份 / 启动不许回填**）、各模块资源分布、占位符约定、**故意未抽取的白名单**。**新增/改 UI 文案前必读** |
 
 **引擎诊断日志**（2026-09-29 加）：设置 → 诊断 → 查看运行日志，可在真机复现后直接分享 `.txt`。
 链路 = `DiagLogger`（core:common）← `DiagEngineLogSink` ← `LoggingLlmEngine`（engine-api 装饰器）
@@ -120,6 +120,7 @@ third_party/llama.cpp    vendored 源码树
 7. **模型根目录迁移**（`ModelRootMigrator`）：**永不删除/覆盖目标已有文件**；重名交用户跳过或取消；原目录有数据询问是否迁移，可不迁移。
 8. **导航不变量**：`NavHost` 的 `startDestination` **必须是编译期常量**（它是内部 `remember` 的 key，传可变值会让 NavGraph 每帧重建 → 死循环，见 `docs/I18N.md` §2 硬规则一）；`popUpTo` 一律 `graph.findStartDestination().id`；**不要再加「跨 recreate 记住当前 tab」的全局单例** —— `rememberNavController()` 自带 `saveState`/`restoreState`。
 9. **不做**：功耗测量、DFM、雷达图、质量评测、OpenAI 兼容 API（P5+ 才可选）。
+10. **UI 语言只有一份存储**：Android 13+ 由系统 `LocaleManager` 负责应用与持久化（AppCompat 自己**不**应用，`calculateApplicationLocales()` 在 API ≥33 返回 null）。**app 侧不许再存副本、冷启动不许回填** —— 任何「把本地值推回系统」的路径都会覆写用户刚选的值，形成回退环（2026-09-30 真机事故，见 `docs/I18N.md` §2 末）。
 
 ## MNN PC 回归（改 native 后必跑）
 
