@@ -78,7 +78,7 @@
 | 5 | **2868ms 产生 99 个 token（≈34.5 tok/s）后被用户取消**，不是自然结束 | `generate error ... tokens=99 type=Cancelled` |
 | 6 | GPU sampler 库缺失 → `Falling back to CPU sampling` | `sampler_factory.cc:730` |
 | 7 | `ThreadPool 'engine': Running up to 1 threads` | `threadpool.cc:41` |
-| 8 | 已安装 APK（`dist/droidllm-debug-diaglogs.apk`）**不含任何复读截断逻辑** | `dexdump`/grep 阴性 + 阳性对照通过 |
+| 8 | 当轮安装的 debug 诊断包**不含任何复读截断逻辑** | `dexdump`/grep 阴性 + 阳性对照通过 |
 
 ### 已排除的假设
 

@@ -248,7 +248,7 @@ arch 裁剪只匹配 `libQnnHtpV<数字>{Skel,Stub}.so`，**不会误删它**。
 
 | 假设 | 排除依据 |
 |---|---|
-| skel 没打进 APK | `dist/*.apk` 内确有 `lib/arm64-v8a/libQnnHtpV81Skel.so`（13,546,372 B） |
+| skel 没打进 APK | 当轮安装的 APK 内确有 `lib/arm64-v8a/libQnnHtpV81Skel.so`（13,546,372 B） |
 | arch 裁错（打成 V79 等） | APK 内 Skel **只有 V81**，与 §3 表一致；且 validator 报设备就是 V81 |
 | 权限 / PD 问题 | 日志里 `remote_session_control Unsigned PD enable 1 request` **成功**（retail 机走 unsigned PD 正常）；之前那条 `remote_handle_control_domain … Permission denied` 是签名 PD 的常规首次失败 |
 | 模型 / htp_config 有问题 | 失败发生在 skel 加载阶段，早于 context binary 与 tokenizer 加载 |

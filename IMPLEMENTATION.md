@@ -1024,7 +1024,7 @@ R4 的 logo 在高密度屏的清晰度与浅色描边观感 —— 模拟器跑
   （`app` 359 / `core:benchmark` 9 / `core:engine-api` 8 / `engine:genie` 16）
 - `values/` = 英文兜底，`values-zh/` = 简体中文；库模块各带一份 `res/`（看不到 app 的 `R`）
 - 顺带修掉一处脆弱判定：`message.startsWith("校验失败")` → ViewModel 显式下发 `messageIsError`
-- 正式版签名：`dist/droidllm-0.1.0-P0-release.apk`（versionCode 1 / `0.1.0-P0`），
+- 正式版签名：`0.1.0-P0`（versionCode 1），
   `apksigner verify` 通过，证书 `CN=pisces312`
 
 ### 验收
