@@ -36,8 +36,11 @@ object ChatUiPersist {
     @Volatile
     var sessionEngine: LlmEngine? = null
 
-    /** Kept sessions when multi-model residency is on (DESIGN §3.3). */
-    val resident = LinkedHashMap<String, Pair<LlmEngine, SessionHandle>>()
+    /**
+     * Kept sessions when multi-model residency is on (DESIGN §3.3).
+     * Access-ordered so [ChatViewModel] can LRU-evict past its cap (CODE_REVIEW B8).
+     */
+    val resident = LinkedHashMap<String, Pair<LlmEngine, SessionHandle>>(8, 0.75f, true)
 
     @Volatile
     var generateSeq: Int = 0

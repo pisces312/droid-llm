@@ -13,6 +13,7 @@
     <string name="genie_no_token">Genie 未产生任何 token</string>
     <string name="genie_stream_note">Genie 流式回调为文本片段，generatedTokens≈回调次数</string>
     <string name="genie_retry_note">空回复后 reset+重试×%1$d</string>
+    <string name="genie_piece_fallback">native 未报 token 数，generatedTokens 用流式 piece 计数</string>
     <string name="genie_model_dir_missing">模型目录不存在: %1$s</string>
     <string name="genie_missing_config">缺少 genie_config.json</string>
     <string name="genie_missing_tokenizer">缺少 tokenizer.json</string>

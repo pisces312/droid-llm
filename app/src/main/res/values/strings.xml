@@ -112,6 +112,7 @@
     <string name="chat_start">Start</string>
     <string name="chat_status_cleared">Model not started; chat history cleared</string>
     <string name="chat_status_engine_unavailable">Engine unavailable — cannot load the model</string>
+    <string name="chat_status_engine_mismatch">Loaded session belongs to a different engine — switch back or tap Start</string>
     <string name="chat_status_generating">Generating…</string>
     <string name="chat_status_idle">Not started: tap 启动 to load %1$s</string>
     <string name="chat_status_idle_no_model">Not started: pick an engine and a model</string>
@@ -121,6 +122,7 @@
     <string name="chat_status_not_started">Model not started — tap 启动 before sending</string>
     <string name="chat_status_pick_first">Pick an engine and a model, then tap 启动</string>
     <string name="chat_status_ready">Ready</string>
+    <string name="chat_status_session_lost">Session was released — tap Start to reload</string>
     <string name="chat_status_stopped">Stopped</string>
     <string name="chat_status_switched_resident">Switched to the resident model %1$s</string>
     <string name="chat_stop_generating">Stop generating</string>

@@ -143,7 +143,7 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
             topK = config.topK,
             topP = config.topP,
             temp = config.temperature,
-            seed = config.seed ?: 0L,
+            seed = config.seed ?: RANDOM_SEED,
         )
         val loadMs = (System.nanoTime() - start) / 1_000_000
         val rssAfter = RssReader.rssMb()
@@ -191,7 +191,7 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
                     topK = request.config.topK,
                     topP = request.config.topP,
                     temp = request.config.temperature,
-                    seed = request.config.seed ?: 0L,
+                    seed = request.config.seed ?: RANDOM_SEED,
                 )
                 val prompt = try {
                     LlamaCppNative.nativeApplyChatTemplate(
@@ -213,9 +213,20 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
                 }
                 collector.onPromptTokenCount(promptTokens)
 
+                // Mirror the native n_ctx clamp so the decode loop and the
+                // UI's maxNewTokens cap note see the real budget (CODE_REVIEW B9).
+                val maxGen = request.config.maxNewTokens
+                    .coerceAtMost((N_CTX - promptTokens - 1).coerceAtLeast(1))
+                val warnings = warningsFor(request.config) +
+                    if (maxGen < request.config.maxNewTokens) {
+                        listOf("maxNewTokens clamped to $maxGen (n_ctx=$N_CTX, prompt=$promptTokens)")
+                    } else {
+                        emptyList()
+                    }
+
                 val text = StringBuilder()
                 var generated = 0
-                while (generated < request.config.maxNewTokens) {
+                while (generated < maxGen) {
                     ensureActive()
                     if (cancelled.get()) break
                     val piece = LlamaCppNative.nativeNextToken(session.handle) ?: break
@@ -240,7 +251,7 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
                     rssMbLoad = session.rssMbLoad,
                     rssMbPeak = rssPeakRef[0],
                     effectiveConfig = request.config,
-                    warnings = warningsFor(request.config),
+                    warnings = warnings,
                 )
                 session.metrics = metrics
                 onEvent(
@@ -345,7 +356,20 @@ class LlamaCppEngine @Inject constructor() : LlmEngine {
     }
 
     private companion object {
-        const val N_CTX = 2048
+        /**
+         * Context window. Large enough that the default `maxNewTokens = 4096`
+         * is reachable after a typical prompt (CODE_REVIEW B9). The native
+         * prefill already clamps generation to `n_ctx - prompt`; Kotlin mirrors
+         * that so metrics / the maxNewTokens cap note stay honest.
+         */
+        const val N_CTX = 8192
+
+        /**
+         * llama.cpp's "random" seed (`LLAMA_DEFAULT_SEED`). A literal 0 is a
+         * *fixed* seed — every run would be identical, which is the opposite of
+         * the contract `seed: Long? = null` (CODE_REVIEW B7).
+         */
+        const val RANDOM_SEED = 0xFFFFFFFFL
     }
 }
 

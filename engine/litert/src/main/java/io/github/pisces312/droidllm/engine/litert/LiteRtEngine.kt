@@ -197,7 +197,9 @@ class LiteRtEngine @Inject constructor(
             val text = StringBuilder()
             val done = CompletableDeferred<Unit>()
             try {
-                val backend = mapBackend(request.config.backend)
+                // Reject unsupported backends (e.g. OPENCL); the live conversation
+                // keeps the load-time backend regardless of what is requested here.
+                mapBackend(request.config.backend)
                 val history = splitHistory(request.messages, request.config)
 
                 // Gallery keeps one Conversation and only sends the new USER turn;
@@ -296,7 +298,7 @@ class LiteRtEngine @Inject constructor(
                     rssMbPeak = rssPeakRef[0],
                     effectiveConfig = request.config,
                     warnings = warningsFor(request.config) +
-                        (if (backend !== mapBackend(session.config.backend)) {
+                        (if (request.config.backend != session.config.backend) {
                             listOf("backend switch requires reload; used load-time backend")
                         } else {
                             emptyList()

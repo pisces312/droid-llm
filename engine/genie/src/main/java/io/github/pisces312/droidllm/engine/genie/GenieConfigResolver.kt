@@ -33,21 +33,40 @@ class GenieConfigResolver @Inject constructor(
     /**
      * @return absolute path of the HTP backend extension json for this device,
      *   or null when the SoC is not in the supported table.
+     *
+     * The asset is re-extracted whenever the app version changes, so an OTA that
+     * ships a newer htp_config json is not ignored (CODE_REVIEW B6).
      */
     fun resolveHtpConfigPath(): String? {
         val fileName = SOC_TO_HTP[Build.SOC_MODEL] ?: return null
-        val target = File(File(context.filesDir, "htp_config"), fileName)
-        if (!target.isFile) {
+        val dir = File(context.filesDir, "htp_config")
+        val target = File(dir, fileName)
+        val stamp = File(dir, "$fileName.version")
+        val expected = appVersionCode()
+        val stale = !target.isFile || runCatching { stamp.readText() }.getOrNull() != expected
+        if (stale) {
             try {
                 context.assets.open("htp_config/$fileName").use { input ->
                     target.parentFile?.mkdirs()
                     target.outputStream().use { output -> input.copyTo(output) }
                 }
+                stamp.writeText(expected)
             } catch (_: IOException) {
                 return null
             }
         }
         return target.absolutePath
+    }
+
+    private fun appVersionCode(): String {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        val code = if (android.os.Build.VERSION.SDK_INT >= 28) {
+            info.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            info.versionCode.toLong()
+        }
+        return code.toString()
     }
 
     fun supportedSocs(): List<String> = SOC_TO_HTP.keys.sorted()

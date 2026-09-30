@@ -79,10 +79,14 @@ class ApiForegroundService : Service() {
     }
 
     override fun onDestroy() {
-        serviceScope.launch {
-            apiServer?.stop()
-            apiServer = null
-            bridge.release()
+        // Cleanup must NOT use serviceScope: the cancel() below would race the
+        // just-enqueued launch and skip stop()/release() (CODE_REVIEW A3).
+        val server = apiServer
+        apiServer = null
+        val cleanup = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        cleanup.launch {
+            runCatching { server?.stop() }
+            runCatching { bridge.release() }
         }
         serviceScope.cancel()
         releaseWakeLock()
@@ -94,7 +98,7 @@ class ApiForegroundService : Service() {
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "droidllm:ApiServer").apply {
             setReferenceCounted(false)
-            acquire(10 * 60 * 60L) // safety cap 10h
+            acquire(10 * 60 * 60 * 1000L) // safety cap 10h (timeout is in ms)
         }
     }
 

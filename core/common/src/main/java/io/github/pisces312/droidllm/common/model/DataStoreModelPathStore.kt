@@ -7,7 +7,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import android.util.Log
 import io.github.pisces312.droidllm.engineapi.EngineId
+import io.github.pisces312.droidllm.engineapi.engineIdFromStorage
 import io.github.pisces312.droidllm.engineapi.LocalModel
 import io.github.pisces312.droidllm.engineapi.ModelLocation
 import javax.inject.Inject
@@ -33,20 +35,27 @@ data class StoredModel(
     val fileSizeBytes: Long? = null,
     val quantHint: String? = null,
 ) {
-    /** Rebuild the runtime model. */
-    fun toLocal(): LocalModel = LocalModel(
-        id = id,
-        engineId = EngineId.valueOf(engineId),
-        displayName = displayName,
-        location = when (locationType) {
-            "saf" -> ModelLocation.SafUri(locationValue)
-            "app_private" -> ModelLocation.AppPrivate(locationValue)
-            else -> ModelLocation.FilePath(locationValue)
-        },
-        formatHint = formatHint,
-        fileSizeBytes = fileSizeBytes,
-        quantHint = quantHint,
-    )
+    /**
+     * Rebuild the runtime model. Returns null when [engineId] is not a known
+     * [EngineId] (import from a different release, engine removed) so one bad
+     * row cannot take down observeModels()/listModels() (CODE_REVIEW B5).
+     */
+    fun toLocal(): LocalModel? {
+        val engine = engineIdFromStorage(engineId) ?: return null
+        return LocalModel(
+            id = id,
+            engineId = engine,
+            displayName = displayName,
+            location = when (locationType) {
+                "saf" -> ModelLocation.SafUri(locationValue)
+                "app_private" -> ModelLocation.AppPrivate(locationValue)
+                else -> ModelLocation.FilePath(locationValue)
+            },
+            formatHint = formatHint,
+            fileSizeBytes = fileSizeBytes,
+            quantHint = quantHint,
+        )
+    }
 
     companion object {
         /** Persist a runtime model. */
@@ -83,7 +92,7 @@ class DataStoreModelPathStore @Inject constructor(
     private val key = stringPreferencesKey("models_json")
 
     override fun observeModels(): Flow<List<LocalModel>> =
-        context.modelDataStore.data.map { prefs -> decode(prefs[key]).map { it.toLocal() } }
+        context.modelDataStore.data.map { prefs -> decode(prefs[key]).mapNotNull { it.toLocalOrWarn() } }
 
     override suspend fun upsert(model: LocalModel) {
         context.modelDataStore.edit { prefs ->
@@ -104,7 +113,7 @@ class DataStoreModelPathStore @Inject constructor(
 
     override suspend fun listModels(): List<LocalModel> {
         val prefs = context.modelDataStore.data.first()
-        return decode(prefs[key]).map { it.toLocal() }
+        return decode(prefs[key]).mapNotNull { it.toLocalOrWarn() }
     }
 
     override suspend fun listModels(engineId: EngineId): List<LocalModel> =
@@ -126,5 +135,17 @@ class DataStoreModelPathStore @Inject constructor(
     private fun decode(raw: String?): List<StoredModel> {
         if (raw.isNullOrBlank()) return emptyList()
         return runCatching { json.decodeFromString<List<StoredModel>>(raw) }.getOrDefault(emptyList())
+    }
+
+    private fun StoredModel.toLocalOrWarn(): LocalModel? {
+        val local = toLocal()
+        if (local == null) {
+            Log.w(TAG, "skipping model '$id': unknown engineId='$engineId'")
+        }
+        return local
+    }
+
+    private companion object {
+        const val TAG = "ModelPathStore"
     }
 }

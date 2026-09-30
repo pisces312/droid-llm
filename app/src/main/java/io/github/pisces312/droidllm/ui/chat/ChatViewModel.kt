@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.pisces312.droidllm.common.model.ConfigResolver
 import io.github.pisces312.droidllm.common.model.ModelParamsOverride
 import io.github.pisces312.droidllm.common.model.ModelParamsStore
 import io.github.pisces312.droidllm.common.model.ModelPathStore
@@ -317,17 +318,37 @@ class ChatViewModel @Inject constructor(
             overridesByKey.find(engine.id, model.id) ?: ModelParamsOverride()
         }
         val d = engine?.defaults
-        return SamplingUiState(
-            temperature = o.temperature ?: d?.temperature ?: current.temperature,
-            topK = o.topK ?: d?.topK ?: current.topK,
-            topP = o.topP ?: d?.topP ?: current.topP,
-            threads = o.threads ?: d?.threads ?: current.threads,
-            maxNewTokens = o.maxNewTokens ?: d?.maxNewTokens ?: current.maxNewTokens,
-            backend = ModelParamsOverride.backendOf(o.backend) ?: d?.backend ?: current.backend,
-            systemPrompt = o.systemPrompt ?: globalSettings.systemPrompt,
-            // Thinking is a per-turn knob, not a settings default; keep the current
-            // session value when settings push a new snapshot.
+        // No engine picked yet: keep the bootstrap UI values.
+        if (d == null) {
+            return SamplingUiState(
+                temperature = o.temperature ?: current.temperature,
+                topK = o.topK ?: current.topK,
+                topP = o.topP ?: current.topP,
+                threads = o.threads ?: current.threads,
+                maxNewTokens = o.maxNewTokens ?: current.maxNewTokens,
+                backend = ModelParamsOverride.backendOf(o.backend) ?: current.backend,
+                systemPrompt = o.systemPrompt ?: globalSettings.systemPrompt,
+                // Thinking is a per-turn knob, not a settings default; keep the current
+                // session value when settings push a new snapshot.
+                enableThinking = current.enableThinking,
+                override = o,
+            )
+        }
+        val resolved = ConfigResolver.resolve(
+            defaults = d,
+            overlay = o,
+            appSystemPrompt = globalSettings.systemPrompt,
             enableThinking = current.enableThinking,
+        )
+        return SamplingUiState(
+            temperature = resolved.temperature,
+            topK = resolved.topK,
+            topP = resolved.topP,
+            threads = resolved.threads,
+            maxNewTokens = resolved.maxNewTokens,
+            backend = resolved.backend,
+            systemPrompt = resolved.systemPrompt ?: globalSettings.systemPrompt,
+            enableThinking = resolved.enableThinking,
             override = o,
         )
     }
@@ -356,7 +377,9 @@ class ChatViewModel @Inject constructor(
         refreshSampling()
         val live = ChatUiPersist.session
         val liveEngine = ChatUiPersist.sessionEngine
-        if (live != null && liveEngine != null) {
+        // Benchmark's unloadAll() closes the handle without clearing these refs.
+        // A closed handle must not be revived as READY (see CODE_REVIEW A1).
+        if (live != null && liveEngine != null && !live.isClosed) {
             session = live
             sessionEngine = liveEngine
             ChatUiPersist.sessionState.value = SessionState.READY
@@ -370,6 +393,7 @@ class ChatViewModel @Inject constructor(
                 )
             }
         } else {
+            if (live != null && live.isClosed) ChatUiPersist.clearSession()
             markIdle()
         }
     }
@@ -445,7 +469,11 @@ class ChatViewModel @Inject constructor(
     /** Release the running model and stop generating. */
     fun stopModel() {
         viewModelScope.launch {
-            releaseSession()
+            stopGenerate()
+            // Force-unload even with multi-residency: "stop" must free memory
+            // (CODE_REVIEW B8). The resident entry is dropped so a later start
+            // reloads fresh instead of resurrecting a freed handle.
+            unloadSession(force = true)
             markIdle()
         }
     }
@@ -607,7 +635,10 @@ class ChatViewModel @Inject constructor(
             session = handle
             sessionEngine = engine
             sessionRegistry.register(engine, handle)
-            if (multiResidency) resident[key] = engine to handle
+            if (multiResidency) {
+                resident[key] = engine to handle
+                evictResidentOverflow()
+            }
             ChatUiPersist.sessionState.value = SessionState.READY
             ChatUiPersist.status.value = appContext.getString(R.string.chat_status_loaded, model.displayName)
         }.onFailure {
@@ -619,12 +650,32 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private suspend fun unloadSession() {
-        if (multiResidency) return
+    /**
+     * Keep at most [MAX_RESIDENT] models in memory. GB-scale weights with no
+     * cap is an OOM waiting to happen (CODE_REVIEW B8). Evicts the least
+     * recently used entry — [ChatUiPersist.resident] is access-ordered.
+     */
+    private suspend fun evictResidentOverflow() {
+        while (resident.size > MAX_RESIDENT) {
+            // Never evict the live handle. Access-order keeps it MRU, but pick
+            // explicitly so a defensive edge case cannot drop it (CODE_REVIEW F.1).
+            val eldestKey = resident.entries.firstOrNull { it.value.second !== session }?.key
+                ?: break
+            val entry = resident.remove(eldestKey) ?: break
+            sessionRegistry.unregister(entry.second)
+            runCatching {
+                withContext(Dispatchers.IO) { entry.first.unload(entry.second) }
+            }
+        }
+    }
+
+    private suspend fun unloadSession(force: Boolean = false) {
+        if (multiResidency && !force) return
         val handle = session ?: return
         val engine = sessionEngine ?: _selectedEngine.value?.engine
         engine?.let { runCatching { withContext(Dispatchers.IO) { it.unload(handle) } } }
         sessionRegistry.unregister(handle)
+        resident.entries.removeAll { it.value.second === handle }
         session = null
         sessionEngine = null
         ChatUiPersist.clearSession()
@@ -635,13 +686,30 @@ class ChatViewModel @Inject constructor(
             ChatUiPersist.status.value = appContext.getString(R.string.chat_status_not_started)
             return
         }
-        val engine = _selectedEngine.value?.engine ?: return
+        // The live session is the source of truth for which engine generates
+        // (CODE_REVIEW C20); the picker can drift after an engine switch.
+        val engine = sessionEngine ?: run {
+            ChatUiPersist.sessionState.value = SessionState.IDLE
+            markIdle()
+            return
+        }
         val handle = session ?: run {
             ChatUiPersist.sessionState.value = SessionState.IDLE
             markIdle()
             return
         }
+        if (_selectedEngine.value?.engine?.id != engine.id) {
+            ChatUiPersist.status.value = appContext.getString(R.string.chat_status_engine_mismatch)
+            return
+        }
         if (ChatUiPersist.generating.value) return
+        if (handle.isClosed) {
+            // External unload (benchmark unloadAll) closed the handle behind the UI.
+            ChatUiPersist.clearSession()
+            ChatUiPersist.sessionState.value = SessionState.FAILED
+            ChatUiPersist.status.value = appContext.getString(R.string.chat_status_session_lost)
+            return
+        }
         val config = _sampling.value.toConfig()
         // The system turn is materialised here instead of being stored in the
         // transcript: chat templates read the system instruction from
@@ -662,7 +730,10 @@ class ChatViewModel @Inject constructor(
         var firstTokenNs = 0L
         var tokenCount = 0
 
-        val job = engine.generate(handle, GenerateRequest(history, config)) { event ->
+        // Adapters throw synchronously when the session is already closed;
+        // without this catch the exception escapes the Compose click handler.
+        val job = runCatching {
+            engine.generate(handle, GenerateRequest(history, config)) { event ->
             if (seq != generateSeq) return@generate
             when (event) {
                 is EngineEvent.Token -> {
@@ -755,6 +826,20 @@ class ChatViewModel @Inject constructor(
                     activeJob = null
                 }
             }
+            }
+        }.getOrElse { e ->
+            // e.g. EngineException.InvalidState after an external unload.
+            val msg = appContext.getString(
+                R.string.chat_error_generic,
+                e.message ?: e.javaClass.simpleName,
+            )
+            ChatUiPersist.messages.value = ChatUiPersist.messages.value +
+                ChatUiMessage(ChatRole.ASSISTANT, "", config.enableThinking, error = msg)
+            ChatUiPersist.status.value = msg
+            ChatUiPersist.sessionState.value = SessionState.FAILED
+            ChatUiPersist.generating.value = false
+            activeJob = null
+            return
         }
         activeJob = job
     }
@@ -769,4 +854,9 @@ class ChatViewModel @Inject constructor(
         systemPrompt = systemPrompt.takeIf { it.isNotBlank() },
         enableThinking = enableThinking,
     )
+
+    private companion object {
+        /** Max simultaneously resident models when multi-model residency is on. */
+        const val MAX_RESIDENT = 3
+    }
 }

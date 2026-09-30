@@ -112,6 +112,7 @@
     <string name="chat_start">启动</string>
     <string name="chat_status_cleared">模型未启动，已清空聊天记录</string>
     <string name="chat_status_engine_unavailable">引擎不可用，无法加载模型</string>
+    <string name="chat_status_engine_mismatch">当前会话属于其他引擎，请切回该引擎或点「启动」</string>
     <string name="chat_status_generating">生成中…</string>
     <string name="chat_status_idle">未启动：点击「启动」加载 %1$s</string>
     <string name="chat_status_idle_no_model">未启动：先选择引擎和模型</string>
@@ -121,6 +122,7 @@
     <string name="chat_status_not_started">模型未启动，点击「启动」后再发送</string>
     <string name="chat_status_pick_first">先选择引擎和模型，再点「启动」</string>
     <string name="chat_status_ready">准备就绪</string>
+    <string name="chat_status_session_lost">会话已释放，点击「启动」重新加载</string>
     <string name="chat_status_stopped">已停止</string>
     <string name="chat_status_switched_resident">已切换到驻留模型 %1$s</string>
     <string name="chat_stop_generating">停止生成</string>

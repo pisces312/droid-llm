@@ -7,6 +7,8 @@ import io.github.pisces312.droidllm.common.bench.BenchmarkRunEntity
 import io.github.pisces312.droidllm.common.bench.SessionRegistry
 import io.github.pisces312.droidllm.common.device.DeviceProbe
 import io.github.pisces312.droidllm.common.metrics.RssReader
+import io.github.pisces312.droidllm.common.model.ConfigResolver
+import io.github.pisces312.droidllm.common.model.ModelParamsStore
 import io.github.pisces312.droidllm.engineapi.ChatMessage
 import io.github.pisces312.droidllm.engineapi.ChatRole
 import io.github.pisces312.droidllm.engineapi.EngineEvent
@@ -47,6 +49,7 @@ class BenchmarkRunner @Inject constructor(
     private val engines: Set<@JvmSuppressWildcards LlmEngine>,
     private val deviceProbe: DeviceProbe,
     private val sessionRegistry: SessionRegistry,
+    private val modelParamsStore: ModelParamsStore,
     private val dao: BenchmarkDao,
     @param:ApplicationContext private val appContext: Context,
 ) {
@@ -120,7 +123,10 @@ class BenchmarkRunner @Inject constructor(
 
         val tempStart = deviceProbe.batteryTempC()?.toDouble()
         val warnings = mutableListOf<String>()
-        val config = InferenceConfig(maxNewTokens = spec.maxNewTokens)
+        // Same two-layer chain as chat / API (overlay → EngineDefaults). Skipping it
+        // here made benchmark numbers incomparable and could reproduce the LiteRT
+        // greeting loop (AUTO→GPU vs the CPU engine default) mid-measurement.
+        val config = resolvedConfig(engine, target.model, spec.maxNewTokens, spec.systemPrompt)
         val cases = linkedMapOf<BenchCaseId, CaseResult>()
         var rssLoad: Long? = null
         var rssPeak = RssReader.rssMb()
@@ -178,7 +184,7 @@ class BenchmarkRunner @Inject constructor(
                             target.engineId, caseId, sampleIndex, totalSamples, lastDecodeTps,
                         ),
                     )
-                    val s = measureCase(caseId, engine, session, spec)
+                    val s = measureCase(caseId, engine, session, spec, target.model)
                     if (s.error != null) warnings += "warmup ${caseId.name}: ${s.error}"
                     s.decodeTps?.let { lastDecodeTps = it }
                     rssPeak = maxOf(rssPeak ?: 0L, RssReader.rssMb() ?: 0L)
@@ -193,7 +199,7 @@ class BenchmarkRunner @Inject constructor(
                             target.engineId, caseId, sampleIndex, totalSamples, lastDecodeTps,
                         ),
                     )
-                    val s = measureCase(caseId, engine, session, spec)
+                    val s = measureCase(caseId, engine, session, spec, target.model)
                     samples += s
                     s.decodeTps?.let { lastDecodeTps = it }
                     rssPeak = maxOf(rssPeak ?: 0L, RssReader.rssMb() ?: 0L)
@@ -210,7 +216,7 @@ class BenchmarkRunner @Inject constructor(
                                 target.engineId, caseId, sampleIndex, totalSamples, lastDecodeTps,
                             ),
                         )
-                        val s = measureCase(caseId, engine, session, spec)
+                        val s = measureCase(caseId, engine, session, spec, target.model)
                         samples += s
                         s.decodeTps?.let { lastDecodeTps = it }
                         rssPeak = maxOf(rssPeak ?: 0L, RssReader.rssMb() ?: 0L)
@@ -254,6 +260,26 @@ class BenchmarkRunner @Inject constructor(
         )
     }
 
+    /**
+     * Two-layer chain shared with chat and the API server (CODE_REVIEW B1).
+     * [maxNewTokensOverride] is the bench-spec cap; [appSystemPrompt] is the
+     * spec's controlled prompt (overlay can still pin over it).
+     */
+    private suspend fun resolvedConfig(
+        engine: LlmEngine,
+        model: LocalModel,
+        maxNewTokensOverride: Int?,
+        appSystemPrompt: String?,
+    ): InferenceConfig {
+        val overlay = modelParamsStore.get(engine.id, model.id)
+        return ConfigResolver.resolve(
+            defaults = engine.defaults,
+            overlay = overlay,
+            appSystemPrompt = appSystemPrompt,
+            maxNewTokensOverride = maxNewTokensOverride,
+        )
+    }
+
     private suspend fun measureLoad(
         engine: LlmEngine,
         model: LocalModel,
@@ -276,6 +302,7 @@ class BenchmarkRunner @Inject constructor(
         engine: LlmEngine,
         session: SessionHandle,
         spec: BenchmarkSpec,
+        model: LocalModel,
     ): CaseSample {
         val promptText = when (caseId) {
             BenchCaseId.PREFILL -> spec.prompt.text
@@ -292,7 +319,7 @@ class BenchmarkRunner @Inject constructor(
                     ?.let { add(ChatMessage(ChatRole.SYSTEM, it)) }
                 add(ChatMessage(ChatRole.USER, promptText))
             },
-            config = InferenceConfig(maxNewTokens = maxNew, systemPrompt = spec.systemPrompt),
+            config = resolvedConfig(engine, model, maxNew, spec.systemPrompt),
         )
 
         val resultRef = AtomicReference<GenerateResult?>(null)

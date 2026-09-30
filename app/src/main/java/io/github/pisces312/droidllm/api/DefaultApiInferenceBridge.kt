@@ -5,7 +5,7 @@ import io.github.pisces312.droidllm.apiserver.ApiGenerateResult
 import io.github.pisces312.droidllm.apiserver.ApiInferenceBridge
 import io.github.pisces312.droidllm.apiserver.ApiModelInfo
 import io.github.pisces312.droidllm.common.bench.SessionRegistry
-import io.github.pisces312.droidllm.common.model.ModelParamsOverride
+import io.github.pisces312.droidllm.common.model.ConfigResolver
 import io.github.pisces312.droidllm.common.model.ModelParamsStore
 import io.github.pisces312.droidllm.common.model.ModelPathStore
 import io.github.pisces312.droidllm.common.settings.AppSettingsStore
@@ -210,18 +210,12 @@ class DefaultApiInferenceBridge @Inject constructor(
      * The API server applies request fields on top of this by itself.
      */
     private suspend fun baseConfig(engine: LlmEngine, model: LocalModel): InferenceConfig {
-        val d = engine.defaults
-        val o = modelParamsStore.get(engine.id, model.id) ?: ModelParamsOverride()
+        val overlay = modelParamsStore.get(engine.id, model.id)
         val settings = settingsStore.current()
-        return InferenceConfig(
-            maxNewTokens = o.maxNewTokens ?: d.maxNewTokens,
-            temperature = o.temperature ?: d.temperature,
-            topK = o.topK ?: d.topK,
-            topP = o.topP ?: d.topP,
-            threads = o.threads ?: d.threads,
-            backend = ModelParamsOverride.backendOf(o.backend) ?: d.backend,
-            // The one app-level value left: a prompt, not a sampling knob.
-            systemPrompt = o.systemPrompt ?: settings.systemPrompt.takeIf { it.isNotBlank() },
+        return ConfigResolver.resolve(
+            defaults = engine.defaults,
+            overlay = overlay,
+            appSystemPrompt = settings.systemPrompt,
         )
     }
 

@@ -14,6 +14,7 @@
     <string name="genie_no_token">Genie produced no tokens</string>
     <string name="genie_stream_note">Genie streams text fragments; generatedTokens ≈ callback count</string>
     <string name="genie_retry_note">reset + retry ×%1$d after empty reply</string>
+    <string name="genie_piece_fallback">native token count was 0; used streamed piece count</string>
     <string name="genie_model_dir_missing">Model directory not found: %1$s</string>
     <string name="genie_missing_config">Missing genie_config.json</string>
     <string name="genie_missing_tokenizer">Missing tokenizer.json</string>

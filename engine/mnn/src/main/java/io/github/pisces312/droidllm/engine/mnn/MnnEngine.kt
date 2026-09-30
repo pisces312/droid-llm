@@ -197,6 +197,7 @@ class MnnEngine @Inject constructor() : LlmEngine {
                 val flat = flattenMessages(request.messages)
                 collector.onGenerateStart(promptTokens = 0)
                 val metricsOut = LongArray(5)
+                var pieceCount = 0
 
                 MnnNative.nativeGenerate(
                     session.handle,
@@ -206,8 +207,9 @@ class MnnEngine @Inject constructor() : LlmEngine {
                         if (cancelled.get()) return@TokenCallback
                         if (piece.isNotEmpty()) {
                             collector.onToken()
+                            pieceCount++
                             text.append(piece)
-                            onEvent(EngineEvent.Token(piece, text.length))
+                            onEvent(EngineEvent.Token(piece, pieceCount))
                         }
                     },
                     metricsOut,
@@ -221,7 +223,10 @@ class MnnEngine @Inject constructor() : LlmEngine {
                 val promptTokens = metricsOut[0].toInt().coerceAtLeast(0)
                 val generatedNative = metricsOut[1].toInt().coerceAtLeast(0)
                 collector.onPromptTokenCount(promptTokens)
-                val generated = if (generatedNative > 0) generatedNative else text.length
+                // Fall back to streamed piece count, never text.length — chars are
+                // not tokens and inflate decode_tps / false-trigger the maxNewTokens cap.
+                val generated = if (generatedNative > 0) generatedNative else pieceCount.coerceAtLeast(1)
+                val countFallback = generatedNative == 0
                 // RSS is sampled once around the whole turn: reading /proc/self/status
                 // inside the token callback would add file IO to the hot path and
                 // inflate the very latency this panel reports.
@@ -232,7 +237,12 @@ class MnnEngine @Inject constructor() : LlmEngine {
                     rssMbLoad = session.rssMbLoad,
                     rssMbPeak = rssPeakRef[0],
                     effectiveConfig = request.config,
-                    warnings = warningsFor(request.config),
+                    warnings = warningsFor(request.config) +
+                        if (countFallback) {
+                            listOf("generatedTokens≈piece count (native reported 0)")
+                        } else {
+                            emptyList()
+                        },
                     // MNN instruments its own stages: prefill_us / decode_us cover
                     // pure compute, so these rates are directly comparable with
                     // MnnLlmChat's `PERF | prefill: ... decode: ...` log line.

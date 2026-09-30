@@ -258,20 +258,26 @@ class GenieEngine @Inject constructor(
             val text = StringBuilder()
             try {
                 GenieNative.nativeSetMaxNumTokens(session.handle, request.config.maxNewTokens)
-                val prompt = buildPromptFor(session, request.messages)
+                var prompt = buildPromptFor(session, request.messages)
                 collector.onGenerateStart(promptTokens = 0)
 
                 val metricsOut = LongArray(2)
                 var produced = false
                 var attempts = 0
+                var pieceCount = 0
                 val maxAttempts = 3 // initial + ≤2 retries after empty reply (DESIGN §6)
 
                 while (attempts < maxAttempts && !produced) {
                     attempts++
                     if (attempts > 1) {
                         // Known Genie quirk: empty reply mid-chat. Reset + retry.
+                        // nativeReset drops the dialog KV, so the incremental prompt
+                        // would replay only the last user turn and lose all history.
                         GenieNative.nativeReset(session.handle)
+                        session.fedMessages = emptyList()
                         text.setLength(0)
+                        pieceCount = 0
+                        prompt = formatFullPrompt(session.promptTags, request.messages)
                     }
                     metricsOut[0] = 0L
                     metricsOut[1] = 0L
@@ -282,8 +288,9 @@ class GenieEngine @Inject constructor(
                             if (cancelled.get()) return@TokenCallback
                             if (piece.isNotEmpty()) {
                                 collector.onToken()
+                                pieceCount++
                                 text.append(piece)
-                                onEvent(EngineEvent.Token(piece, text.length))
+                                onEvent(EngineEvent.Token(piece, pieceCount))
                             }
                         },
                         metricsOut,
@@ -309,9 +316,11 @@ class GenieEngine @Inject constructor(
                     throw EngineException.GenerateFailed(reason)
                 }
 
-                val generatedPieces = metricsOut[0].toInt().coerceAtLeast(text.length)
-                // Genie streams text pieces, not discrete tokens — approximate.
-                val generatedTokens = generatedPieces
+                // Genie streams text pieces, not discrete tokens. Prefer the native
+                // count; fall back to streamed piece count — never text.length, which
+                // inflates decode_tps and false-triggers the maxNewTokens cap.
+                val nativeCount = metricsOut[0].toInt().coerceAtLeast(0)
+                val generatedTokens = if (nativeCount > 0) nativeCount else pieceCount.coerceAtLeast(1)
                 val metrics = collector.build(
                     generatedTokens = generatedTokens,
                     loadMs = session.loadMs,
@@ -319,12 +328,13 @@ class GenieEngine @Inject constructor(
                     rssMbPeak = rssPeakRef[0],
                     effectiveConfig = request.config,
                     warnings = warningsFor(request.config) +
-                        context.getString(R.string.genie_stream_note) +
-                        if (attempts > 1) {
+                        listOfNotNull(
+                            context.getString(R.string.genie_stream_note),
                             context.getString(R.string.genie_retry_note, attempts - 1)
-                        } else {
-                            ""
-                        },
+                                .takeIf { attempts > 1 },
+                            context.getString(R.string.genie_piece_fallback)
+                                .takeIf { nativeCount == 0 },
+                        ),
                 )
                 session.metrics = metrics
                 session.fedMessages = request.messages
