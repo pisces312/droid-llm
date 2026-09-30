@@ -192,7 +192,7 @@ val prompt = try {
 
 **复现/定位建议**：
 
-1. **真机 arm64 复现**（`adb-RFCNC0MT5VV`）：native 栈完整，可直接看是
+1. **真机 arm64 复现**（`adb-<device-serial>`，用 `adb devices` 取当前值）：native 栈完整，可直接看是
    哪条 `GGML_ASSERT`。这是首选。
 2. 模拟器抓完整 abort message：`logcat -b all` 过滤 `llamacpp_jni|ggml|DEBUG|libc`，
    在 `ggml_abort` 的 `fprintf(stderr)` 落盘前不要清 buffer。

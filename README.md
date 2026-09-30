@@ -13,9 +13,33 @@
 
 ## 截图
 
-> 待真机截图后补充（聊天 / 模型浏览器 / 评测结果表）。
+真机实测（HONOR BKQ-AN80 / Snapdragon 8 Elite / Android 17）。四张图分别是各引擎在**本机跑得最快的后端组合**下的聊天界面：
 
-## Benchmark 示例表
+<table>
+<tr>
+<td align="center"><img src="docs/screenshots/engine-genie-npu.jpg" width="255"><br><sub>Genie (QNN) · NPU · Qwen3-4B</sub></td>
+<td align="center"><img src="docs/screenshots/engine-llamacpp-cpu.jpg" width="255"><br><sub>llama.cpp · CPU · Qwen3-0.6B</sub></td>
+<td align="center"><img src="docs/screenshots/engine-litert-cpu.jpg" width="255"><br><sub>LiteRT-LM · CPU · Gemma3-1B</sub></td>
+<td align="center"><img src="docs/screenshots/engine-mnn-gpu.jpg" width="255"><br><sub>MNN · GPU · Qwen3.5-9B</sub></td>
+</tr>
+</table>
+
+| 引擎 | 最快后端 | 实测模型 | TTFT | Decode |
+|------|----------|----------|------|--------|
+| Genie (QNN) | **NPU**（HTP V81） | Qwen3-4B-Instruct-2507 w4a16 | 49 ms | 48.3 tok/s |
+| llama.cpp | **CPU** | Qwen3-0.6B Q4_K_M | 187 ms | 78.6 tok/s |
+| LiteRT-LM | **CPU** | Gemma3-1B-IT int4 | 375 ms | 38.1 tok/s |
+| MNN | **GPU**（OpenCL） | Qwen3.5-9B-MNN | 2041 ms | 9.4 tok/s |
+
+> 四张图是同一次真机会话的抓取，**模型各不相同，故上表不可横向比快慢** —— 它只回答「该引擎在本机该用哪个后端」。跨模型/跨量化的对比请在评测页固定同一模型跑。
+
+## 已知问题
+
+- **LiteRT-LM + GPU**：生成会不断重复同一段回答且**无法停止**。请使用 **LiteRT-LM + CPU**（也是本项目默认验证口径）。历史上的同类退化修复见 `docs/litert.md`。
+
+## Benchmark 导出格式示意
+
+> 下表只说明评测页导出的**字段**，**数字是占位值、不是实测结果**（真实数字由你在评测页跑出来）。
 
 | Engine | Model | Quant | Load(ms) | TTFT(ms) | Prefill tps | Decode tps | RSS peak |
 |--------|-------|-------|----------|----------|-------------|------------|----------|
@@ -85,6 +109,22 @@ $env:ANDROID_HOME = "D:\dev\android_sdk"
 | `docs/ENGINE_INTEGRATION.md` | 依赖、编译开关、模型导出 |
 | `docs/MODEL_PATHS.md` | 模型下载与存放（布局、导入迁移） |
 
-## 许可
+## 许可与第三方合规
 
-droid-llm 自身代码见仓库 LICENSE（如有）。第三方组件许可见 `docs/ENGINE_INTEGRATION.md`「许可摘要」：LiteRT-LM / MNN / Compose 系为 Apache-2.0，llama.cpp 为 MIT，QAIRT/Genie 需遵守 Qualcomm SDK 条款。
+本项目自身代码以 **Apache-2.0** 发布，全文见仓库根 `LICENSE`。
+
+随 APK 打包的第三方组件：
+
+| 组件 | 集成方式 | 许可 |
+|------|----------|------|
+| llama.cpp / ggml / minja | vendored 源码，静态链接 | MIT |
+| cpp-httplib / nlohmann-json / miniaudio / subprocess.h | vendored | MIT / Public Domain |
+| MNN（`libMNN.so`） | 预编译 `.so`，动态链接 | Apache-2.0 |
+| LiteRT-LM（`litertlm-android` AAR） | Gradle 依赖 | Apache-2.0 |
+| AndroidX / Compose / Lifecycle / Navigation / AppCompat / Kotlin | Gradle 依赖 | Apache-2.0 |
+| **QAIRT / Genie（`libGenie.so` + QNN 运行时）** | 预编译 `.so`，随应用打包 | **Qualcomm 专有** |
+
+- **Qualcomm QAIRT / Genie**：按 Qualcomm AI Stack License 使用 —— 仅允许以**目标码形式与应用集成**分发，**禁止单独再分发 SDK**，禁止逆向工程 / 反编译，并受美国出口管制约束。本仓库**不包含**该 SDK；自行构建 Genie 引擎需自备 QAIRT 并自行接受其条款。
+- **模型权重**不随仓库与 APK 分发，由用户自备；权重的许可与代码许可相互独立（内置模型市场只提供下载地址）。
+- **厂商 logo**（`ui/components/VendorLogo.kt` + `res/drawable-nodpi/*.webp`）仅作标识性使用；若权利方要求下架，从该映射中移除即可。
+- 完整的核查方法、逐项依赖许可表与选型决策记录见 `docs/LICENSING.md`。
